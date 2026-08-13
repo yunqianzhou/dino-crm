@@ -1,0 +1,79 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #f0f2f5;
+  color: #1f2329;
+}
+
+.page-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 20px 24px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 4px 0 16px;
+  padding-left: 10px;
+  border-left: 3px solid #2f6bff;
+  line-height: 1;
+}
+
+.login-bg {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(1200px 600px at 10% 10%, #e8efff 0%, #f0f2f5 45%),
+    radial-gradient(900px 500px at 90% 90%, #eafff4 0%, rgba(240, 242, 245, 0) 50%);
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lifecycle-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 28px;
+  margin-bottom: 14px;
+  border: 1px solid #d8eded;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 88% 20%, rgba(19, 168, 168, .14), transparent 28%),
+    linear-gradient(115deg, #fff 0%, #f5ffff 55%, #f1f7ff 100%);
+  box-shadow: 0 8px 30px rgba(16, 79, 86, .06);
+}
+
+.eyebrow { color: #087f83; font-size: 11px; font-weight: 800; letter-spacing: 1.4px; }
+.lifecycle-tabs .ant-tabs-nav { margin-bottom: 16px; padding: 0 4px; }
+.lifecycle-tabs .ant-tabs-tab { padding: 12px 8px; }
+.metric-card { height: 100%; border: 1px solid #edf1f5; }
+.metric-icon {
+  width: 40px; height: 40px; display: grid; place-items: center; border-radius: 11px;
+  color: #087f83; background: #e9fafa; font-size: 19px;
+}
+.journey-row { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(180px, 280px) 80px; gap: 18px; align-items: center; padding: 13px 0; border-bottom: 1px solid #f0f2f5; }
+.journey-row:last-child { border-bottom: 0; }
+.journey-progress { display: grid; grid-template-columns: 1fr 48px; gap: 10px; align-items: center; }
+.subtle { color: #7a8795; font-size: 12px; margin-top: 3px; }
+.journey-canvas { padding: 12px 10px 24px; }
+.journey-node { position: relative; display: flex; gap: 14px; align-items: center; min-height: 70px; padding: 12px 16px; margin-bottom: 20px; background: #fff; border: 1px solid #dce8ea; border-radius: 12px; box-shadow: 0 4px 14px rgba(30, 86, 90, .06); }
+.node-icon { flex: 0 0 auto; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; color: #087f83; background: #e8fafa; font-size: 17px; }
+.node-line { position: absolute; left: 34px; top: 69px; width: 2px; height: 22px; background: #8fd6d6; }
