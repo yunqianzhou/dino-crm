@@ -450,9 +450,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
             items: [
               { key: 'edit', icon: <EditOutlined />, label: t('user.editInfo'), onClick: () => openEdit(r) },
               { key: 'membership', icon: <PlusCircleOutlined />, label: t('user.addMembership'), onClick: () => openAddMembership(r) },
-              ...(resolveUserStatus(r, lessons).startsWith('未付费')
-                ? [{ key: 'trialLevel', label: '修改试听课等级', onClick: () => openTrialLevel(r) }]
-                : []),
+              { key: 'trialLevel', label: '修改试听课等级', onClick: () => openTrialLevel(r) },
             ],
           }}
         >
