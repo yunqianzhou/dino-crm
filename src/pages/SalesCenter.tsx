@@ -72,15 +72,19 @@ const PROGRESS_COLOR: Record<string, string> = {
 }
 
 // 更新跟进弹窗里可选的进度
-const FOLLOW_PROGRESS = ['跟进中', '已付费', '暂不跟进'] as const
+// 付费由订单中心回流；此处只允许设置可恢复的跟进状态。
+const FOLLOW_PROGRESS = ['跟进中', '暂不跟进'] as const
 
-const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待预约: 'default', 已预约: 'blue', 待出勤确认: 'orange', 已出勤: 'cyan', 'No Show': 'red', 咨询完成待付费: 'purple', 已成交: 'green' }
+const CONSULTATION_STAGES = ['待预约', '已预约', '待出勤确认', '已出勤', '未出勤', '咨询完成待付费', '已成交', '暂不跟进', '已关闭'] as const
+const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待预约: 'default', 已预约: 'blue', 待出勤确认: 'orange', 已出勤: 'cyan', 未出勤: 'red', 咨询完成待付费: 'purple', 已成交: 'green', 暂不跟进: 'gold', 已关闭: 'default' }
 function currentAppointment(student: Student) { return (student.salesAppointments ?? []).find((item) => item.appointmentStatus === '已预约') }
 function consultationStage(student: Student, paid: boolean) {
   if (paid) return '已成交'
+  if (student.salesLifecycleStatus === '已关闭') return '已关闭'
+  if (student.salesProgress === '暂不跟进') return '暂不跟进'
   const current = currentAppointment(student)
-  if (!current) { const last = student.salesAppointments?.[0]; return last?.attendanceStatus === 'No Show' ? 'No Show' : last?.consultationStatus === '已完成' ? '咨询完成待付费' : '待预约' }
-  if (current.attendanceStatus === 'No Show') return 'No Show'
+  if (!current) { const last = student.salesAppointments?.[0]; return last?.attendanceStatus === 'No Show' ? '未出勤' : last?.consultationStatus === '已完成' ? '咨询完成待付费' : '待预约' }
+  if (current.attendanceStatus === 'No Show') return '未出勤'
   if (current.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待付费' : '已出勤'
   return dayjs(current.scheduledStartAt).isBefore(dayjs()) ? '待出勤确认' : '已预约'
 }
@@ -168,8 +172,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     () =>
       poolAll.filter((s) => {
         const kw = keyword.trim().toLowerCase()
-        const matchStage = !consultationStageFilter || (s.businessLine === '越南' && consultationStage(s, isPaidStudent(s)) === consultationStageFilter)
-        return (!kw || leadText(s).includes(kw)) && matchStage
+        return !kw || leadText(s).includes(kw)
       }),
     [poolAll, keyword],
   )
@@ -178,7 +181,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     () =>
       followAll.filter((s) => {
         const kw = keyword.trim().toLowerCase()
-        return !kw || leadText(s).includes(kw)
+        const matchStage = !consultationStageFilter || (s.businessLine === '越南' && consultationStage(s, isPaidStudent(s)) === consultationStageFilter)
+        return (!kw || leadText(s).includes(kw)) && matchStage
       }),
     [followAll, keyword, consultationStageFilter],
   )
@@ -241,6 +245,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     form.setFieldsValue({
       note: '',
       purchaseIntention: s.purchaseIntention || '未填写',
+      salesProgress: s.salesProgress || '跟进中',
       lifecycleAction: 'none',
       occurredAt: dayjs(),
       scheduledStartAt: undefined,
@@ -258,14 +263,14 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     const action = v.lifecycleAction as string | undefined
     const actionLabel: Record<string, string> = {
       create: '新建预约', reschedule: '已改期', cancel: '已取消预约', attended: '已出勤',
-      noShow: 'No Show', completed: '咨询完成', incomplete: '咨询未完成',
+      noShow: '未出勤', completed: '咨询完成', incomplete: '咨询未完成', close: '已关闭', reactivate: '已重新激活',
     }
     const occurredAt = v.occurredAt?.format?.('YYYY-MM-DD HH:mm:ss') || now
     setState((prev) => ({
       ...prev,
       students: prev.students.map((x) => {
         if (x.studentId === editing.studentId) {
-          const currentProgress = x.salesProgress || '跟进中'
+          const currentProgress = v.salesProgress || x.salesProgress || '跟进中'
           const current = currentAppointment(x)
           let appointments = [...(x.salesAppointments ?? [])]
           let event = undefined as any
@@ -277,6 +282,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               const appointmentId = uid('sa_')
               appointments = [{ appointmentId, scheduledStartAt: v.scheduledStartAt.format('YYYY-MM-DD HH:mm:ss'), timezone: 'Asia/Ho_Chi_Minh', meetingLink: v.meetingLink, appointmentStatus: '已预约', attendanceStatus: '待标记', consultationStatus: '待标记', note, createdBy: owner, createdAt: now }, ...appointments]
               event = { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: action === 'reschedule' ? '已改期' : '已预约', reason: v.reason, description: note, appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+            } else if (action === 'close' || action === 'reactivate') {
+              event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
             } else if (current) {
               appointments = appointments.map((item) => {
                 if (item.appointmentId !== current.appointmentId) return item
@@ -292,6 +299,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           return {
             ...x,
             purchaseIntention: v.purchaseIntention,
+            salesProgress: currentProgress,
+            salesLifecycleStatus: action === 'close' ? '已关闭' : action === 'reactivate' ? '进行中' : x.salesLifecycleStatus,
             salesAppointments: appointments,
             salesLifecycleEvents: event ? [event, ...(x.salesLifecycleEvents ?? [])] : x.salesLifecycleEvents,
             salesLatestNote: historyNote,
@@ -480,10 +489,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     },
   }
   const consultationColumns: ColumnsType<Student> = [
-    { title: '销售咨询阶段', key: 'consultationStage', width: 150, render: (_: unknown, s) => s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[consultationStage(s, isPaidStudent(s))]}>{consultationStage(s, isPaidStudent(s))}</Tag> : <Text type="secondary">—</Text> },
-    { title: '最近预约时间', key: 'appointmentTime', width: 180, render: (_: unknown, s) => { const item = currentAppointment(s); return item ? <LocalTime time={item.scheduledStartAt} country="越南" /> : <Text type="secondary">—</Text> } },
-    { title: '出勤', key: 'attendance', width: 100, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{item.attendanceStatus}</Tag> : <Text type="secondary">—</Text> } },
-    { title: '咨询完成', key: 'completed', width: 110, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{item.consultationStatus}</Tag> : <Text type="secondary">—</Text> } },
+    { title: t('sales.consultation.stage'), key: 'consultationStage', width: 150, render: (_: unknown, s) => { const stage = consultationStage(s, isPaidStudent(s)); return s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag> : <Text type="secondary">—</Text> } },
+    { title: t('sales.consultation.latestAppointment'), key: 'appointmentTime', width: 180, render: (_: unknown, s) => { const item = currentAppointment(s); return item ? <LocalTime time={item.scheduledStartAt} country="越南" /> : <Text type="secondary">—</Text> } },
+    { title: t('sales.consultation.attendance'), key: 'attendance', width: 100, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{t(`sales.consultation.attendance.${item.attendanceStatus}`)}</Tag> : <Text type="secondary">—</Text> } },
+    { title: t('sales.consultation.completed'), key: 'completed', width: 110, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{t(`sales.consultation.completed.${item.consultationStatus}`)}</Tag> : <Text type="secondary">—</Text> } },
   ]
   // 基于「用户中心-二期」字段增加
   const userColumns: ColumnsType<Student> = [
@@ -734,7 +743,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             />
           </>
         )}
-        {tab === 'follow' && <Select allowClear placeholder="销售咨询阶段（越南）" style={{ width: 190 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={['待预约', '已预约', '待出勤确认', '已出勤', 'No Show', '咨询完成待付费', '已成交'].map((value) => ({ label: value, value }))} />}
+        {tab === 'follow' && <Select allowClear placeholder={t('sales.consultation.filter')} style={{ width: 190 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
         <Input
           allowClear
           prefix={<SearchOutlined />}
@@ -1084,22 +1093,26 @@ function Modal_Follow({
   const activeAppointment = editing?.salesAppointments?.find((item) => item.appointmentStatus === '已预约' && item.attendanceStatus !== 'No Show' && item.consultationStatus === '待标记')
   const lifecycleAction = Form.useWatch('lifecycleAction', form)
   const isVietnamLead = editing?.businessLine === '越南'
+  const isClosed = editing?.salesLifecycleStatus === '已关闭'
   const appointmentHistory = editing?.salesAppointments ?? []
   const lifecycleOptions = [
-    { label: '不标记链路阶段', value: 'none' },
-    ...(!activeAppointment && appointmentHistory.length > 0 ? [{ label: '再次预约', value: 'create' }] : []),
-    ...(activeAppointment?.attendanceStatus === '待标记' ? [
-      { label: '改期', value: 'reschedule' },
-      { label: '取消预约', value: 'cancel' },
-      { label: '标记已出勤', value: 'attended' },
-      { label: '标记 No Show', value: 'noShow' },
-    ] : []),
-    ...(activeAppointment?.attendanceStatus === '已出勤' && activeAppointment.consultationStatus === '待标记' ? [
-      { label: '标记咨询完成', value: 'completed' },
-      { label: '标记咨询未完成', value: 'incomplete' },
-    ] : []),
+    { label: t('sales.consultation.action.none'), value: 'none' },
+    ...(isClosed ? [{ label: t('sales.consultation.action.reactivate'), value: 'reactivate' }] : [
+      ...(!activeAppointment && appointmentHistory.length > 0 ? [{ label: t('sales.consultation.action.create'), value: 'create' }] : []),
+      ...(activeAppointment?.attendanceStatus === '待标记' ? [
+        { label: t('sales.consultation.action.reschedule'), value: 'reschedule' },
+        { label: t('sales.consultation.action.cancel'), value: 'cancel' },
+        { label: t('sales.consultation.action.attended'), value: 'attended' },
+        { label: t('sales.consultation.action.noShow'), value: 'noShow' },
+      ] : []),
+      ...(activeAppointment?.attendanceStatus === '已出勤' && activeAppointment.consultationStatus === '待标记' ? [
+        { label: t('sales.consultation.action.completed'), value: 'completed' },
+        { label: t('sales.consultation.action.incomplete'), value: 'incomplete' },
+      ] : []),
+      { label: t('sales.consultation.action.close'), value: 'close' },
+    ]),
   ]
-  const requiresReason = ['reschedule', 'cancel', 'noShow', 'incomplete'].includes(lifecycleAction)
+  const requiresReason = ['reschedule', 'cancel', 'noShow', 'incomplete', 'close'].includes(lifecycleAction)
   return (
     <ModalWrapper open={!!editing} title={t('sales.modal.title')} onCancel={onCancel} onOk={onOk} okText={t('sales.saveFollow')} cancelText={t('common.cancel')}>
       <Form form={form} layout="vertical" preserve={false} style={{ marginTop: 8 }}>
@@ -1118,24 +1131,25 @@ function Modal_Follow({
             <Select.Option value="无意向">{t('sales.purchaseIntention.no')}</Select.Option>
           </Select>
         </Form.Item>
-        <Form.Item name="note" label={t('sales.f.note')} rules={[{ required: true, message: t('sales.f.noteRequired') }]}>
-          <Input.TextArea rows={3} placeholder={t('sales.f.notePlaceholder')} />
+        <Form.Item name="salesProgress" label={t('sales.followStatus')}>
+          <Select options={FOLLOW_PROGRESS.map((value) => ({ label: t(`sales.progress.${value}`), value }))} />
         </Form.Item>
-        {isVietnamLead && <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16, marginTop: 8 }}>
-          <Text strong>销售咨询链路标记</Text>
-          <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>外呼后的预约、出勤、No Show、改期和咨询完成均在此记录；说明会与本次跟进一并写入时间线。</Text>
-          {activeAppointment && <div style={{ marginTop: 10, marginBottom: 12 }}><Tag color="blue">当前预约：{activeAppointment.scheduledStartAt}</Tag><Tag>出勤：{activeAppointment.attendanceStatus}</Tag><Tag>咨询：{activeAppointment.consultationStatus}</Tag></div>}
-          {!activeAppointment && appointmentHistory.length === 0 && <Alert type="info" showIcon style={{ marginTop: 12, marginBottom: 12 }} message="暂无销售咨询预约" description="首次预约请在外呼结束后的通话小结中完成。" />}
-          <Form.Item name="lifecycleAction" label="本次链路标记" style={{ marginTop: 12 }}>
+        {isVietnamLead && <>
+          {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag><Tag>{t('sales.consultation.attendance')}：{t(`sales.consultation.attendance.${activeAppointment.attendanceStatus}`)}</Tag><Tag>{t('sales.consultation.completed')}：{t(`sales.consultation.completed.${activeAppointment.consultationStatus}`)}</Tag></div>}
+          {!activeAppointment && appointmentHistory.length === 0 && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
+          <Form.Item name="lifecycleAction" label={t('sales.consultation.result')}>
             <Select options={lifecycleOptions} />
           </Form.Item>
           {['create', 'reschedule'].includes(lifecycleAction) && <>
-            <Form.Item name="scheduledStartAt" label="新的预约开始时间" rules={[{ required: true, message: '请选择预约开始时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
-            <Form.Item name="meetingLink" label="Google Meet 链接"><Input placeholder="选填" /></Form.Item>
+            <Form.Item name="scheduledStartAt" label={t('sales.consultation.appointmentTime')} rules={[{ required: true, message: t('sales.consultation.appointmentTimeRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="meetingLink" label="Google Meet"><Input placeholder={t('sales.optional')} /></Form.Item>
           </>}
-          {requiresReason && <Form.Item name="reason" label="原因" rules={[{ required: true, message: '请填写原因' }]}><Input.TextArea rows={2} placeholder="例如：客户临时有事、未到会、希望改期" /></Form.Item>}
-          {lifecycleAction && lifecycleAction !== 'none' && <Form.Item name="occurredAt" label="业务发生时间" rules={[{ required: true, message: '请选择业务发生时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>}
-        </div>}
+          {requiresReason && <Form.Item name="reason" label={t('sales.consultation.reason')} rules={[{ required: true, message: t('sales.consultation.reasonRequired') }]}><Input.TextArea rows={2} placeholder={t('sales.consultation.reasonPlaceholder')} /></Form.Item>}
+          {lifecycleAction && lifecycleAction !== 'none' && <Form.Item name="occurredAt" label={t('sales.consultation.occurredAt')} rules={[{ required: true, message: t('sales.consultation.occurredAtRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>}
+        </>}
+        <Form.Item name="note" label={t('sales.f.note')} rules={[{ required: true, message: t('sales.f.noteRequired') }]}>
+          <Input.TextArea rows={3} placeholder={t('sales.f.notePlaceholder')} />
+        </Form.Item>
       </Form>
       <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
         <Text strong>{t('sales.history')}</Text>
