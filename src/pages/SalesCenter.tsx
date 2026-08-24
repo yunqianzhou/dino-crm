@@ -165,6 +165,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       ),
     [channels, students],
   )
+  // 仅当当前国家筛选范围包含越南时展示越南销售咨询阶段；避免其他国家看到无关筛选。
+  const showVietnamStageFilter = filterOptions(lineOptions).includes('越南') && (lineSel.length === 0 || lineSel.includes('越南'))
+
+  useEffect(() => {
+    if (!showVietnamStageFilter && consultationStageFilter) setConsultationStageFilter(undefined)
+  }, [showVietnamStageFilter, consultationStageFilter])
 
   const leadText = (s: Student) =>
     `${s.phone ?? ''} ${s.studentId} ${s.localName ?? s.name} ${s.country ?? ''}`.toLowerCase()
@@ -762,7 +768,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             />
           </>
         )}
-        {tab === 'follow' && <Select allowClear placeholder={t('sales.consultation.filter')} style={{ width: 190 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
+        {tab === 'follow' && showVietnamStageFilter && <Select allowClear placeholder={t('sales.consultation.filter')} style={{ width: 190 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
         <Input
           allowClear
           prefix={<SearchOutlined />}
