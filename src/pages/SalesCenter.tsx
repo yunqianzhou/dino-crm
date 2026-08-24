@@ -241,6 +241,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     form.setFieldsValue({
       note: '',
       purchaseIntention: s.purchaseIntention || '未填写',
+      lifecycleAction: 'none',
+      occurredAt: dayjs(),
+      scheduledStartAt: undefined,
+      meetingLink: '',
+      reason: '',
     })
   }
 
@@ -250,17 +255,48 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
     const note = (v.note as string).trim()
     const owner = editing.salesOwner ?? actor
+    const action = v.lifecycleAction as string | undefined
+    const actionLabel: Record<string, string> = {
+      create: '新建预约', reschedule: '已改期', cancel: '已取消预约', attended: '已出勤',
+      noShow: 'No Show', completed: '咨询完成', incomplete: '咨询未完成',
+    }
+    const occurredAt = v.occurredAt?.format?.('YYYY-MM-DD HH:mm:ss') || now
     setState((prev) => ({
       ...prev,
       students: prev.students.map((x) => {
         if (x.studentId === editing.studentId) {
           const currentProgress = x.salesProgress || '跟进中'
+          const current = currentAppointment(x)
+          let appointments = [...(x.salesAppointments ?? [])]
+          let event = undefined as any
+          if (action && action !== 'none') {
+            if (action === 'create' || action === 'reschedule') {
+              if (action === 'reschedule' && current) {
+                appointments = appointments.map((item) => item.appointmentId === current.appointmentId ? { ...item, appointmentStatus: '已改期' as const, reason: v.reason, updatedBy: owner, updatedAt: now } : item)
+              }
+              const appointmentId = uid('sa_')
+              appointments = [{ appointmentId, scheduledStartAt: v.scheduledStartAt.format('YYYY-MM-DD HH:mm:ss'), timezone: 'Asia/Ho_Chi_Minh', meetingLink: v.meetingLink, appointmentStatus: '已预约', attendanceStatus: '待标记', consultationStatus: '待标记', note, createdBy: owner, createdAt: now }, ...appointments]
+              event = { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: action === 'reschedule' ? '已改期' : '已预约', reason: v.reason, description: note, appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+            } else if (current) {
+              appointments = appointments.map((item) => {
+                if (item.appointmentId !== current.appointmentId) return item
+                if (action === 'cancel') return { ...item, appointmentStatus: '已取消' as const, reason: v.reason, note, updatedBy: owner, updatedAt: now }
+                if (action === 'attended') return { ...item, attendanceStatus: '已出勤' as const, note, updatedBy: owner, updatedAt: now }
+                if (action === 'noShow') return { ...item, attendanceStatus: 'No Show' as const, reason: v.reason, note, updatedBy: owner, updatedAt: now }
+                return { ...item, consultationStatus: action === 'completed' ? '已完成' as const : '未完成' as const, note, updatedBy: owner, updatedAt: now }
+              })
+              event = { eventId: uid('sle_'), node: (action === 'cancel' ? 'appointment' : ['attended', 'noShow'].includes(action) ? 'attendance' : 'consultation') as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, appointmentId: current.appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+            }
+          }
+          const historyNote = action && action !== 'none' ? `${note}\n【销售咨询】${actionLabel[action]}${v.reason ? `：${v.reason}` : ''}` : note
           return {
             ...x,
             purchaseIntention: v.purchaseIntention,
-            salesLatestNote: note,
+            salesAppointments: appointments,
+            salesLifecycleEvents: event ? [event, ...(x.salesLifecycleEvents ?? [])] : x.salesLifecycleEvents,
+            salesLatestNote: historyNote,
             salesUpdatedAt: now,
-            salesHistory: [{ progress: currentProgress, note, time: now, owner }, ...(x.salesHistory || [])],
+            salesHistory: [{ progress: currentProgress, note: historyNote, time: now, owner }, ...(x.salesHistory || [])],
           }
         }
         return x
@@ -383,17 +419,19 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       callRecords: [record, ...prev.callRecords],
       students: prev.students.map((x) => {
         if (x.studentId !== dialing.studentId) return x
-        const appointmentEvent = appointment?.booked ? { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: '已预约', description: note, occurredAt: now, reportedAt: now, reportedBy: actor, source: 'CC手动' as const } : undefined
+        const appointmentNote = appointment?.booked ? `【销售咨询预约】已预约：${appointment.scheduledStartAt}${appointment.meetingLink ? ` · ${appointment.meetingLink}` : ''}` : ''
+        const followNote = appointmentNote ? `${note}\n${appointmentNote}` : note
+        const appointmentEvent = appointment?.booked ? { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: '已预约', description: followNote, occurredAt: now, reportedAt: now, reportedBy: actor, source: 'CC手动' as const } : undefined
         const appointments = appointment?.booked ? [{ appointmentId: uid('sa_'), scheduledStartAt: appointment.scheduledStartAt!, timezone: 'Asia/Ho_Chi_Minh', meetingLink: appointment.meetingLink, appointmentStatus: '已预约' as const, attendanceStatus: '待标记' as const, consultationStatus: '待标记' as const, note, createdBy: actor, createdAt: now }, ...(x.salesAppointments ?? [])] : x.salesAppointments
         return {
               ...x,
               purchaseIntention: intention as any,
               salesAppointments: appointments,
               salesLifecycleEvents: appointmentEvent ? [appointmentEvent, ...(x.salesLifecycleEvents ?? [])] : x.salesLifecycleEvents,
-              salesLatestNote: note,
+              salesLatestNote: followNote,
               salesUpdatedAt: now,
               salesHistory: [
-                { progress: x.salesProgress || '跟进中', note, time: now, owner, audioUrl: dummyAudio, aiSummary: dummySummary },
+                { progress: x.salesProgress || '跟进中', note: followNote, time: now, owner, audioUrl: dummyAudio, aiSummary: dummySummary },
                 ...(x.salesHistory || []),
               ],
             }
@@ -1042,6 +1080,26 @@ function Modal_Follow({
   onOk: () => void
 }) {
   const history: SalesFollowLog[] = editing?.salesHistory ?? []
+  // No Show、已完课等属于上一场预约的结束结果，后续应新建一场预约，不能继续推进旧预约。
+  const activeAppointment = editing?.salesAppointments?.find((item) => item.appointmentStatus === '已预约' && item.attendanceStatus !== 'No Show' && item.consultationStatus === '待标记')
+  const lifecycleAction = Form.useWatch('lifecycleAction', form)
+  const isVietnamLead = editing?.businessLine === '越南'
+  const appointmentHistory = editing?.salesAppointments ?? []
+  const lifecycleOptions = [
+    { label: '不标记链路阶段', value: 'none' },
+    ...(!activeAppointment && appointmentHistory.length > 0 ? [{ label: '再次预约', value: 'create' }] : []),
+    ...(activeAppointment?.attendanceStatus === '待标记' ? [
+      { label: '改期', value: 'reschedule' },
+      { label: '取消预约', value: 'cancel' },
+      { label: '标记已出勤', value: 'attended' },
+      { label: '标记 No Show', value: 'noShow' },
+    ] : []),
+    ...(activeAppointment?.attendanceStatus === '已出勤' && activeAppointment.consultationStatus === '待标记' ? [
+      { label: '标记咨询完成', value: 'completed' },
+      { label: '标记咨询未完成', value: 'incomplete' },
+    ] : []),
+  ]
+  const requiresReason = ['reschedule', 'cancel', 'noShow', 'incomplete'].includes(lifecycleAction)
   return (
     <ModalWrapper open={!!editing} title={t('sales.modal.title')} onCancel={onCancel} onOk={onOk} okText={t('sales.saveFollow')} cancelText={t('common.cancel')}>
       <Form form={form} layout="vertical" preserve={false} style={{ marginTop: 8 }}>
@@ -1063,6 +1121,21 @@ function Modal_Follow({
         <Form.Item name="note" label={t('sales.f.note')} rules={[{ required: true, message: t('sales.f.noteRequired') }]}>
           <Input.TextArea rows={3} placeholder={t('sales.f.notePlaceholder')} />
         </Form.Item>
+        {isVietnamLead && <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16, marginTop: 8 }}>
+          <Text strong>销售咨询链路标记</Text>
+          <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>外呼后的预约、出勤、No Show、改期和咨询完成均在此记录；说明会与本次跟进一并写入时间线。</Text>
+          {activeAppointment && <div style={{ marginTop: 10, marginBottom: 12 }}><Tag color="blue">当前预约：{activeAppointment.scheduledStartAt}</Tag><Tag>出勤：{activeAppointment.attendanceStatus}</Tag><Tag>咨询：{activeAppointment.consultationStatus}</Tag></div>}
+          {!activeAppointment && appointmentHistory.length === 0 && <Alert type="info" showIcon style={{ marginTop: 12, marginBottom: 12 }} message="暂无销售咨询预约" description="首次预约请在外呼结束后的通话小结中完成。" />}
+          <Form.Item name="lifecycleAction" label="本次链路标记" style={{ marginTop: 12 }}>
+            <Select options={lifecycleOptions} />
+          </Form.Item>
+          {['create', 'reschedule'].includes(lifecycleAction) && <>
+            <Form.Item name="scheduledStartAt" label="新的预约开始时间" rules={[{ required: true, message: '请选择预约开始时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="meetingLink" label="Google Meet 链接"><Input placeholder="选填" /></Form.Item>
+          </>}
+          {requiresReason && <Form.Item name="reason" label="原因" rules={[{ required: true, message: '请填写原因' }]}><Input.TextArea rows={2} placeholder="例如：客户临时有事、未到会、希望改期" /></Form.Item>}
+          {lifecycleAction && lifecycleAction !== 'none' && <Form.Item name="occurredAt" label="业务发生时间" rules={[{ required: true, message: '请选择业务发生时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>}
+        </div>}
       </Form>
       <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
         <Text strong>{t('sales.history')}</Text>
