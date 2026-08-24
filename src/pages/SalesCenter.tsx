@@ -71,19 +71,19 @@ const PROGRESS_COLOR: Record<string, string> = {
   已付费: 'green',
 }
 
-const CONSULTATION_STAGES = ['待外呼', '未接通待跟进', '已接通待预约', '已预约', '待确认出勤', '已出勤待确认咨询', '未出勤待跟进', '已取消预约待跟进', '咨询完成待支付', '暂不跟进', '已关闭'] as const
-const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待外呼: 'default', 未接通待跟进: 'orange', 已接通待预约: 'cyan', 已预约: 'blue', 待确认出勤: 'orange', 已出勤待确认咨询: 'cyan', 未出勤待跟进: 'red', 已取消预约待跟进: 'volcano', 咨询完成待支付: 'purple', 暂不跟进: 'gold', 已关闭: 'default' }
+const CONSULTATION_STAGES = ['待外呼', '未接通待跟进', '已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '暂不跟进', '已关闭'] as const
+const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待外呼: 'default', 未接通待跟进: 'orange', 已接通待预约: 'cyan', 已预约: 'blue', 未出勤待跟进: 'red', 咨询未完成待跟进: 'volcano', 咨询完成待支付: 'purple', 暂不跟进: 'gold', 已关闭: 'default' }
 function currentAppointment(student: Student) { return (student.salesAppointments ?? []).find((item) => item.appointmentStatus === '已预约') }
 function consultationStage(student: Student, callRecords: CallRecord[] = []) {
   if (student.salesLifecycleStatus === '已关闭') return '已关闭'
   if (student.salesProgress === '暂不跟进') return '暂不跟进'
   const current = currentAppointment(student)
   if (current?.attendanceStatus === 'No Show') return '未出勤待跟进'
-  if (current?.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待支付' : '已出勤待确认咨询'
+  if (current?.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待支付' : current.consultationStatus === '未完成' ? '咨询未完成待跟进' : '已预约'
   if (current) return dayjs(current.scheduledStartAt).isBefore(dayjs()) ? '待确认出勤' : '已预约'
   const last = student.salesAppointments?.[0]
   if (last?.attendanceStatus === 'No Show') return '未出勤待跟进'
-  if (last?.appointmentStatus === '已取消') return '已取消预约待跟进'
+  if (last?.consultationStatus === '未完成') return '咨询未完成待跟进'
   if (last?.consultationStatus === '已完成') return '咨询完成待支付'
   const calls = callRecords.filter((item) => item.studentId === student.studentId)
   if (!calls.length) return '待外呼'
@@ -293,11 +293,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               appointments = appointments.map((item) => {
                 if (item.appointmentId !== current.appointmentId) return item
                 if (action === 'cancel') return { ...item, appointmentStatus: '已取消' as const, reason: v.reason, note, updatedBy: owner, updatedAt: now }
-                if (action === 'attended') return { ...item, attendanceStatus: '已出勤' as const, note, updatedBy: owner, updatedAt: now }
                 if (action === 'noShow') return { ...item, attendanceStatus: 'No Show' as const, reason: v.reason, note, updatedBy: owner, updatedAt: now }
-                return { ...item, consultationStatus: action === 'completed' ? '已完成' as const : '未完成' as const, note, updatedBy: owner, updatedAt: now }
+                return { ...item, attendanceStatus: '已出勤' as const, consultationStatus: action === 'completed' ? '已完成' as const : '未完成' as const, note, updatedBy: owner, updatedAt: now }
               })
-              event = { eventId: uid('sle_'), node: (action === 'cancel' ? 'appointment' : ['attended', 'noShow'].includes(action) ? 'attendance' : 'consultation') as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, appointmentId: current.appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+              event = { eventId: uid('sle_'), node: (action === 'cancel' ? 'appointment' : action === 'noShow' ? 'attendance' : 'consultation') as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, appointmentId: current.appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
             }
           }
           if (action === 'pause') event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
@@ -1131,10 +1130,7 @@ function Modal_Follow({
       ...(activeAppointment?.attendanceStatus === '待标记' ? [
         { label: t('sales.consultation.action.reschedule'), value: 'reschedule' },
         { label: t('sales.consultation.action.cancel'), value: 'cancel' },
-        { label: t('sales.consultation.action.attended'), value: 'attended' },
         { label: t('sales.consultation.action.noShow'), value: 'noShow' },
-      ] : []),
-      ...(activeAppointment?.attendanceStatus === '已出勤' && activeAppointment.consultationStatus === '待标记' ? [
         { label: t('sales.consultation.action.completed'), value: 'completed' },
         { label: t('sales.consultation.action.incomplete'), value: 'incomplete' },
       ] : []),
