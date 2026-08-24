@@ -71,18 +71,23 @@ const PROGRESS_COLOR: Record<string, string> = {
   已付费: 'green',
 }
 
-const CONSULTATION_STAGES = ['待预约', '已预约', '待出勤确认', '已出勤', '未出勤', '咨询完成待付费', '已成交', '暂不跟进', '已关闭'] as const
-const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待预约: 'default', 已预约: 'blue', 待出勤确认: 'orange', 已出勤: 'cyan', 未出勤: 'red', 咨询完成待付费: 'purple', 已成交: 'green', 暂不跟进: 'gold', 已关闭: 'default' }
+const CONSULTATION_STAGES = ['待外呼', '未接通待跟进', '已接通待预约', '已预约', '待确认出勤', '已出勤待确认咨询', '未出勤待跟进', '已取消预约待跟进', '咨询完成待支付', '暂不跟进', '已关闭'] as const
+const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待外呼: 'default', 未接通待跟进: 'orange', 已接通待预约: 'cyan', 已预约: 'blue', 待确认出勤: 'orange', 已出勤待确认咨询: 'cyan', 未出勤待跟进: 'red', 已取消预约待跟进: 'volcano', 咨询完成待支付: 'purple', 暂不跟进: 'gold', 已关闭: 'default' }
 function currentAppointment(student: Student) { return (student.salesAppointments ?? []).find((item) => item.appointmentStatus === '已预约') }
-function consultationStage(student: Student, paid: boolean) {
-  if (paid) return '已成交'
+function consultationStage(student: Student, callRecords: CallRecord[] = []) {
   if (student.salesLifecycleStatus === '已关闭') return '已关闭'
   if (student.salesProgress === '暂不跟进') return '暂不跟进'
   const current = currentAppointment(student)
-  if (!current) { const last = student.salesAppointments?.[0]; return last?.attendanceStatus === 'No Show' ? '未出勤' : last?.consultationStatus === '已完成' ? '咨询完成待付费' : '待预约' }
-  if (current.attendanceStatus === 'No Show') return '未出勤'
-  if (current.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待付费' : '已出勤'
-  return dayjs(current.scheduledStartAt).isBefore(dayjs()) ? '待出勤确认' : '已预约'
+  if (current?.attendanceStatus === 'No Show') return '未出勤待跟进'
+  if (current?.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待支付' : '已出勤待确认咨询'
+  if (current) return dayjs(current.scheduledStartAt).isBefore(dayjs()) ? '待确认出勤' : '已预约'
+  const last = student.salesAppointments?.[0]
+  if (last?.attendanceStatus === 'No Show') return '未出勤待跟进'
+  if (last?.appointmentStatus === '已取消') return '已取消预约待跟进'
+  if (last?.consultationStatus === '已完成') return '咨询完成待支付'
+  const calls = callRecords.filter((item) => item.studentId === student.studentId)
+  if (!calls.length) return '待外呼'
+  return calls.some((item) => item.result === '已接通') ? '已接通待预约' : '未接通待跟进'
 }
 function isPaidStudent(student: Student) { return student.status === '付费' || student.paymentStatusStr === '已付费' }
 
@@ -177,10 +182,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     () =>
       followAll.filter((s) => {
         const kw = keyword.trim().toLowerCase()
-        const matchStage = !consultationStageFilter || (s.businessLine === '越南' && consultationStage(s, isPaidStudent(s)) === consultationStageFilter)
+        const matchStage = !consultationStageFilter || (s.businessLine === '越南' && consultationStage(s, callRecords) === consultationStageFilter)
         return (!kw || leadText(s).includes(kw)) && matchStage
       }),
-    [followAll, keyword, consultationStageFilter],
+    [followAll, keyword, consultationStageFilter, callRecords],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -485,7 +490,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     },
   }
   const consultationColumns: ColumnsType<Student> = [
-    { title: t('sales.consultation.stage'), key: 'consultationStage', width: 150, render: (_: unknown, s) => { const stage = consultationStage(s, isPaidStudent(s)); return s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag> : <Text type="secondary">—</Text> } },
+    { title: t('sales.consultation.stage'), key: 'consultationStage', width: 170, render: (_: unknown, s) => { const stage = consultationStage(s, callRecords); return s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag> : <Text type="secondary">—</Text> } },
   ]
   // 基于「用户中心-二期」字段增加
   const userColumns: ColumnsType<Student> = [
@@ -916,7 +921,7 @@ function Modal_Consultation({ student, paid, hasConnectedCall, onCancel, onSave 
   const title: Record<string, string> = { create: '创建销售咨询预约', reschedule: '改期销售咨询', cancel: '取消预约', attended: '标记已出勤', noShow: '标记 No Show', completed: '标记咨询完成', incomplete: '标记咨询未完成', contact: '记录其他渠道联系', close: '关闭 Lead', reactivate: '重新激活 Lead' }
   return <Modal open={!!student} title={`销售咨询链路标记 · ${student?.localName || student?.name || ''}`} width={720} destroyOnClose onCancel={onCancel} footer={action ? [<Button key="back" onClick={() => setAction(null)}>返回</Button>, <Button key="save" type="primary" onClick={submit}>确认</Button>] : [<Button key="close" onClick={onCancel}>关闭</Button>]}>
     {student && !action && <>
-      <Alert type={paid ? 'success' : closed ? 'warning' : 'info'} showIcon style={{ marginBottom: 16 }} message={paid ? '已成交：支付状态来自订单中心' : closed ? '链路状态：已关闭' : `当前阶段：${consultationStage(student, paid)}`} description="所有变更均会记录原因、说明、业务发生时间和操作人。" />
+      <Alert type={paid ? 'success' : closed ? 'warning' : 'info'} showIcon style={{ marginBottom: 16 }} message={paid ? '已成交：支付状态来自订单中心' : closed ? '链路状态：已关闭' : `当前阶段：${consultationStage(student)}`} description="所有变更均会记录原因、说明、业务发生时间和操作人。" />
       {active ? <Card size="small" title="当前有效预约" style={{ marginBottom: 16 }}><Space direction="vertical"><span>预约时间：<LocalTime time={active.scheduledStartAt} country="越南" /></span><span>出勤：<Tag>{active.attendanceStatus}</Tag>　咨询完成：<Tag>{active.consultationStatus}</Tag></span></Space></Card> : <Alert type="warning" showIcon style={{ marginBottom: 16 }} message="当前无有效预约" />}
       {!paid && !closed && <Space wrap style={{ marginBottom: 16 }}>
         {!active && (hasConnectedCall || appointments.length > 0) && <Button type="primary" onClick={() => start('create')}>创建预约</Button>}
