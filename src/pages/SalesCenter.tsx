@@ -490,9 +490,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   }
   const consultationColumns: ColumnsType<Student> = [
     { title: t('sales.consultation.stage'), key: 'consultationStage', width: 150, render: (_: unknown, s) => { const stage = consultationStage(s, isPaidStudent(s)); return s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag> : <Text type="secondary">—</Text> } },
-    { title: t('sales.consultation.latestAppointment'), key: 'appointmentTime', width: 180, render: (_: unknown, s) => { const item = currentAppointment(s); return item ? <LocalTime time={item.scheduledStartAt} country="越南" /> : <Text type="secondary">—</Text> } },
-    { title: t('sales.consultation.attendance'), key: 'attendance', width: 100, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{t(`sales.consultation.attendance.${item.attendanceStatus}`)}</Tag> : <Text type="secondary">—</Text> } },
-    { title: t('sales.consultation.completed'), key: 'completed', width: 110, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{t(`sales.consultation.completed.${item.consultationStatus}`)}</Tag> : <Text type="secondary">—</Text> } },
   ]
   // 基于「用户中心-二期」字段增加
   const userColumns: ColumnsType<Student> = [
