@@ -80,7 +80,8 @@ function consultationStage(student: Student, callRecords: CallRecord[] = []) {
   const current = currentAppointment(student)
   if (current?.attendanceStatus === 'No Show') return '未出勤待跟进'
   if (current?.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待支付' : current.consultationStatus === '未完成' ? '咨询未完成待跟进' : '已预约'
-  if (current) return dayjs(current.scheduledStartAt).isBefore(dayjs()) ? '待确认出勤' : '已预约'
+  // P0 暂无会议状态自动回传：无论预约时间是否已过，只要尚未人工标记会议结果，当前阶段均为“已预约”。
+  if (current) return '已预约'
   const last = student.salesAppointments?.[0]
   if (last?.attendanceStatus === 'No Show') return '未出勤待跟进'
   if (last?.consultationStatus === '未完成') return '咨询未完成待跟进'
