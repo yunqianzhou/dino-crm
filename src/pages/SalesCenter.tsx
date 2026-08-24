@@ -257,13 +257,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       scheduledStartAt: undefined,
       meetingLink: '',
       reason: '',
+      reasonOther: '',
     })
   }
 
   const persistFollow = (v: any) => {
     if (!editing) return
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
-    const note = (v.note as string).trim()
+    const note = ((v.note as string) || '').trim()
+    const reason = v.reason === '其他' ? `其他：${(v.reasonOther as string).trim()}` : v.reason
     const owner = editing.salesOwner ?? actor
     const action = v.lifecycleAction as string | undefined
     const actionLabel: Record<string, string> = {
@@ -282,25 +284,25 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           if (action && !['continue', 'pause'].includes(action)) {
             if (action === 'create' || action === 'reschedule') {
               if (action === 'reschedule' && current) {
-                appointments = appointments.map((item) => item.appointmentId === current.appointmentId ? { ...item, appointmentStatus: '已改期' as const, reason: v.reason, updatedBy: owner, updatedAt: now } : item)
+                appointments = appointments.map((item) => item.appointmentId === current.appointmentId ? { ...item, appointmentStatus: '已改期' as const, reason, updatedBy: owner, updatedAt: now } : item)
               }
               const appointmentId = uid('sa_')
               appointments = [{ appointmentId, scheduledStartAt: v.scheduledStartAt.format('YYYY-MM-DD HH:mm:ss'), timezone: 'Asia/Ho_Chi_Minh', meetingLink: v.meetingLink, appointmentStatus: '已预约', attendanceStatus: '待标记', consultationStatus: '待标记', note, createdBy: owner, createdAt: now }, ...appointments]
-              event = { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: action === 'reschedule' ? '已改期' : '已预约', reason: v.reason, description: note, appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+              event = { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: action === 'reschedule' ? '已改期' : '已预约', reason, description: note, appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
             } else if (action === 'close' || action === 'reactivate') {
-              event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+              event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason, description: note, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
             } else if (current) {
               appointments = appointments.map((item) => {
                 if (item.appointmentId !== current.appointmentId) return item
-                if (action === 'cancel') return { ...item, appointmentStatus: '已取消' as const, reason: v.reason, note, updatedBy: owner, updatedAt: now }
-                if (action === 'noShow') return { ...item, attendanceStatus: 'No Show' as const, reason: v.reason, note, updatedBy: owner, updatedAt: now }
+                if (action === 'cancel') return { ...item, appointmentStatus: '已取消' as const, reason, note, updatedBy: owner, updatedAt: now }
+                if (action === 'noShow') return { ...item, attendanceStatus: 'No Show' as const, reason, note, updatedBy: owner, updatedAt: now }
                 return { ...item, attendanceStatus: '已出勤' as const, consultationStatus: action === 'completed' ? '已完成' as const : '未完成' as const, note, updatedBy: owner, updatedAt: now }
               })
-              event = { eventId: uid('sle_'), node: (action === 'cancel' ? 'appointment' : action === 'noShow' ? 'attendance' : 'consultation') as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, appointmentId: current.appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+              event = { eventId: uid('sle_'), node: (action === 'cancel' ? 'appointment' : action === 'noShow' ? 'attendance' : 'consultation') as SalesLifecycleNode, result: actionLabel[action], reason, description: note, appointmentId: current.appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
             }
           }
-          if (action === 'pause') event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
-          const historyNote = action && action !== 'continue' ? `${note}\n【销售咨询】${actionLabel[action]}${v.reason ? `：${v.reason}` : ''}` : note
+          if (action === 'pause') event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason, description: note, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+          const historyNote = action && action !== 'continue' ? `${note ? `${note}\n` : ''}【销售咨询】${actionLabel[action]}${reason ? `：${reason}` : ''}` : note
           return {
             ...x,
             purchaseIntention: v.purchaseIntention,
@@ -1119,9 +1121,18 @@ function Modal_Follow({
   // No Show、已完课等属于上一场预约的结束结果，后续应新建一场预约，不能继续推进旧预约。
   const activeAppointment = editing?.salesAppointments?.find((item) => item.appointmentStatus === '已预约' && item.attendanceStatus !== 'No Show' && item.consultationStatus === '待标记')
   const lifecycleAction = Form.useWatch('lifecycleAction', form)
+  const reasonValue = Form.useWatch('reason', form)
   const isVietnamLead = editing?.businessLine === '越南'
   const isClosed = editing?.salesLifecycleStatus === '已关闭'
   const appointmentHistory = editing?.salesAppointments ?? []
+  const reasonOptions: Record<string, string[]> = {
+    pause: ['暂无需求', '暂不方便', '预算原因', '其他'],
+    reschedule: ['客户要求改期', '时间冲突', '其他'],
+    cancel: ['客户主动取消', '时间冲突', '重复预约', '其他'],
+    noShow: ['客户未到会', '无法联系', '会议技术问题', '其他'],
+    incomplete: ['中途离开', '时间不足', '会议异常', '其他'],
+    close: ['明确拒绝', '号码无效', '重复 Lead', '要求不联系', '其他'],
+  }
   const lifecycleOptions = [
     { label: t('sales.consultation.action.continue'), value: 'continue' },
     { label: t('sales.consultation.action.pause'), value: 'pause' },
@@ -1157,20 +1168,21 @@ function Modal_Follow({
           </Select>
         </Form.Item>
         {isVietnamLead && <>
-          {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag><Tag>{t('sales.consultation.attendance')}：{t(`sales.consultation.attendance.${activeAppointment.attendanceStatus}`)}</Tag><Tag>{t('sales.consultation.completed')}：{t(`sales.consultation.completed.${activeAppointment.consultationStatus}`)}</Tag></div>}
+          {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag></div>}
           {!activeAppointment && appointmentHistory.length === 0 && !hasConnectedCall && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
           <Form.Item name="lifecycleAction" label={t('sales.consultation.result')}>
-            <Select options={lifecycleOptions} />
+            <Select options={lifecycleOptions} onChange={() => form.setFieldsValue({ reason: undefined, reasonOther: '' })} />
           </Form.Item>
           {['create', 'reschedule'].includes(lifecycleAction) && <>
             <Form.Item name="scheduledStartAt" label={t('sales.consultation.appointmentTime')} rules={[{ required: true, message: t('sales.consultation.appointmentTimeRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="meetingLink" label="Google Meet"><Input placeholder={t('sales.optional')} /></Form.Item>
           </>}
-          {requiresReason && <Form.Item name="reason" label={t('sales.consultation.reason')} rules={[{ required: true, message: t('sales.consultation.reasonRequired') }]}><Input.TextArea rows={2} placeholder={t('sales.consultation.reasonPlaceholder')} /></Form.Item>}
+          {requiresReason && <Form.Item name="reason" label={t('sales.consultation.reason')} rules={[{ required: true, message: t('sales.consultation.reasonRequired') }]}><Select options={(reasonOptions[lifecycleAction] || []).map((value) => ({ label: t(`sales.consultation.reasonOption.${value}`), value }))} /></Form.Item>}
+          {requiresReason && reasonValue === '其他' && <Form.Item name="reasonOther" label={t('sales.consultation.reasonOther')} rules={[{ required: true, message: t('sales.consultation.reasonOtherRequired') }]}><Input.TextArea rows={2} /></Form.Item>}
           {lifecycleAction && lifecycleAction !== 'continue' && <Form.Item name="occurredAt" label={t('sales.consultation.occurredAt')} rules={[{ required: true, message: t('sales.consultation.occurredAtRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>}
         </>}
-        <Form.Item name="note" label={t('sales.f.note')} rules={[{ required: true, message: t('sales.f.noteRequired') }]}>
-          <Input.TextArea rows={3} placeholder={t('sales.f.notePlaceholder')} />
+        <Form.Item name="note" label={requiresReason ? t('sales.consultation.noteOptional') : t('sales.f.note')} rules={[{ required: !requiresReason, message: t('sales.f.noteRequired') }]}>
+          <Input.TextArea rows={requiresReason ? 2 : 3} placeholder={requiresReason ? t('sales.consultation.noteOptionalPlaceholder') : t('sales.f.notePlaceholder')} />
         </Form.Item>
       </Form>
       <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
