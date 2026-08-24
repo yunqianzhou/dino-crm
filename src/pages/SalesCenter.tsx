@@ -358,7 +358,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   }
 
   // 保存外呼通话小结：生成通话记录 + 归档到该线索的销售跟进记录
-  const saveCall = (note: string, intention: string) => {
+  const saveCall = (note: string, intention: string, appointment?: { booked: boolean; scheduledStartAt?: string; meetingLink?: string }) => {
     if (!dialing) return
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
     const owner = dialing.salesOwner ?? actor
@@ -381,11 +381,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     setState((prev) => ({
       ...prev,
       callRecords: [record, ...prev.callRecords],
-      students: prev.students.map((x) =>
-        x.studentId === dialing.studentId
-          ? {
+      students: prev.students.map((x) => {
+        if (x.studentId !== dialing.studentId) return x
+        const appointmentEvent = appointment?.booked ? { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: '已预约', description: note, occurredAt: now, reportedAt: now, reportedBy: actor, source: 'CC手动' as const } : undefined
+        const appointments = appointment?.booked ? [{ appointmentId: uid('sa_'), scheduledStartAt: appointment.scheduledStartAt!, timezone: 'Asia/Ho_Chi_Minh', meetingLink: appointment.meetingLink, appointmentStatus: '已预约' as const, attendanceStatus: '待标记' as const, consultationStatus: '待标记' as const, note, createdBy: actor, createdAt: now }, ...(x.salesAppointments ?? [])] : x.salesAppointments
+        return {
               ...x,
               purchaseIntention: intention as any,
+              salesAppointments: appointments,
+              salesLifecycleEvents: appointmentEvent ? [appointmentEvent, ...(x.salesLifecycleEvents ?? [])] : x.salesLifecycleEvents,
               salesLatestNote: note,
               salesUpdatedAt: now,
               salesHistory: [
@@ -393,8 +397,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                 ...(x.salesHistory || []),
               ],
             }
-          : x,
-      ),
+      }),
     }))
     setDialing(null)
     message.success(t('sales.dialed'))
@@ -774,7 +777,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         form={form}
         onCancel={() => setEditing(null)}
         onOk={saveFollow}
-        onLifecycle={() => { if (editing) { setConsulting(editing); setEditing(null) } }}
       />
 
       <Modal_Dial t={t} dialing={dialing} onCancel={() => setDialing(null)} onSave={saveCall} />
@@ -907,12 +909,15 @@ function Modal_Dial({
   t: (k: string, v?: Record<string, string | number>) => string
   dialing: Student | null
   onCancel: () => void
-  onSave: (note: string, intention: string) => void
+  onSave: (note: string, intention: string, appointment?: { booked: boolean; scheduledStartAt?: string; meetingLink?: string }) => void
 }) {
   const [phase, setPhase] = useState<'calling' | 'summary'>('calling')
   const [seconds, setSeconds] = useState(0)
   const [note, setNote] = useState('')
   const [purchaseIntention, setPurchaseIntention] = useState('未填写')
+  const [appointmentBooked, setAppointmentBooked] = useState<'yes' | 'no'>('no')
+  const [appointmentTime, setAppointmentTime] = useState<any>(null)
+  const [meetingLink, setMeetingLink] = useState('')
 
   // 打开弹窗时重置状态并开始计时
   useEffect(() => {
@@ -921,6 +926,9 @@ function Modal_Dial({
       setSeconds(0)
       setNote('')
       setPurchaseIntention(dialing.purchaseIntention || '未填写')
+      setAppointmentBooked('no')
+      setAppointmentTime(null)
+      setMeetingLink('')
     }
   }, [dialing])
 
@@ -939,7 +947,11 @@ function Modal_Dial({
       message.warning(t('sales.dial.noteRequired'))
       return
     }
-    onSave(note, purchaseIntention)
+    if (dialing?.businessLine === '越南' && appointmentBooked === 'yes' && !appointmentTime) {
+      message.warning('请选择销售咨询预约时间')
+      return
+    }
+    onSave(note, purchaseIntention, dialing?.businessLine === '越南' ? { booked: appointmentBooked === 'yes', scheduledStartAt: appointmentTime?.format('YYYY-MM-DD HH:mm:ss'), meetingLink } : undefined)
   }
 
   return (
@@ -999,6 +1011,16 @@ function Modal_Dial({
               placeholder={t('sales.f.notePlaceholder')}
             />
           </Form.Item>
+          {dialing?.businessLine === '越南' && <>
+            <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16, marginTop: 8 }}>
+              <Text strong>销售咨询预约</Text>
+              <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>本次外呼结束后可直接标记是否已预约；所有信息会随通话小结一并保存。</Text>
+            </div>
+            <Form.Item label="是否已预约" required style={{ marginTop: 16 }}>
+              <Select value={appointmentBooked} onChange={setAppointmentBooked} options={[{ label: '已预约', value: 'yes' }, { label: '未预约', value: 'no' }]} />
+            </Form.Item>
+            {appointmentBooked === 'yes' && <><Form.Item label="预约开始时间" required><DatePicker showTime value={appointmentTime} onChange={setAppointmentTime} style={{ width: '100%' }} /></Form.Item><Form.Item label="Google Meet 链接"><Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} placeholder="选填" /></Form.Item></>}
+          </>}
         </Form>
       )}
     </Modal>
@@ -1012,14 +1034,12 @@ function Modal_Follow({
   form,
   onCancel,
   onOk,
-  onLifecycle,
 }: {
   t: (k: string, v?: Record<string, string | number>) => string
   editing: Student | null
   form: ReturnType<typeof Form.useForm>[0]
   onCancel: () => void
   onOk: () => void
-  onLifecycle: () => void
 }) {
   const history: SalesFollowLog[] = editing?.salesHistory ?? []
   return (
@@ -1044,7 +1064,6 @@ function Modal_Follow({
           <Input.TextArea rows={3} placeholder={t('sales.f.notePlaceholder')} />
         </Form.Item>
       </Form>
-      {editing?.businessLine === '越南' && <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8, marginBottom: 12 }}><Text strong>销售咨询链路</Text><div style={{ marginTop: 8 }}><Text type="secondary">预约、出勤、No Show、咨询完成及关闭/再激活均在链路标记中记录。</Text><br /><Button type="link" style={{ paddingLeft: 0, marginTop: 4 }} onClick={onLifecycle}>进入链路数据标记</Button></div></div>}
       <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
         <Text strong>{t('sales.history')}</Text>
         <div style={{ marginTop: 12 }}>
