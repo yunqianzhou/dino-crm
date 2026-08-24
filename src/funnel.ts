@@ -14,6 +14,8 @@ export function isRegisteredNotTried(s: Student, lessons: LessonRecord[]): boole
 // 销售中心线索：未付费-未体验，且能拿到手机号 → 自动进入销售中心
 // 一旦跟进为「已付费」，会改写 status 为「付费」，从而离开销售中心、进入用户中心
 export function isSalesLead(s: Student, lessons: LessonRecord[]): boolean {
+  // 越南线上销售咨询与 App 体验课为独立链路，App 完课不应移出销售中心。
+  if (s.businessLine === '越南') return !isPaidStatus(s) && hasContactPhone(s)
   return isRegisteredNotTried(s, lessons) && hasContactPhone(s)
 }
 

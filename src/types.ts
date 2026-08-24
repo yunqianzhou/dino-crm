@@ -151,6 +151,9 @@ export type Student = {
   salesLatestNote?: string // 最新备注
   salesUpdatedAt?: string // 最后更新时间
   salesHistory?: SalesFollowLog[] // 跟进记录
+  salesAppointments?: SalesAppointment[] // 销售咨询预约历史（与 App 课程分离）
+  salesLifecycleEvents?: SalesLifecycleEvent[] // 节点标签上报事件（不可覆盖）
+  salesLifecycleStatus?: SalesLifecycleStatus // 本期仅记录当前状态，不产生待办或提醒
 }
 
 // 销售跟进进度（线索在销售中心的状态；转「已体验/已付费」时改写 status 并离开销售中心）
@@ -164,6 +167,43 @@ export type SalesFollowLog = {
   audioUrl?: string
   aiSummary?: string
 }
+
+export type SalesAppointmentStatus = '已预约' | '已改期' | '已取消'
+export type SalesAttendanceStatus = '待标记' | '已出勤' | 'No Show'
+export type SalesConsultationStatus = '待标记' | '已完成' | '未完成'
+
+export type SalesAppointment = {
+  appointmentId: string
+  scheduledStartAt: string
+  timezone: string
+  meetingLink?: string
+  appointmentStatus: SalesAppointmentStatus
+  attendanceStatus: SalesAttendanceStatus
+  consultationStatus: SalesConsultationStatus
+  reason?: string
+  note?: string
+  createdBy: string
+  createdAt: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+export type SalesLifecycleNode = 'lead' | 'outbound' | 'contact' | 'appointment' | 'attendance' | 'consultation' | 'sale'
+export type SalesLifecycleEvent = {
+  eventId: string
+  node: SalesLifecycleNode
+  result: string
+  reason?: string
+  description: string
+  contactChannel?: '电话' | 'Zalo' | 'WhatsApp' | '用户主动联系' | '其他'
+  appointmentId?: string
+  occurredAt: string
+  reportedAt: string
+  reportedBy: string
+  source: 'CC手动' | '外呼系统' | '订单系统' | '系统任务'
+}
+
+export type SalesLifecycleStatus = '进行中' | '已关闭'
 
 // 销售设置（每条业务线独立配置）
 export type SalesSettings = {

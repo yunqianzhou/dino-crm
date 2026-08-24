@@ -23,8 +23,8 @@ import {
 import { CheckOutlined, DownOutlined, EditOutlined, PhoneOutlined, SearchOutlined, SettingOutlined, SwapOutlined, RollbackOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { genCallId, setState, updateSalesSettings, useStore } from '../store'
-import type { Account, CallRecord, CallResult, SalesFollowLog, SalesSettings, Student, UserType, UserStatus } from '../types'
+import { genCallId, setState, uid, updateSalesSettings, useStore } from '../store'
+import type { Account, CallRecord, CallResult, SalesFollowLog, SalesLifecycleNode, SalesSettings, Student, UserType, UserStatus } from '../types'
 import { CALL_RESULTS } from '../types'
 import { useI18n } from '../i18n'
 import { useNavigate } from 'react-router-dom'
@@ -74,6 +74,18 @@ const PROGRESS_COLOR: Record<string, string> = {
 // 更新跟进弹窗里可选的进度
 const FOLLOW_PROGRESS = ['跟进中', '已付费', '暂不跟进'] as const
 
+const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待预约: 'default', 已预约: 'blue', 待出勤确认: 'orange', 已出勤: 'cyan', 'No Show': 'red', 咨询完成待付费: 'purple', 已成交: 'green' }
+function currentAppointment(student: Student) { return (student.salesAppointments ?? []).find((item) => item.appointmentStatus === '已预约') }
+function consultationStage(student: Student, paid: boolean) {
+  if (paid) return '已成交'
+  const current = currentAppointment(student)
+  if (!current) { const last = student.salesAppointments?.[0]; return last?.attendanceStatus === 'No Show' ? 'No Show' : last?.consultationStatus === '已完成' ? '咨询完成待付费' : '待预约' }
+  if (current.attendanceStatus === 'No Show') return 'No Show'
+  if (current.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待付费' : '已出勤'
+  return dayjs(current.scheduledStartAt).isBefore(dayjs()) ? '待出勤确认' : '已预约'
+}
+function isPaidStudent(student: Student) { return student.status === '付费' || student.paymentStatusStr === '已付费' }
+
 export default function SalesCenter({ importAction, detailPath, phase3 = false }: { importAction?: ReactNode; detailPath?: string; phase3?: boolean }) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -106,12 +118,14 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const [keyword, setKeyword] = useState('')
   const [callResultFilter, setCallResultFilter] = useState<string | undefined>()
   const [callDateRange, setCallDateRange] = useState<any>(null)
+  const [consultationStageFilter, setConsultationStageFilter] = useState<string | undefined>()
 
   const [editing, setEditing] = useState<Student | null>(null)
   const [dialing, setDialing] = useState<Student | null>(null)
   const [reassigning, setReassigning] = useState<Student | null>(null)
   const [dropping, setDropping] = useState<Student | null>(null)
   const [trialLevelStudent, setTrialLevelStudent] = useState<Student | null>(null)
+  const [consulting, setConsulting] = useState<Student | null>(null)
   const [reassignTo, setReassignTo] = useState<string | undefined>()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [form] = Form.useForm()
@@ -154,7 +168,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     () =>
       poolAll.filter((s) => {
         const kw = keyword.trim().toLowerCase()
-        return !kw || leadText(s).includes(kw)
+        const matchStage = !consultationStageFilter || (s.businessLine === '越南' && consultationStage(s, isPaidStudent(s)) === consultationStageFilter)
+        return (!kw || leadText(s).includes(kw)) && matchStage
       }),
     [poolAll, keyword],
   )
@@ -165,7 +180,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         const kw = keyword.trim().toLowerCase()
         return !kw || leadText(s).includes(kw)
       }),
-    [followAll, keyword],
+    [followAll, keyword, consultationStageFilter],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -385,6 +400,35 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     message.success(t('sales.dialed'))
   }
 
+  const saveConsultation = (action: 'create' | 'reschedule' | 'cancel' | 'attended' | 'noShow' | 'completed' | 'incomplete' | 'contact' | 'close' | 'reactivate', values: any) => {
+    if (!consulting) return
+    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const label: Record<string, string> = { create: '创建销售咨询预约', reschedule: '销售咨询已改期', cancel: '取消销售咨询预约', attended: '标记已出勤', noShow: '标记 No Show', completed: '标记咨询完成', incomplete: '标记咨询未完成', contact: '记录其他渠道联系', close: '关闭 Lead', reactivate: '重新激活 Lead' }
+    setState((prev) => ({ ...prev, students: prev.students.map((student) => {
+      if (student.studentId !== consulting.studentId) return student
+      const current = currentAppointment(student)
+      let appointments = [...(student.salesAppointments ?? [])]
+      if (action === 'create' || action === 'reschedule') {
+        if (action === 'reschedule' && current) appointments = appointments.map((item) => item.appointmentId === current.appointmentId ? { ...item, appointmentStatus: '已改期', reason: values.reason, updatedBy: actor, updatedAt: now } : item)
+        appointments = [{ appointmentId: uid('sa_'), scheduledStartAt: values.scheduledStartAt!, timezone: values.timezone || 'Asia/Ho_Chi_Minh', meetingLink: values.meetingLink, appointmentStatus: '已预约', attendanceStatus: '待标记', consultationStatus: '待标记', note: values.note, createdBy: actor, createdAt: now }, ...appointments]
+      } else if (current && ['cancel', 'attended', 'noShow', 'completed', 'incomplete'].includes(action)) {
+        appointments = appointments.map((item) => {
+          if (item.appointmentId !== current.appointmentId) return item
+          if (action === 'cancel') return { ...item, appointmentStatus: '已取消', reason: values.reason, note: values.note, updatedBy: actor, updatedAt: now }
+          if (action === 'attended') return { ...item, attendanceStatus: '已出勤', note: values.note, updatedBy: actor, updatedAt: now }
+          if (action === 'noShow') return { ...item, attendanceStatus: 'No Show', reason: values.reason, note: values.note, updatedBy: actor, updatedAt: now }
+          return { ...item, consultationStatus: action === 'completed' ? '已完成' : '未完成', note: values.note, updatedBy: actor, updatedAt: now }
+        })
+      }
+      const result: Record<string, string> = { create: '已预约', reschedule: '已改期', cancel: '已取消', attended: '已出勤', noShow: 'No Show', completed: '咨询完成', incomplete: '咨询未完成', close: '已关闭', reactivate: '已再激活' }
+      const event = { eventId: uid('sle_'), node: (action === 'contact' ? 'contact' : action === 'close' || action === 'reactivate' ? 'lead' : ['create', 'reschedule', 'cancel'].includes(action) ? 'appointment' : ['attended', 'noShow'].includes(action) ? 'attendance' : 'consultation') as SalesLifecycleNode, result: action === 'contact' ? values.contactResult : result[action], reason: values.reason, description: values.note, contactChannel: values.contactChannel, appointmentId: current?.appointmentId, occurredAt: values.occurredAt || now, reportedAt: now, reportedBy: actor, source: 'CC手动' as const }
+      const note = `【销售咨询】${label[action]}${values.reason ? `：${values.reason}` : ''}`
+      return { ...student, salesLifecycleStatus: action === 'close' ? '已关闭' : action === 'reactivate' ? '进行中' : student.salesLifecycleStatus, salesAppointments: appointments, salesLifecycleEvents: [event, ...(student.salesLifecycleEvents ?? [])], salesLatestNote: note, salesUpdatedAt: now, salesHistory: [{ progress: student.salesProgress || '跟进中', note, time: now, owner: actor }, ...(student.salesHistory || [])] }
+    }) }))
+    setConsulting(null)
+    message.success(label[action])
+  }
+
   const typeCol = {
     title: t('user.col.userType'),
     dataIndex: 'userType',
@@ -394,6 +438,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       return <Tag color={USER_TYPE_COLOR[tp]}>{t(`enum.userType.${tp}`)}</Tag>
     },
   }
+  const consultationColumns: ColumnsType<Student> = [
+    { title: '销售咨询阶段', key: 'consultationStage', width: 150, render: (_: unknown, s) => s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[consultationStage(s, isPaidStudent(s))]}>{consultationStage(s, isPaidStudent(s))}</Tag> : <Text type="secondary">—</Text> },
+    { title: '最近预约时间', key: 'appointmentTime', width: 180, render: (_: unknown, s) => { const item = currentAppointment(s); return item ? <LocalTime time={item.scheduledStartAt} country="越南" /> : <Text type="secondary">—</Text> } },
+    { title: '出勤', key: 'attendance', width: 100, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{item.attendanceStatus}</Tag> : <Text type="secondary">—</Text> } },
+    { title: '咨询完成', key: 'completed', width: 110, render: (_: unknown, s) => { const item = currentAppointment(s) ?? s.salesAppointments?.[0]; return item ? <Tag>{item.consultationStatus}</Tag> : <Text type="secondary">—</Text> } },
+  ]
   // 基于「用户中心-二期」字段增加
   const userColumns: ColumnsType<Student> = [
     {
@@ -502,6 +552,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const followColumns: ColumnsType<Student> = [
     ...userColumns,
+    ...consultationColumns,
     {
       title: t('sales.col.latestNote'),
       dataIndex: 'salesLatestNote',
@@ -642,6 +693,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             />
           </>
         )}
+        {tab === 'follow' && <Select allowClear placeholder="销售咨询阶段（越南）" style={{ width: 190 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={['待预约', '已预约', '待出勤确认', '已出勤', 'No Show', '咨询完成待付费', '已成交'].map((value) => ({ label: value, value }))} />}
         <Input
           allowClear
           prefix={<SearchOutlined />}
@@ -722,9 +774,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         form={form}
         onCancel={() => setEditing(null)}
         onOk={saveFollow}
+        onLifecycle={() => { if (editing) { setConsulting(editing); setEditing(null) } }}
       />
 
       <Modal_Dial t={t} dialing={dialing} onCancel={() => setDialing(null)} onSave={saveCall} />
+      <Modal_Consultation student={consulting} paid={consulting ? isPaidStudent(consulting) : false} hasConnectedCall={consulting ? callRecords.some((item) => item.studentId === consulting.studentId && item.result === '已接通') : false} onCancel={() => setConsulting(null)} onSave={saveConsultation} />
 
       <Modal
         open={!!reassigning}
@@ -807,6 +861,40 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       )}
     </Card>
   )
+}
+
+function Modal_Consultation({ student, paid, hasConnectedCall, onCancel, onSave }: { student: Student | null; paid: boolean; hasConnectedCall: boolean; onCancel: () => void; onSave: (action: any, values: any) => void }) {
+  const [form] = Form.useForm()
+  const [action, setAction] = useState<string | null>(null)
+  const active = student ? currentAppointment(student) : undefined
+  const appointments = student?.salesAppointments ?? []
+  const closed = student?.salesLifecycleStatus === '已关闭'
+  const start = (next: string) => { setAction(next); form.resetFields(); form.setFieldValue('occurredAt', dayjs()); if (next === 'create') form.setFieldValue('timezone', 'Asia/Ho_Chi_Minh') }
+  const submit = async () => { const v = await form.validateFields(); onSave(action, { ...v, scheduledStartAt: v.scheduledStartAt?.format('YYYY-MM-DD HH:mm:ss'), occurredAt: v.occurredAt?.format('YYYY-MM-DD HH:mm:ss') }) }
+  const title: Record<string, string> = { create: '创建销售咨询预约', reschedule: '改期销售咨询', cancel: '取消预约', attended: '标记已出勤', noShow: '标记 No Show', completed: '标记咨询完成', incomplete: '标记咨询未完成', contact: '记录其他渠道联系', close: '关闭 Lead', reactivate: '重新激活 Lead' }
+  return <Modal open={!!student} title={`销售咨询链路标记 · ${student?.localName || student?.name || ''}`} width={720} destroyOnClose onCancel={onCancel} footer={action ? [<Button key="back" onClick={() => setAction(null)}>返回</Button>, <Button key="save" type="primary" onClick={submit}>确认</Button>] : [<Button key="close" onClick={onCancel}>关闭</Button>]}>
+    {student && !action && <>
+      <Alert type={paid ? 'success' : closed ? 'warning' : 'info'} showIcon style={{ marginBottom: 16 }} message={paid ? '已成交：支付状态来自订单中心' : closed ? '链路状态：已关闭' : `当前阶段：${consultationStage(student, paid)}`} description="所有变更均会记录原因、说明、业务发生时间和操作人。" />
+      {active ? <Card size="small" title="当前有效预约" style={{ marginBottom: 16 }}><Space direction="vertical"><span>预约时间：<LocalTime time={active.scheduledStartAt} country="越南" /></span><span>出勤：<Tag>{active.attendanceStatus}</Tag>　咨询完成：<Tag>{active.consultationStatus}</Tag></span></Space></Card> : <Alert type="warning" showIcon style={{ marginBottom: 16 }} message="当前无有效预约" />}
+      {!paid && !closed && <Space wrap style={{ marginBottom: 16 }}>
+        {!active && (hasConnectedCall || appointments.length > 0) && <Button type="primary" onClick={() => start('create')}>创建预约</Button>}
+        <Button onClick={() => start('contact')}>记录其他渠道联系</Button>
+        {active?.attendanceStatus === '待标记' && <><Button onClick={() => start('reschedule')}>改期</Button><Button danger onClick={() => start('cancel')}>取消预约</Button><Button type="primary" onClick={() => start('attended')}>标记已出勤</Button><Button danger onClick={() => start('noShow')}>标记 No Show</Button></>}
+        {active?.attendanceStatus === '已出勤' && active.consultationStatus === '待标记' && <><Button type="primary" onClick={() => start('completed')}>标记咨询完成</Button><Button onClick={() => start('incomplete')}>标记咨询未完成</Button></>}
+        {active && (active.attendanceStatus === 'No Show' || active.consultationStatus !== '待标记') && <Button type="primary" onClick={() => start('reschedule')}>再次预约</Button>}
+        <Button danger onClick={() => start('close')}>关闭 Lead</Button>
+      </Space>}
+      {!paid && !closed && !active && !hasConnectedCall && !appointments.length && <Alert type="warning" showIcon message="请先完成电话外呼并获得已接听结果" description="Lead 的首次预约必须由电话已接听推进。" />}
+      {!paid && closed && <Button type="primary" onClick={() => start('reactivate')}>重新激活 Lead</Button>}
+      <Text strong style={{ display: 'block', marginTop: 12 }}>预约历史</Text><Timeline style={{ marginTop: 12 }} items={appointments.length ? appointments.map((item) => ({ children: `${item.appointmentStatus} · ${item.scheduledStartAt} · 出勤：${item.attendanceStatus} · 咨询：${item.consultationStatus}${item.reason ? ` · 原因：${item.reason}` : ''}` })) : [{ color: 'gray', children: '暂无销售咨询预约' }]} />
+    </>}
+    {student && action && <Form form={form} layout="vertical" preserve={false}><Alert type="info" showIcon style={{ marginBottom: 16 }} message={title[action]} />
+      {['create', 'reschedule'].includes(action) && <><Form.Item name="scheduledStartAt" label="预约开始时间" rules={[{ required: true, message: '请选择预约开始时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="timezone" label="时区" rules={[{ required: true }]}><Select options={[{ label: '越南（Asia/Ho_Chi_Minh）', value: 'Asia/Ho_Chi_Minh' }]} /></Form.Item><Form.Item name="meetingLink" label="Google Meet 链接"><Input /></Form.Item></>}
+      {action === 'contact' && <><Form.Item name="contactChannel" label="联系渠道" rules={[{ required: true, message: '请选择联系渠道' }]}><Select options={['Zalo', 'WhatsApp', '用户主动联系', '其他'].map((value) => ({ label: value, value }))} /></Form.Item><Form.Item name="contactResult" label="联系结果" rules={[{ required: true, message: '请选择联系结果' }]}><Select options={['已联系成功', '未联系成功'].map((value) => ({ label: value, value }))} /></Form.Item></>}
+      {['reschedule', 'cancel', 'noShow', 'incomplete', 'close'].includes(action) && <Form.Item name="reason" label="原因" rules={[{ required: true, message: '请填写原因' }]}><Input.TextArea rows={3} /></Form.Item>}
+      <Form.Item name="occurredAt" label="业务发生时间" rules={[{ required: true, message: '请选择业务发生时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="note" label="标记说明" rules={[{ required: true, message: '请填写本次标记说明' }]}><Input.TextArea rows={3} /></Form.Item>
+    </Form>}
+  </Modal>
 }
 
 // 外呼弹窗：模拟发起呼叫 → 挂断后填写通话小结
@@ -924,12 +1012,14 @@ function Modal_Follow({
   form,
   onCancel,
   onOk,
+  onLifecycle,
 }: {
   t: (k: string, v?: Record<string, string | number>) => string
   editing: Student | null
   form: ReturnType<typeof Form.useForm>[0]
   onCancel: () => void
   onOk: () => void
+  onLifecycle: () => void
 }) {
   const history: SalesFollowLog[] = editing?.salesHistory ?? []
   return (
@@ -954,6 +1044,7 @@ function Modal_Follow({
           <Input.TextArea rows={3} placeholder={t('sales.f.notePlaceholder')} />
         </Form.Item>
       </Form>
+      {editing?.businessLine === '越南' && <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12, marginTop: 8, marginBottom: 12 }}><Text strong>销售咨询链路</Text><div style={{ marginTop: 8 }}><Text type="secondary">预约、出勤、No Show、咨询完成及关闭/再激活均在链路标记中记录。</Text><br /><Button type="link" style={{ paddingLeft: 0, marginTop: 4 }} onClick={onLifecycle}>进入链路数据标记</Button></div></div>}
       <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 12 }}>
         <Text strong>{t('sales.history')}</Text>
         <div style={{ marginTop: 12 }}>
