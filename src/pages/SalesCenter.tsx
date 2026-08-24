@@ -990,7 +990,7 @@ function Modal_Dial({
   const [seconds, setSeconds] = useState(0)
   const [note, setNote] = useState('')
   const [purchaseIntention, setPurchaseIntention] = useState('未填写')
-  const [appointmentBooked, setAppointmentBooked] = useState<'yes' | 'no'>('no')
+  const [appointmentAction, setAppointmentAction] = useState<'create' | 'continue'>('continue')
   const [appointmentTime, setAppointmentTime] = useState<any>(null)
   const [meetingLink, setMeetingLink] = useState('')
 
@@ -1001,7 +1001,7 @@ function Modal_Dial({
       setSeconds(0)
       setNote('')
       setPurchaseIntention(dialing.purchaseIntention || '未填写')
-      setAppointmentBooked('no')
+      setAppointmentAction('continue')
       setAppointmentTime(null)
       setMeetingLink('')
     }
@@ -1022,11 +1022,11 @@ function Modal_Dial({
       message.warning(t('sales.dial.noteRequired'))
       return
     }
-    if (dialing?.businessLine === '越南' && appointmentBooked === 'yes' && !appointmentTime) {
+    if (dialing?.businessLine === '越南' && appointmentAction === 'create' && !appointmentTime) {
       message.warning('请选择销售咨询预约时间')
       return
     }
-    onSave(note, purchaseIntention, dialing?.businessLine === '越南' ? { booked: appointmentBooked === 'yes', scheduledStartAt: appointmentTime?.format('YYYY-MM-DD HH:mm:ss'), meetingLink } : undefined)
+    onSave(note, purchaseIntention, dialing?.businessLine === '越南' ? { booked: appointmentAction === 'create', scheduledStartAt: appointmentTime?.format('YYYY-MM-DD HH:mm:ss'), meetingLink } : undefined)
   }
 
   return (
@@ -1078,24 +1078,24 @@ function Modal_Dial({
               <Select.Option value="无意向">{t('sales.purchaseIntention.no')}</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item label={t('sales.call.note')} required>
+          {dialing?.businessLine === '越南' && <>
+            <div style={{ marginBottom: 12 }}>{t('sales.consultation.currentStage')}：<Tag color={CONSULTATION_STAGE_COLOR['待外呼']}>{t('sales.consultation.stage.待外呼')}</Tag></div>
+            <Form.Item label={t('sales.consultation.nextAction')} required>
+              <Select value={appointmentAction} onChange={setAppointmentAction} options={[
+                { label: t('sales.consultation.action.continue'), value: 'continue' },
+                { label: t('sales.consultation.action.create'), value: 'create' },
+              ]} />
+            </Form.Item>
+            {appointmentAction === 'create' && <><Form.Item label={t('sales.consultation.appointmentTime')} required><DatePicker showTime value={appointmentTime} onChange={setAppointmentTime} style={{ width: '100%' }} /></Form.Item><Form.Item label="Google Meet"><Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} placeholder={t('sales.optional')} /></Form.Item></>}
+          </>}
+          <Form.Item label={t('sales.f.note')} required>
             <Input.TextArea
-              rows={4}
+              rows={3}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={t('sales.f.notePlaceholder')}
             />
           </Form.Item>
-          {dialing?.businessLine === '越南' && <>
-            <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 16, marginTop: 8 }}>
-              <Text strong>销售咨询预约</Text>
-              <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>本次外呼结束后可直接标记是否已预约；所有信息会随通话小结一并保存。</Text>
-            </div>
-            <Form.Item label="是否已预约" required style={{ marginTop: 16 }}>
-              <Select value={appointmentBooked} onChange={setAppointmentBooked} options={[{ label: '已预约', value: 'yes' }, { label: '未预约', value: 'no' }]} />
-            </Form.Item>
-            {appointmentBooked === 'yes' && <><Form.Item label="预约开始时间" required><DatePicker showTime value={appointmentTime} onChange={setAppointmentTime} style={{ width: '100%' }} /></Form.Item><Form.Item label="Google Meet 链接"><Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} placeholder="选填" /></Form.Item></>}
-          </>}
         </Form>
       )}
     </Modal>
