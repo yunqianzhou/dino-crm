@@ -254,8 +254,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     })
   }
 
-  const saveFollow = async () => {
-    const v = await form.validateFields()
+  const persistFollow = (v: any) => {
     if (!editing) return
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
     const note = (v.note as string).trim()
@@ -314,6 +313,28 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     }))
     setEditing(null)
     message.success(t('sales.saved'))
+  }
+
+  const saveFollow = async () => {
+    const v = await form.validateFields()
+    const action = v.lifecycleAction as string | undefined
+    const immutableActions = ['reschedule', 'cancel', 'attended', 'noShow', 'completed', 'incomplete', 'close']
+    if (!immutableActions.includes(action || '')) {
+      persistFollow(v)
+      return
+    }
+    const content = action === 'close'
+      ? t('sales.consultation.confirm.close')
+      : ['cancel', 'noShow', 'completed', 'incomplete'].includes(action || '')
+        ? t('sales.consultation.confirm.endAppointment')
+        : t('sales.consultation.confirm.immutable')
+    Modal.confirm({
+      title: t('sales.consultation.confirm.title', { action: t(`sales.consultation.action.${action}`) }),
+      content,
+      okText: t('common.confirm'),
+      cancelText: t('common.cancel'),
+      onOk: () => persistFollow(v),
+    })
   }
 
   const openReassign = (s: Student) => {
@@ -820,6 +841,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         t={t}
         editing={editing}
         form={form}
+        hasConnectedCall={editing ? callRecords.some((item) => item.studentId === editing.studentId && item.result === '已接通') : false}
         onCancel={() => setEditing(null)}
         onOk={saveFollow}
       />
@@ -1077,12 +1099,14 @@ function Modal_Follow({
   t,
   editing,
   form,
+  hasConnectedCall,
   onCancel,
   onOk,
 }: {
   t: (k: string, v?: Record<string, string | number>) => string
   editing: Student | null
   form: ReturnType<typeof Form.useForm>[0]
+  hasConnectedCall: boolean
   onCancel: () => void
   onOk: () => void
 }) {
@@ -1097,7 +1121,7 @@ function Modal_Follow({
     { label: t('sales.consultation.action.continue'), value: 'continue' },
     { label: t('sales.consultation.action.pause'), value: 'pause' },
     ...(isClosed ? [{ label: t('sales.consultation.action.reactivate'), value: 'reactivate' }] : [
-      ...(!activeAppointment && appointmentHistory.length > 0 ? [{ label: t('sales.consultation.action.create'), value: 'create' }] : []),
+      ...(!activeAppointment && (appointmentHistory.length > 0 || hasConnectedCall) ? [{ label: t('sales.consultation.action.create'), value: 'create' }] : []),
       ...(activeAppointment?.attendanceStatus === '待标记' ? [
         { label: t('sales.consultation.action.reschedule'), value: 'reschedule' },
         { label: t('sales.consultation.action.cancel'), value: 'cancel' },
@@ -1132,7 +1156,7 @@ function Modal_Follow({
         </Form.Item>
         {isVietnamLead && <>
           {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag><Tag>{t('sales.consultation.attendance')}：{t(`sales.consultation.attendance.${activeAppointment.attendanceStatus}`)}</Tag><Tag>{t('sales.consultation.completed')}：{t(`sales.consultation.completed.${activeAppointment.consultationStatus}`)}</Tag></div>}
-          {!activeAppointment && appointmentHistory.length === 0 && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
+          {!activeAppointment && appointmentHistory.length === 0 && !hasConnectedCall && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
           <Form.Item name="lifecycleAction" label={t('sales.consultation.result')}>
             <Select options={lifecycleOptions} />
           </Form.Item>
