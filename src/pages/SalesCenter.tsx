@@ -71,10 +71,6 @@ const PROGRESS_COLOR: Record<string, string> = {
   已付费: 'green',
 }
 
-// 更新跟进弹窗里可选的进度
-// 付费由订单中心回流；此处只允许设置可恢复的跟进状态。
-const FOLLOW_PROGRESS = ['跟进中', '暂不跟进'] as const
-
 const CONSULTATION_STAGES = ['待预约', '已预约', '待出勤确认', '已出勤', '未出勤', '咨询完成待付费', '已成交', '暂不跟进', '已关闭'] as const
 const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待预约: 'default', 已预约: 'blue', 待出勤确认: 'orange', 已出勤: 'cyan', 未出勤: 'red', 咨询完成待付费: 'purple', 已成交: 'green', 暂不跟进: 'gold', 已关闭: 'default' }
 function currentAppointment(student: Student) { return (student.salesAppointments ?? []).find((item) => item.appointmentStatus === '已预约') }
@@ -245,8 +241,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     form.setFieldsValue({
       note: '',
       purchaseIntention: s.purchaseIntention || '未填写',
-      salesProgress: s.salesProgress || '跟进中',
-      lifecycleAction: 'none',
+      lifecycleAction: 'continue',
       occurredAt: dayjs(),
       scheduledStartAt: undefined,
       meetingLink: '',
@@ -262,7 +257,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     const owner = editing.salesOwner ?? actor
     const action = v.lifecycleAction as string | undefined
     const actionLabel: Record<string, string> = {
-      create: '新建预约', reschedule: '已改期', cancel: '已取消预约', attended: '已出勤',
+      continue: '继续跟进', pause: '暂不跟进', create: '新建预约', reschedule: '已改期', cancel: '已取消预约', attended: '已出勤',
       noShow: '未出勤', completed: '咨询完成', incomplete: '咨询未完成', close: '已关闭', reactivate: '已重新激活',
     }
     const occurredAt = v.occurredAt?.format?.('YYYY-MM-DD HH:mm:ss') || now
@@ -270,11 +265,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       ...prev,
       students: prev.students.map((x) => {
         if (x.studentId === editing.studentId) {
-          const currentProgress = v.salesProgress || x.salesProgress || '跟进中'
+          const currentProgress = action === 'pause' ? '暂不跟进' : ['continue', 'reactivate'].includes(action || '') ? '跟进中' : x.salesProgress || '跟进中'
           const current = currentAppointment(x)
           let appointments = [...(x.salesAppointments ?? [])]
           let event = undefined as any
-          if (action && action !== 'none') {
+          if (action && !['continue', 'pause'].includes(action)) {
             if (action === 'create' || action === 'reschedule') {
               if (action === 'reschedule' && current) {
                 appointments = appointments.map((item) => item.appointmentId === current.appointmentId ? { ...item, appointmentStatus: '已改期' as const, reason: v.reason, updatedBy: owner, updatedAt: now } : item)
@@ -295,7 +290,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               event = { eventId: uid('sle_'), node: (action === 'cancel' ? 'appointment' : ['attended', 'noShow'].includes(action) ? 'attendance' : 'consultation') as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, appointmentId: current.appointmentId, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
             }
           }
-          const historyNote = action && action !== 'none' ? `${note}\n【销售咨询】${actionLabel[action]}${v.reason ? `：${v.reason}` : ''}` : note
+          if (action === 'pause') event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason: v.reason, description: note, occurredAt, reportedAt: now, reportedBy: owner, source: 'CC手动' as const }
+          const historyNote = action && action !== 'continue' ? `${note}\n【销售咨询】${actionLabel[action]}${v.reason ? `：${v.reason}` : ''}` : note
           return {
             ...x,
             purchaseIntention: v.purchaseIntention,
@@ -1093,7 +1089,8 @@ function Modal_Follow({
   const isClosed = editing?.salesLifecycleStatus === '已关闭'
   const appointmentHistory = editing?.salesAppointments ?? []
   const lifecycleOptions = [
-    { label: t('sales.consultation.action.none'), value: 'none' },
+    { label: t('sales.consultation.action.continue'), value: 'continue' },
+    { label: t('sales.consultation.action.pause'), value: 'pause' },
     ...(isClosed ? [{ label: t('sales.consultation.action.reactivate'), value: 'reactivate' }] : [
       ...(!activeAppointment && appointmentHistory.length > 0 ? [{ label: t('sales.consultation.action.create'), value: 'create' }] : []),
       ...(activeAppointment?.attendanceStatus === '待标记' ? [
@@ -1109,7 +1106,7 @@ function Modal_Follow({
       { label: t('sales.consultation.action.close'), value: 'close' },
     ]),
   ]
-  const requiresReason = ['reschedule', 'cancel', 'noShow', 'incomplete', 'close'].includes(lifecycleAction)
+  const requiresReason = ['pause', 'reschedule', 'cancel', 'noShow', 'incomplete', 'close'].includes(lifecycleAction)
   return (
     <ModalWrapper open={!!editing} title={t('sales.modal.title')} onCancel={onCancel} onOk={onOk} okText={t('sales.saveFollow')} cancelText={t('common.cancel')}>
       <Form form={form} layout="vertical" preserve={false} style={{ marginTop: 8 }}>
@@ -1128,9 +1125,6 @@ function Modal_Follow({
             <Select.Option value="无意向">{t('sales.purchaseIntention.no')}</Select.Option>
           </Select>
         </Form.Item>
-        <Form.Item name="salesProgress" label={t('sales.followStatus')}>
-          <Select options={FOLLOW_PROGRESS.map((value) => ({ label: t(`sales.progress.${value}`), value }))} />
-        </Form.Item>
         {isVietnamLead && <>
           {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag><Tag>{t('sales.consultation.attendance')}：{t(`sales.consultation.attendance.${activeAppointment.attendanceStatus}`)}</Tag><Tag>{t('sales.consultation.completed')}：{t(`sales.consultation.completed.${activeAppointment.consultationStatus}`)}</Tag></div>}
           {!activeAppointment && appointmentHistory.length === 0 && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
@@ -1142,7 +1136,7 @@ function Modal_Follow({
             <Form.Item name="meetingLink" label="Google Meet"><Input placeholder={t('sales.optional')} /></Form.Item>
           </>}
           {requiresReason && <Form.Item name="reason" label={t('sales.consultation.reason')} rules={[{ required: true, message: t('sales.consultation.reasonRequired') }]}><Input.TextArea rows={2} placeholder={t('sales.consultation.reasonPlaceholder')} /></Form.Item>}
-          {lifecycleAction && lifecycleAction !== 'none' && <Form.Item name="occurredAt" label={t('sales.consultation.occurredAt')} rules={[{ required: true, message: t('sales.consultation.occurredAtRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>}
+          {lifecycleAction && lifecycleAction !== 'continue' && <Form.Item name="occurredAt" label={t('sales.consultation.occurredAt')} rules={[{ required: true, message: t('sales.consultation.occurredAtRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>}
         </>}
         <Form.Item name="note" label={t('sales.f.note')} rules={[{ required: true, message: t('sales.f.noteRequired') }]}>
           <Input.TextArea rows={3} placeholder={t('sales.f.notePlaceholder')} />
