@@ -123,7 +123,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const [keyword, setKeyword] = useState('')
   const [callResultFilter, setCallResultFilter] = useState<string | undefined>()
   const [callDateRange, setCallDateRange] = useState<any>(null)
-  const [consultationStageFilter, setConsultationStageFilter] = useState<string | undefined>()
+  const [consultationStageFilter, setConsultationStageFilter] = useState<string[]>([])
 
   const [editing, setEditing] = useState<Student | null>(null)
   const [dialing, setDialing] = useState<Student | null>(null)
@@ -169,7 +169,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const showVietnamStageFilter = filterOptions(lineOptions).includes('越南') && (lineSel.length === 0 || lineSel.includes('越南'))
 
   useEffect(() => {
-    if (!showVietnamStageFilter && consultationStageFilter) setConsultationStageFilter(undefined)
+    if (!showVietnamStageFilter && consultationStageFilter.length) setConsultationStageFilter([])
   }, [showVietnamStageFilter, consultationStageFilter])
 
   const leadText = (s: Student) =>
@@ -188,7 +188,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     () =>
       followAll.filter((s) => {
         const kw = keyword.trim().toLowerCase()
-        const matchStage = !consultationStageFilter || (s.businessLine === '越南' && consultationStage(s, callRecords) === consultationStageFilter)
+        const matchStage = consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))
         return (!kw || leadText(s).includes(kw)) && matchStage
       }),
     [followAll, keyword, consultationStageFilter, callRecords],
@@ -769,7 +769,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             />
           </>
         )}
-        {tab === 'follow' && showVietnamStageFilter && <Select allowClear placeholder={t('sales.consultation.filter')} style={{ width: 190 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
+        {tab === 'follow' && showVietnamStageFilter && <Select mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} style={{ width: 250 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
         <Input
           allowClear
           prefix={<SearchOutlined />}
