@@ -849,6 +849,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         editing={editing}
         form={form}
         hasConnectedCall={editing ? callRecords.some((item) => item.studentId === editing.studentId && item.result === '已接通') : false}
+        currentStage={editing ? consultationStage(editing, callRecords) : undefined}
         onCancel={() => setEditing(null)}
         onOk={saveFollow}
       />
@@ -1107,6 +1108,7 @@ function Modal_Follow({
   editing,
   form,
   hasConnectedCall,
+  currentStage,
   onCancel,
   onOk,
 }: {
@@ -1114,6 +1116,7 @@ function Modal_Follow({
   editing: Student | null
   form: ReturnType<typeof Form.useForm>[0]
   hasConnectedCall: boolean
+  currentStage?: string
   onCancel: () => void
   onOk: () => void
 }) {
@@ -1168,9 +1171,10 @@ function Modal_Follow({
           </Select>
         </Form.Item>
         {isVietnamLead && <>
+          {currentStage && <div style={{ marginBottom: 12 }}>{t('sales.consultation.currentStage')}：<Tag color={CONSULTATION_STAGE_COLOR[currentStage]}>{t(`sales.consultation.stage.${currentStage}`)}</Tag></div>}
           {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag></div>}
           {!activeAppointment && appointmentHistory.length === 0 && !hasConnectedCall && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
-          <Form.Item name="lifecycleAction" label={t('sales.consultation.result')}>
+          <Form.Item name="lifecycleAction" label={t('sales.consultation.nextAction')}>
             <Select options={lifecycleOptions} onChange={() => form.setFieldsValue({ reason: undefined, reasonOther: '' })} />
           </Form.Item>
           {['create', 'reschedule'].includes(lifecycleAction) && <>
