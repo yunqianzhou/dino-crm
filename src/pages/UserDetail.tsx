@@ -36,9 +36,15 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
   const scope = allowedLines()
 
   const student = useMemo(() => students.find((s) => s.studentId === studentId), [students, studentId])
+  const currentUserStatus = useMemo(
+    () => student ? resolveUserStatus(student, lessons) : undefined,
+    [student, lessons],
+  )
   const vietnamFollowStage = useMemo(
-    () => student?.businessLine === '越南' ? consultationStage(student, callRecords) : undefined,
-    [student, callRecords],
+    () => student?.businessLine === '越南' && currentUserStatus && !['付费', '付费逾期'].includes(currentUserStatus)
+      ? consultationStage(student, callRecords)
+      : undefined,
+    [student, callRecords, currentUserStatus],
   )
   const inScope = student && (!scope || scope.includes(student.businessLine))
   const canViewReport = can(variant === 'sales' ? 'salesV3_view_report' : 'usersV2_view_report') === 'operate'
@@ -138,7 +144,7 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
           {vietnamFollowStage && <Descriptions.Item label={t('sales.consultation.currentStage')}><Tag color={CONSULTATION_STAGE_COLOR[vietnamFollowStage]}>{t(`sales.consultation.stage.${vietnamFollowStage}`)}</Tag></Descriptions.Item>}
           <Descriptions.Item label={t('user.col.status')}>
             {(() => {
-              const status = resolveUserStatus(student, lessons)
+              const status = currentUserStatus!
               return <Tag color={STATUS_COLOR[status]}>{t(`enum.status.${status}`)}</Tag>
             })()}
           </Descriptions.Item>
