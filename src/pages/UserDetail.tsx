@@ -11,6 +11,7 @@ import { resolveUserType } from '../userType'
 import { openReplayVideo, reportKind, resolveUserStatus, studentLessons, TRIAL_REPORT_URL } from '../lessons'
 import { appChannelSourceText, lineLabel, lpChannelSourceText } from '../channel'
 import LocalTime from '../components/LocalTime'
+import { CONSULTATION_STAGE_COLOR, consultationStage } from '../salesLifecycle'
 
 const { Text } = Typography
 
@@ -30,10 +31,15 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
   const students = useStore((s) => s.students)
   const channels = useStore((s) => s.channels)
   const lessons = useStore((s) => s.lessons ?? [])
+  const callRecords = useStore((s) => s.callRecords ?? [])
   const { allowedLines, can } = usePerm()
   const scope = allowedLines()
 
   const student = useMemo(() => students.find((s) => s.studentId === studentId), [students, studentId])
+  const vietnamFollowStage = useMemo(
+    () => student?.businessLine === '越南' ? consultationStage(student, callRecords) : undefined,
+    [student, callRecords],
+  )
   const inScope = student && (!scope || scope.includes(student.businessLine))
   const canViewReport = can(variant === 'sales' ? 'salesV3_view_report' : 'usersV2_view_report') === 'operate'
   const canViewReplay = can(variant === 'sales' ? 'salesV3_view_replay' : 'usersV2_view_replay') === 'operate'
@@ -129,6 +135,7 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
           <Descriptions.Item label="用户ID">{student.studentId}</Descriptions.Item>
           <Descriptions.Item label="学生姓名">{student.localName || student.name}</Descriptions.Item>
           {variant === 'sales' && <Descriptions.Item label="购买意向">{student.purchaseIntention || <Text type="secondary">—</Text>}</Descriptions.Item>}
+          {vietnamFollowStage && <Descriptions.Item label={t('sales.consultation.currentStage')}><Tag color={CONSULTATION_STAGE_COLOR[vietnamFollowStage]}>{t(`sales.consultation.stage.${vietnamFollowStage}`)}</Tag></Descriptions.Item>}
           <Descriptions.Item label={t('user.col.status')}>
             {(() => {
               const status = resolveUserStatus(student, lessons)

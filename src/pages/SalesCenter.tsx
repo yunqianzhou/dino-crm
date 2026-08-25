@@ -36,6 +36,7 @@ import { useLineScope } from '../useLineScope'
 import { businessLineOf, lineLabel, lpChannelSourceText, appChannelSourceText } from '../channel'
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
+import { CONSULTATION_STAGE_COLOR, CONSULTATION_STAGES, consultationStage, currentAppointment } from '../salesLifecycle'
 
 const { Text } = Typography
 
@@ -71,25 +72,6 @@ const PROGRESS_COLOR: Record<string, string> = {
   已付费: 'green',
 }
 
-const CONSULTATION_STAGES = ['待外呼', '未接通待跟进', '已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '暂不跟进', '已关闭'] as const
-const CONSULTATION_STAGE_COLOR: Record<string, string> = { 待外呼: 'default', 未接通待跟进: 'orange', 已接通待预约: 'cyan', 已预约: 'blue', 未出勤待跟进: 'red', 咨询未完成待跟进: 'volcano', 咨询完成待支付: 'purple', 暂不跟进: 'gold', 已关闭: 'default' }
-function currentAppointment(student: Student) { return (student.salesAppointments ?? []).find((item) => item.appointmentStatus === '已预约') }
-function consultationStage(student: Student, callRecords: CallRecord[] = []) {
-  if (student.salesLifecycleStatus === '已关闭') return '已关闭'
-  if (student.salesProgress === '暂不跟进') return '暂不跟进'
-  const current = currentAppointment(student)
-  if (current?.attendanceStatus === 'No Show') return '未出勤待跟进'
-  if (current?.attendanceStatus === '已出勤') return current.consultationStatus === '已完成' ? '咨询完成待支付' : current.consultationStatus === '未完成' ? '咨询未完成待跟进' : '已预约'
-  // P0 暂无会议状态自动回传：无论预约时间是否已过，只要尚未人工标记会议结果，当前阶段均为“已预约”。
-  if (current) return '已预约'
-  const last = student.salesAppointments?.[0]
-  if (last?.attendanceStatus === 'No Show') return '未出勤待跟进'
-  if (last?.consultationStatus === '未完成') return '咨询未完成待跟进'
-  if (last?.consultationStatus === '已完成') return '咨询完成待支付'
-  const calls = callRecords.filter((item) => item.studentId === student.studentId)
-  if (!calls.length) return '待外呼'
-  return calls.some((item) => item.result === '已接通') ? '已接通待预约' : '未接通待跟进'
-}
 function isPaidStudent(student: Student) { return student.status === '付费' || student.paymentStatusStr === '已付费' }
 
 export default function SalesCenter({ importAction, detailPath, phase3 = false }: { importAction?: ReactNode; detailPath?: string; phase3?: boolean }) {
