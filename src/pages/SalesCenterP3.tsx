@@ -11,6 +11,9 @@ import { downloadCsv } from '../export'
 
 type LeadRow = { phone: string; areaCode?: string; channelCode?: string; followNote?: string }
 
+const MAX_IMPORT_RECORDS = 2000
+const MAX_IMPORT_FILE_SIZE = 10 * 1024 * 1024
+
 const AREA_CODE_LOCATION: Record<string, { country: string; businessLine: BusinessLine }> = {
   '60': { country: '马来西亚', businessLine: '马来' },
   '62': { country: '印尼', businessLine: '印尼' },
@@ -81,6 +84,10 @@ function LeadImportButton() {
       message.error('仅支持 CSV 或 Excel（.xlsx/.xls）文件。')
       return
     }
+    if (file.size > MAX_IMPORT_FILE_SIZE) {
+      message.error('请拆成多个文件')
+      return
+    }
     let content = ''
     if (isExcel) {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' })
@@ -91,6 +98,10 @@ function LeadImportButton() {
     }
     if (!content.trim()) {
       message.warning('文件中没有可导入的数据。')
+      return
+    }
+    if (parseLeads(content).length > MAX_IMPORT_RECORDS) {
+      message.error('请拆成多个文件')
       return
     }
     form.setFieldValue('content', content)
@@ -184,7 +195,8 @@ function LeadImportButton() {
               <p className="ant-upload-text">拖动至此处 <span style={{ color: '#ff4d4f' }}>点击上传</span></p>
               <p className="ant-upload-hint">支持 CSV 或 Excel（.xlsx / .xls）</p>
             </Upload.Dragger>
-            <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>表头：Phone Number、Phone Country Code、Channel Code、FOLLOW Remark；系统将按手机区号自动映射国家与业务线，重复手机号会自动跳过。{fileName ? '已读取：' + fileName : ''}</div>
+            <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 8 }}>单个文件最多 2,000 条记录，文件大小不超过 10MB；超过上限请拆成多个文件。</div>
+            <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 4 }}>表头：Phone Number、Phone Country Code、Channel Code、FOLLOW Remark；系统将按手机区号自动映射国家与业务线，重复手机号会自动跳过。{fileName ? '已读取：' + fileName : ''}</div>
           </Form.Item>
         </Form>
       </Modal>
