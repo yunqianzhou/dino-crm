@@ -1146,7 +1146,7 @@ function Modal_Follow({
       : [
           { label: t('sales.consultation.action.continue'), value: 'continue' },
           ...(!activeAppointment ? [{ label: t('sales.consultation.action.pause'), value: 'pause' }] : []),
-          ...(!activeAppointment && currentStage !== '咨询完成待支付' && (appointmentHistory.length > 0 || hasConnectedCall) ? [{ label: t('sales.consultation.action.create'), value: 'create' }] : []),
+          ...(!activeAppointment && currentStage !== '咨询完成待支付' && (currentStage === '待外呼' || appointmentHistory.length > 0 || hasConnectedCall) ? [{ label: t('sales.consultation.action.create'), value: 'create' }] : []),
           ...(activeAppointment ? [
         { label: t('sales.consultation.action.reschedule'), value: 'reschedule' },
         { label: t('sales.consultation.action.cancel'), value: 'cancel' },
@@ -1178,7 +1178,7 @@ function Modal_Follow({
         {isVietnamLead && <>
           {currentStage && <div style={{ marginBottom: 12 }}>{t('sales.consultation.currentStage')}：<Tag color={CONSULTATION_STAGE_COLOR[currentStage]}>{t(`sales.consultation.stage.${currentStage}`)}</Tag></div>}
           {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag></div>}
-          {!activeAppointment && appointmentHistory.length === 0 && !hasConnectedCall && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
+          {!activeAppointment && currentStage !== '待外呼' && appointmentHistory.length === 0 && !hasConnectedCall && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
           <Form.Item name="lifecycleAction" label={t('sales.consultation.nextAction')}>
             <Select options={lifecycleOptions} onChange={() => form.setFieldsValue({ reason: undefined, reasonOther: '' })} />
           </Form.Item>
