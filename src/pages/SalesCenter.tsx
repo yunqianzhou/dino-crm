@@ -105,7 +105,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const [tab, setTab] = useState('follow')
   const [keyword, setKeyword] = useState('')
-  const [salesProgressFilter, setSalesProgressFilter] = useState<string[]>([])
   const [purchaseIntentionFilter, setPurchaseIntentionFilter] = useState<string[]>([])
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>()
   const [ageGroupFilter, setAgeGroupFilter] = useState<string[]>([])
@@ -191,7 +190,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     const owner = s.salesOwner || '__unassigned__'
     return (
       (!kw || leadText(s).includes(kw)) &&
-      (!salesProgressFilter.length || salesProgressFilter.includes(s.salesProgress || '待领取')) &&
       (!purchaseIntentionFilter.length || purchaseIntentionFilter.includes(s.purchaseIntention || '未填写')) &&
       (!ownerFilter || ownerFilter === owner) &&
       (!ageGroupFilter.length || (!!s.ageGroup && ageGroupFilter.includes(s.ageGroup))) &&
@@ -205,12 +203,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const poolData = useMemo(
     () => poolAll.filter(matchesLeadFilters),
-    [poolAll, keyword, salesProgressFilter, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange],
+    [poolAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange],
   )
 
   const followData = useMemo(
     () => followAll.filter(matchesLeadFilters).filter((s) => consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))),
-    [followAll, keyword, salesProgressFilter, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, callRecords],
+    [followAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, callRecords],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -770,7 +768,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const totalLeads = students.filter((s) => isSalesLead(s, lessons)).length
 
   const resetLeadFilters = () => {
-    setSalesProgressFilter([])
     setPurchaseIntentionFilter([])
     setOwnerFilter(undefined)
     setAgeGroupFilter([])
@@ -843,16 +840,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             mode="multiple"
             allowClear
             maxTagCount="responsive"
-            placeholder="跟进状态"
-            style={{ minWidth: 150 }}
-            value={salesProgressFilter}
-            onChange={setSalesProgressFilter}
-            options={['待领取', '跟进中', '暂不跟进'].map((value) => ({ label: value, value }))}
-          />
-          <Select
-            mode="multiple"
-            allowClear
-            maxTagCount="responsive"
             placeholder="购买意向"
             style={{ minWidth: 150 }}
             value={purchaseIntentionFilter}
@@ -863,7 +850,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             allowClear
             showSearch
             optionFilterProp="label"
-            placeholder="负责人"
+            placeholder="CC"
             style={{ minWidth: 180 }}
             value={ownerFilter}
             onChange={setOwnerFilter}
@@ -890,10 +877,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       {tab !== 'calls' && showMoreFilters && (
         <Space wrap style={{ marginBottom: 16 }}>
           <DatePicker.RangePicker value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={['注册开始日期', '注册结束日期']} />
-          <DatePicker.RangePicker value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['跟进开始日期', '跟进结束日期']} />
+          <DatePicker.RangePicker value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['最后跟进开始日期', '最后跟进结束日期']} />
           <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="年龄段" style={{ minWidth: 130 }} value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
           <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" style={{ minWidth: 130 }} value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
-          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="注册渠道" style={{ minWidth: 180 }} value={registerChannelFilter} onChange={setRegisterChannelFilter} options={registerChannelOptions.map((value) => ({ label: value, value }))} />
+          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="注册来源" style={{ minWidth: 180 }} value={registerChannelFilter} onChange={setRegisterChannelFilter} options={registerChannelOptions.map((value) => ({ label: value, value }))} />
           <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="用户类型" style={{ minWidth: 150 }} value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: value, value }))} />
         </Space>
       )}
