@@ -31,7 +31,7 @@ import { useNavigate } from 'react-router-dom'
 import { usePerm } from '../perm'
 import { isClaimedLead, isPoolLead, isSalesLead } from '../funnel'
 import { resolveUserType } from '../userType'
-import { resolveUserStatus } from '../lessons'
+import { latestTrialReport, resolveUserStatus, TRIAL_REPORT_URL } from '../lessons'
 import { useLineScope } from '../useLineScope'
 import { businessLineOf, lineLabel, lpChannelSourceText, appChannelSourceText } from '../channel'
 import LineFilter from '../components/LineFilter'
@@ -89,6 +89,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const canClaim = can(phase3 ? 'salesV3_claim' : 'sales_claim') === 'operate'
   const canDial = can(phase3 ? 'salesV3_dial' : 'sales_dial') === 'operate'
   const canReassign = can(phase3 ? 'salesV3_reassign' : 'sales_reassign') === 'operate'
+  const canViewReport = phase3 && can('salesV3_view_report') === 'operate'
   const canManageSettings = can(phase3 ? 'salesV3_config' : 'sales_config') === 'operate'
   // 全业务线（超管）或拥有重新分配权限的主管可见范围内全部领取记录
   const seeAllOwners = allowedLines() === null || canReassign
@@ -104,7 +105,18 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const [tab, setTab] = useState('follow')
   const [keyword, setKeyword] = useState('')
+  const [salesProgressFilter, setSalesProgressFilter] = useState<string[]>([])
+  const [purchaseIntentionFilter, setPurchaseIntentionFilter] = useState<string[]>([])
+  const [ownerFilter, setOwnerFilter] = useState<string | undefined>()
+  const [ageGroupFilter, setAgeGroupFilter] = useState<string[]>([])
+  const [courseLevelFilter, setCourseLevelFilter] = useState<string[]>([])
+  const [registerChannelFilter, setRegisterChannelFilter] = useState<string[]>([])
+  const [userTypeFilter, setUserTypeFilter] = useState<string[]>([])
+  const [registerDateRange, setRegisterDateRange] = useState<any>(null)
+  const [followDateRange, setFollowDateRange] = useState<any>(null)
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [callResultFilter, setCallResultFilter] = useState<string | undefined>()
+  const [callAgentFilter, setCallAgentFilter] = useState<string | undefined>()
   const [callDateRange, setCallDateRange] = useState<any>(null)
   const [consultationStageFilter, setConsultationStageFilter] = useState<string[]>([])
 
@@ -158,23 +170,47 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const leadText = (s: Student) =>
     `${s.phone ?? ''} ${s.studentId} ${s.localName ?? s.name} ${s.country ?? ''}`.toLowerCase()
 
+  const salesLeads = useMemo(() => [...poolAll, ...followAll], [poolAll, followAll])
+  const filterOptionsFromLeads = (pick: (student: Student) => string | undefined) =>
+    Array.from(new Set(salesLeads.map(pick).filter((value): value is string => Boolean(value)))).sort()
+  const ageGroupOptions = useMemo(() => filterOptionsFromLeads((s) => s.ageGroup), [salesLeads])
+  const courseLevelOptions = useMemo(() => filterOptionsFromLeads((s) => s.courseLevel), [salesLeads])
+  const registerChannelOptions = useMemo(() => filterOptionsFromLeads((s) => s.registerChannel), [salesLeads])
+
+  const matchesDateRange = (value: string | undefined, range: any) => {
+    if (!range || range.length !== 2) return true
+    if (!value) return false
+    const [start, end] = range
+    if (!start || !end) return true
+    const time = dayjs.utc(value).valueOf()
+    return time >= start.startOf('day').valueOf() && time <= end.endOf('day').valueOf()
+  }
+
+  const matchesLeadFilters = (s: Student) => {
+    const kw = keyword.trim().toLowerCase()
+    const owner = s.salesOwner || '__unassigned__'
+    return (
+      (!kw || leadText(s).includes(kw)) &&
+      (!salesProgressFilter.length || salesProgressFilter.includes(s.salesProgress || '待领取')) &&
+      (!purchaseIntentionFilter.length || purchaseIntentionFilter.includes(s.purchaseIntention || '未填写')) &&
+      (!ownerFilter || ownerFilter === owner) &&
+      (!ageGroupFilter.length || (!!s.ageGroup && ageGroupFilter.includes(s.ageGroup))) &&
+      (!courseLevelFilter.length || (!!s.courseLevel && courseLevelFilter.includes(s.courseLevel))) &&
+      (!registerChannelFilter.length || registerChannelFilter.includes(s.registerChannel)) &&
+      (!userTypeFilter.length || userTypeFilter.includes(resolveUserType(s))) &&
+      matchesDateRange(s.registerTime, registerDateRange) &&
+      matchesDateRange(s.salesUpdatedAt, followDateRange)
+    )
+  }
+
   const poolData = useMemo(
-    () =>
-      poolAll.filter((s) => {
-        const kw = keyword.trim().toLowerCase()
-        return !kw || leadText(s).includes(kw)
-      }),
-    [poolAll, keyword],
+    () => poolAll.filter(matchesLeadFilters),
+    [poolAll, keyword, salesProgressFilter, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange],
   )
 
   const followData = useMemo(
-    () =>
-      followAll.filter((s) => {
-        const kw = keyword.trim().toLowerCase()
-        const matchStage = consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))
-        return (!kw || leadText(s).includes(kw)) && matchStage
-      }),
-    [followAll, keyword, consultationStageFilter, callRecords],
+    () => followAll.filter(matchesLeadFilters).filter((s) => consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))),
+    [followAll, keyword, salesProgressFilter, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, callRecords],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -193,6 +229,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           ? `${c.studentId} ${c.customer} ${student?.account ?? ''}`.toLowerCase()
           : `${c.phone} ${c.studentId} ${c.customer}`.toLowerCase()
         const matchResult = !callResultFilter || c.result === callResultFilter
+        const matchAgent = !callAgentFilter || c.agent === callAgentFilter
         let matchDate = true
         if (callDateRange && callDateRange.length === 2) {
           const [start, end] = callDateRange
@@ -203,9 +240,9 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             matchDate = callTime.isAfter(start.startOf('day')) && callTime.isBefore(end.endOf('day'))
           }
         }
-        return (!kw || text.includes(kw)) && matchResult && matchDate
+        return (!kw || text.includes(kw)) && matchResult && matchAgent && matchDate
       }),
-    [callScoped, keyword, callResultFilter, callDateRange, students, phase3],
+    [callScoped, keyword, callResultFilter, callAgentFilter, callDateRange, students, phase3],
   )
 
   const claim = (s: Student) => {
@@ -448,6 +485,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       result: '已接通',
       duration: '01:30',
       note,
+      audioUrl: dummyAudio,
       agent: actor,
       time: now,
     }
@@ -656,6 +694,9 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                     items: [
                       ...(canEdit ? [{ key: 'follow', icon: <EditOutlined />, label: '更新跟进', onClick: () => openFollow(r) }] : []),
                       ...(canReassign ? [{ key: 'reassign', icon: <SwapOutlined />, label: '重新分配线索', onClick: () => openReassign(r) }] : []),
+                      ...(canViewReport && latestTrialReport(lessons, r.studentId)
+                        ? [{ key: 'trialReport', label: '试听报告', onClick: () => window.open(TRIAL_REPORT_URL, '_blank', 'noopener,noreferrer') }]
+                        : []),
                       ...(canEdit ? [
                         { key: 'drop', danger: true, icon: <RollbackOutlined />, label: '退回公海', onClick: () => openDrop(r) },
                         { key: 'trialLevel', label: '修改试听课等级', onClick: () => openTrialLevel(r) },
@@ -700,13 +741,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     { title: t('sales.call.customer'), dataIndex: 'customer', width: 140 },
     ...(phase3 ? [{ title: '用户ID', dataIndex: 'studentId', width: 190, render: (v: string) => <Text code>{v}</Text> }] : []),
     { title: t('user.col.phone'), dataIndex: 'phone', width: 160 },
-    ...(!phase3 ? [{
+    {
       title: t('sales.call.result'),
       dataIndex: 'result',
       width: 110,
       render: (v: CallResult) => <Tag color={CALL_RESULT_COLOR[v]}>{t(`sales.callResult.${v}`)}</Tag>,
-    }] : []),
+    },
     { title: t('sales.call.duration'), dataIndex: 'duration', width: 90 },
+    {
+      title: '录音',
+      dataIndex: 'audioUrl',
+      width: 110,
+      render: (url: string | undefined) =>
+        url ? <Button type="link" style={{ padding: 0 }} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>播放</Button> : <Text type="secondary">—</Text>,
+    },
     {
       title: t('sales.call.note'),
       dataIndex: 'note',
@@ -720,6 +768,19 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const [showIntro, setShowIntro] = useState(false)
 
   const totalLeads = students.filter((s) => isSalesLead(s, lessons)).length
+
+  const resetLeadFilters = () => {
+    setSalesProgressFilter([])
+    setPurchaseIntentionFilter([])
+    setOwnerFilter(undefined)
+    setAgeGroupFilter([])
+    setCourseLevelFilter([])
+    setRegisterChannelFilter([])
+    setUserTypeFilter([])
+    setRegisterDateRange(null)
+    setFollowDateRange(null)
+    setConsultationStageFilter([])
+  }
 
   return (
     <Card
@@ -751,15 +812,25 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
       <Space wrap style={{ marginBottom: 16 }}>
         <LineFilter value={lineSel} onChange={setLineSel} options={filterOptions(lineOptions)} placeholder={t('user.col.country')} disabled={lineDisabled} />
-        {tab === 'calls' && (
+        {tab === 'calls' ? (
           <>
-            {!phase3 && <Select
+            <Select
               allowClear
               placeholder={t('sales.call.result')}
               style={{ width: 150 }}
               value={callResultFilter}
               onChange={setCallResultFilter}
               options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))}
+            />
+            {seeAllOwners && <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="坐席"
+              style={{ width: 180 }}
+              value={callAgentFilter}
+              onChange={setCallAgentFilter}
+              options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))}
             />}
             <DatePicker.RangePicker 
               onChange={setCallDateRange} 
@@ -767,7 +838,41 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               placeholder={['开始时间', '结束时间']}
             />
           </>
-        )}
+        ) : <>
+          <Select
+            mode="multiple"
+            allowClear
+            maxTagCount="responsive"
+            placeholder="跟进状态"
+            style={{ minWidth: 150 }}
+            value={salesProgressFilter}
+            onChange={setSalesProgressFilter}
+            options={['待领取', '跟进中', '暂不跟进'].map((value) => ({ label: value, value }))}
+          />
+          <Select
+            mode="multiple"
+            allowClear
+            maxTagCount="responsive"
+            placeholder="购买意向"
+            style={{ minWidth: 150 }}
+            value={purchaseIntentionFilter}
+            onChange={setPurchaseIntentionFilter}
+            options={['有意向', '无意向', '未填写'].map((value) => ({ label: value, value }))}
+          />
+          {seeAllOwners && <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="负责人"
+            style={{ minWidth: 180 }}
+            value={ownerFilter}
+            onChange={setOwnerFilter}
+            options={[
+              { label: '未分配', value: '__unassigned__' },
+              ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email })),
+            ]}
+          />}
+        </>}
         {tab === 'follow' && showVietnamStageFilter && <Select mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} style={{ width: 250 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
         <Input
           allowClear
@@ -777,8 +882,21 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
+        {tab !== 'calls' && <Button onClick={() => setShowMoreFilters((value) => !value)}>{showMoreFilters ? '收起筛选' : '更多筛选'}</Button>}
+        {tab !== 'calls' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
         {importAction}
       </Space>
+
+      {tab !== 'calls' && showMoreFilters && (
+        <Space wrap style={{ marginBottom: 16 }}>
+          <DatePicker.RangePicker value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={['注册开始日期', '注册结束日期']} />
+          <DatePicker.RangePicker value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['跟进开始日期', '跟进结束日期']} />
+          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="年龄段" style={{ minWidth: 130 }} value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
+          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" style={{ minWidth: 130 }} value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
+          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="注册渠道" style={{ minWidth: 180 }} value={registerChannelFilter} onChange={setRegisterChannelFilter} options={registerChannelOptions.map((value) => ({ label: value, value }))} />
+          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="用户类型" style={{ minWidth: 150 }} value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: value, value }))} />
+        </Space>
+      )}
 
       <Tabs
         activeKey={tab}

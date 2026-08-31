@@ -257,6 +257,7 @@ export type CallRecord = {
   result: CallResult // 通话结果
   duration: string // 时长（mm:ss，无人接听为 —）
   note: string // 本次跟进记录
+  audioUrl?: string // 通话录音链接
   agent: string // 外呼坐席
   time: string // 起呼时间
 }
