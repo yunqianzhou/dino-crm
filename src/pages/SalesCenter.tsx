@@ -807,6 +807,14 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       />
 
       <Space wrap style={{ marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined />}
+          placeholder={tab === 'calls' ? (phase3 ? '搜索用户ID / 姓名 / 登录账号' : t('sales.searchCalls')) : t('sales.searchFollow')}
+          style={{ width: 340 }}
+          value={keyword}
+          onChange={(e) => setKeyword(e.target.value)}
+        />
         <LineFilter value={lineSel} onChange={setLineSel} options={filterOptions(lineOptions)} placeholder={t('user.col.country')} disabled={lineDisabled} />
         {tab === 'calls' ? (
           <>
@@ -857,14 +865,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           <DatePicker.RangePicker value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={['注册开始日期', '注册结束日期']} />
           <DatePicker.RangePicker value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['最后跟进开始日期', '最后跟进结束日期']} />
         </>}
-        <Input
-          allowClear
-          prefix={<SearchOutlined />}
-          placeholder={tab === 'calls' ? (phase3 ? '搜索用户ID / 姓名 / 登录账号' : t('sales.searchCalls')) : t('sales.searchFollow')}
-          style={{ width: 340 }}
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-        />
         {tab !== 'calls' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
         {importAction}
       </Space>
