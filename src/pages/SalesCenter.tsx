@@ -806,37 +806,40 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         description={showIntro ? t('sales.intro') : undefined}
       />
 
-      <Space wrap style={{ marginBottom: 16 }}>
+      <div className="sales-filter-bar">
         <Input
+          className="sales-filter-search"
           allowClear
           prefix={<SearchOutlined />}
           placeholder={tab === 'calls' ? (phase3 ? '搜索用户ID / 姓名 / 登录账号' : t('sales.searchCalls')) : t('sales.searchFollow')}
-          style={{ width: 340 }}
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
         />
-        <LineFilter value={lineSel} onChange={setLineSel} options={filterOptions(lineOptions)} placeholder={t('user.col.country')} disabled={lineDisabled} />
+        <div className="sales-filter-control">
+          <LineFilter value={lineSel} onChange={setLineSel} options={filterOptions(lineOptions)} width={0} placeholder={t('user.col.country')} disabled={lineDisabled} />
+        </div>
         {tab === 'calls' ? (
           <>
             <Select
+              className="sales-filter-control"
               allowClear
               placeholder={t('sales.call.result')}
-              style={{ width: 150 }}
               value={callResultFilter}
               onChange={setCallResultFilter}
               options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))}
             />
             {seeAllOwners && <Select
+              className="sales-filter-control"
               allowClear
               showSearch
               optionFilterProp="label"
               placeholder="坐席"
-              style={{ width: 180 }}
               value={callAgentFilter}
               onChange={setCallAgentFilter}
               options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))}
             />}
-            <DatePicker.RangePicker 
+            <DatePicker.RangePicker
+              className="sales-filter-date"
               onChange={setCallDateRange} 
               allowClear 
               placeholder={['开始时间', '结束时间']}
@@ -844,11 +847,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           </>
         ) : <>
           {seeAllOwners && <Select
+            className="sales-filter-control"
             allowClear
             showSearch
             optionFilterProp="label"
             placeholder="CC"
-            style={{ minWidth: 180 }}
             value={ownerFilter}
             onChange={setOwnerFilter}
             options={[
@@ -856,18 +859,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email })),
             ]}
           />}
-          {tab === 'follow' && showVietnamStageFilter && <Select mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} style={{ width: 250 }} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
-          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="购买意向" style={{ minWidth: 150 }} value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value) => ({ label: value, value }))} />
-          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" style={{ minWidth: 130 }} value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
-          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="用户类型" style={{ minWidth: 150 }} value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: value, value }))} />
-          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="年龄段" style={{ minWidth: 130 }} value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
-          <Select mode="multiple" allowClear maxTagCount="responsive" placeholder="注册来源" style={{ minWidth: 180 }} value={registerChannelFilter} onChange={setRegisterChannelFilter} options={registerChannelOptions.map((value) => ({ label: value, value }))} />
-          <DatePicker.RangePicker value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={['注册开始日期', '注册结束日期']} />
-          <DatePicker.RangePicker value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['最后跟进开始日期', '最后跟进结束日期']} />
+          {tab === 'follow' && showVietnamStageFilter && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
+          <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="购买意向" value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value) => ({ label: value, value }))} />
+          <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
+          <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="用户类型" value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: value, value }))} />
+          <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="年龄段" value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
+          <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="注册来源" value={registerChannelFilter} onChange={setRegisterChannelFilter} options={registerChannelOptions.map((value) => ({ label: value, value }))} />
+          <DatePicker.RangePicker className="sales-filter-date" value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={['注册开始日期', '注册结束日期']} />
+          <DatePicker.RangePicker className="sales-filter-date" value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['最后跟进开始日期', '最后跟进结束日期']} />
         </>}
-        {tab !== 'calls' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
-        {importAction}
-      </Space>
+        <div className="sales-filter-actions">
+          {tab !== 'calls' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
+          {importAction}
+        </div>
+      </div>
 
       <Tabs
         activeKey={tab}
