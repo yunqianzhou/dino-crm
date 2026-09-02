@@ -128,7 +128,8 @@
     const offers={
       'AMY-AUG':{name:'Amy 8 月销售新客券包',code:'AMY-AUG',line:'韩国',from:'2026-08-01',to:'2026-09-30',status:'生效中',approval:'已通过',rules:['季度包：9 折','半年包：85 折','年度包：固定价 229,000 KRW']},
       'JISU-SUMMER':{name:'Jisu KOL 夏季券包',code:'JISU-SUMMER',line:'韩国',from:'2026-08-20',to:'2026-09-15',status:'生效中',approval:'已通过',rules:['季度包：95 折','半年包：9 折','年度包：82 折']},
-      'KR-SUMMER':{name:'韩国开学季通用券包',code:'KR-SUMMER',line:'韩国',from:'2026-09-01',to:'2026-09-30',status:'生效中',approval:'已通过',rules:['季度包：95 折','半年包：9 折','年度包：85 折']}
+      'KR-SUMMER':{name:'韩国开学季通用券包',code:'KR-SUMMER',line:'韩国',from:'2026-09-01',to:'2026-09-30',status:'生效中',approval:'已通过',rules:['季度包：95 折','半年包：9 折','年度包：85 折']},
+      'VN-MID-AUTUMN':{name:'越南中秋新客券包',code:'VN-MID-AUTUMN',line:'越南',from:'2026-09-05',to:'2026-10-05',status:'生效中',approval:'已通过',rules:['季度包：9 折','半年包：85 折','年度包：固定价 2,490,000 VND']}
     };
     const businessLines=['马来','印尼','泰国','新加坡','越南','韩国','沙特','其他'];
     const promotionTypes=Object.fromEntries(businessLines.map(line=>[line,['广告投放','KOL','销售']]));
@@ -136,23 +137,34 @@
       {id:'LK_8F2KQ',name:'Amy · 韩国暑期新客优惠',line:'韩国',lpType:'10',templateId:'KR_SKIN_A',channel:'销售',type:'销售',owner:'Amy Zhang',set:'AMY-AUG',promo:'AMY-AUG',status:'已上架',from:'2026-08-31',to:'2026-09-30',clicks:'1,824',paid:'¥38,400'},
       {id:'LK_KR1S9',name:'Jisu · TikTok 夏季合作',line:'韩国',lpType:'10',templateId:'KR_SKIN_B',channel:'KOL',type:'KOL',owner:'@jisu_mom',set:'JISU-SUMMER',promo:'JISU-SUMMER',campaignId:'tt_jisu_20260901',status:'已上架',from:'2026-08-20',to:'2026-09-15',clicks:'2,106',paid:'¥46,200'},
       {id:'LK_META2',name:'韩国 Meta 开学季投放',line:'韩国',lpType:'104',templateId:'KR_SKIN_B',channel:'广告投放',type:'广告投放',owner:'韩国 Meta 开学季投放',set:'KR-SUMMER',promo:'KR-SUMMER',adPlatform:'Meta',adId:'DINOAD-META-7K29Q',status:'已上架',from:'2026-09-01',to:'2026-09-30',clicks:'4,682',paid:'¥68,500'},
-      {id:'LK_GG7AX',name:'韩国 Google 暑期拉新',line:'韩国',lpType:'10',templateId:'KR_SKIN_A',channel:'广告投放',type:'广告投放',owner:'韩国 Google 暑期拉新',set:'KR-SUMMER',promo:'KR-SUMMER',adPlatform:'Google',adId:'DINOAD-GOOG-4X8PM',status:'已下架',from:'2026-08-01',to:'2026-08-25',clicks:'3,940',paid:'¥43,800'}
+      {id:'LK_GG7AX',name:'韩国 Google 暑期拉新',line:'韩国',lpType:'10',templateId:'KR_SKIN_A',channel:'广告投放',type:'广告投放',owner:'韩国 Google 暑期拉新',set:'KR-SUMMER',promo:'KR-SUMMER',adPlatform:'Google',adId:'DINOAD-GOOG-4X8PM',status:'已下架',from:'2026-08-01',to:'2026-08-25',clicks:'3,940',paid:'¥43,800'},
+      {id:'LK_VN3L8',name:'Linh · 越南中秋新客优惠',line:'越南',lpType:'10',templateId:'DEFAULT',channel:'销售',type:'销售',owner:'Linh Nguyen',set:'VN-MID-AUTUMN',promo:'VN-MID-AUTUMN',status:'已上架',from:'2026-09-05',to:'2026-10-05',clicks:'1,286',paid:'₫12,860,000'},
+      {id:'LK_VN8KM',name:'Minh · TikTok 中秋合作',line:'越南',lpType:'10',templateId:'DEFAULT',channel:'KOL',type:'KOL',owner:'@minh_study',set:'VN-MID-AUTUMN',promo:'VN-MID-AUTUMN',campaignId:'tt_minh_20260905',status:'已上架',from:'2026-09-05',to:'2026-10-05',clicks:'1,958',paid:'₫19,580,000'},
+      {id:'LK_VNM2',name:'越南 Meta 中秋投放',line:'越南',lpType:'104',templateId:'DEFAULT',channel:'广告投放',type:'广告投放',owner:'越南 Meta 中秋投放',set:'VN-MID-AUTUMN',promo:'VN-MID-AUTUMN',adPlatform:'Meta',adId:'DINOAD-META-VN829',status:'已上架',from:'2026-09-05',to:'2026-10-05',clicks:'3,426',paid:'₫34,260,000'},
+      {id:'LK_VNG7',name:'越南 Google 秋季拉新',line:'越南',lpType:'10',templateId:'DEFAULT',channel:'广告投放',type:'广告投放',owner:'越南 Google 秋季拉新',set:'VN-MID-AUTUMN',promo:'VN-MID-AUTUMN',adPlatform:'Google',adId:'DINOAD-GOOG-VN4X8',status:'已下架',from:'2026-08-10',to:'2026-08-31',clicks:'2,804',paid:'₫28,040,000'}
     ];
     let skus=[
       {id:'KR-Q-2026',name:'Dino English 季度包',line:'韩国',price:'99,000 KRW',valid:'购买后 90 天',scope:'In App + Landing Page',best:false,status:'上架'},
       {id:'KR-H-2026',name:'Dino English 半年包',line:'韩国',price:'178,000 KRW',valid:'购买后 180 天',scope:'Landing Page',best:false,status:'上架'},
       {id:'KR-Y-2026',name:'Dino English 年度包',line:'韩国',price:'298,000 KRW',valid:'购买后 365 天',scope:'In App + Landing Page',best:true,status:'上架'},
-      {id:'VN-Y-2026',name:'Dino English 年度包',line:'越南',price:'2,990,000 VND',valid:'购买后 365 天',scope:'In App',best:true,status:'上架'}
+      {id:'VN-Q-2026',name:'Dino English 季度包',line:'越南',price:'990,000 VND',valid:'购买后 90 天',scope:'In App + Landing Page',best:false,status:'上架'},
+      {id:'VN-H-2026',name:'Dino English 半年包',line:'越南',price:'1,790,000 VND',valid:'购买后 180 天',scope:'Landing Page',best:false,status:'上架'},
+      {id:'VN-Y-2026',name:'Dino English 年度包',line:'越南',price:'2,990,000 VND',valid:'购买后 365 天',scope:'In App + Landing Page',best:true,status:'上架'}
     ];
     let distributors=[
       {id:'sales_amy_zhang',name:'Amy Zhang',type:'销售',channel:'销售',line:'韩国',account:'—',manager:'韩国销售组',source:'手工创建',enabled:true},
       {id:'kol_jisu_mom',name:'@jisu_mom',type:'KOL',channel:'KOL',line:'韩国',account:'TikTok @jisu_mom',manager:'Mia',source:'手工创建',enabled:true},
       {id:'ad_kr_meta',name:'韩国 Meta 开学季投放',type:'广告投放',channel:'广告投放',line:'韩国',platform:'Meta',account:'Meta Ads',adId:'DINOAD-META-7K29Q',adSyncStatus:'已同步',manager:'Mia',source:'手工创建',enabled:true},
-      {id:'ad_kr_google',name:'韩国 Google 暑期拉新',type:'广告投放',channel:'广告投放',line:'韩国',platform:'Google',account:'Google Ads',adId:'DINOAD-GOOG-4X8PM',adSyncStatus:'已同步',manager:'Mia',source:'手工创建',enabled:true}
+      {id:'ad_kr_google',name:'韩国 Google 暑期拉新',type:'广告投放',channel:'广告投放',line:'韩国',platform:'Google',account:'Google Ads',adId:'DINOAD-GOOG-4X8PM',adSyncStatus:'已同步',manager:'Mia',source:'手工创建',enabled:true},
+      {id:'sales_linh_nguyen',name:'Linh Nguyen',type:'销售',channel:'销售',line:'越南',account:'—',manager:'越南销售组',source:'手工创建',enabled:true},
+      {id:'kol_minh_study',name:'@minh_study',type:'KOL',channel:'KOL',line:'越南',platform:'TikTok',account:'TikTok @minh_study',manager:'Hana',source:'手工创建',enabled:true},
+      {id:'ad_vn_meta',name:'越南 Meta 中秋投放',type:'广告投放',channel:'广告投放',line:'越南',platform:'Meta',account:'Meta Ads',adId:'DINOAD-META-VN829',adSyncStatus:'已同步',manager:'Hana',source:'手工创建',enabled:true},
+      {id:'ad_vn_google',name:'越南 Google 秋季拉新',type:'广告投放',channel:'广告投放',line:'越南',platform:'Google',account:'Google Ads',adId:'DINOAD-GOOG-VN4X8',adSyncStatus:'已同步',manager:'Hana',source:'手工创建',enabled:true}
     ];
     let setApprovals=[
       {id:'AP-COUPON-202609-008',name:'韩国开学季通用券包',change:'新建优惠方案',proof:'开学季优惠审批.pdf',applicant:'Mia',status:'待审批'},
-      {id:'AP-COUPON-202608-006',name:'Amy 8 月销售新客券包',change:'调整年度包到手价',proof:'审批邮件截图.png',applicant:'Amy',status:'已通过'}
+      {id:'AP-COUPON-202608-006',name:'Amy 8 月销售新客券包',change:'调整年度包到手价',proof:'审批邮件截图.png',applicant:'Amy',status:'已通过'},
+      {id:'AP-COUPON-202609-012',name:'越南中秋新客券包',change:'新建优惠方案',proof:'越南中秋活动审批.pdf',applicant:'Hana',status:'已通过'}
     ];
     let editingSkuId=null,editingSetKey=null,editingOwnerId=null,editingLinkId=null,pendingAdId='',setRuleSkuIds=[],setRuleDrafts={},setRulesInitialized=false;
     const $=id=>document.getElementById(id); const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
@@ -222,6 +234,7 @@
       Object.assign(en,{'新增类型':'New Type','主页链接':'Profile URL'});
       Object.assign(en,{'建立 KOL 渠道后，不会自动生成链接。':'Creating a KOL channel does not generate links automatically.','每次发布内容在创建落地页时填写帖子标识或帖子链接。':'For each post, add its identifier or URL when creating a landing page.','基础信息':'Basic Information','用于后续查找和归因':'Used for future lookup and attribution','请选择类型':'Please select a type','KOL 名称 / 昵称':'KOL Name / Alias','账号 / 主页地址':'Account / Profile URL','保存渠道':'Save Channel','仅支持相对时间：购买后生效。':'Relative duration only: starts after purchase.','优惠方案须审批：':'Offer plans require approval:','新建或修改优惠规则后进入待审批；可上传外部审批结果作为附件。仅“生效中 + 已通过”的方案可被落地页选择。':'New or changed offer rules enter approval. External approval evidence can be attached. Only active approved plans can be selected for landing pages.','先选业务线，再为该业务线的每个商品包设置优惠。提交后进入审批；通过后才能在创建落地页时选用。':'Select a business line, then set offers for each SKU. Submit for approval before it can be used on landing pages.','适用商品包与优惠':'Eligible SKUs and Offers','添加商品包':'Add SKU','暂无可添加商品包':'No SKU available to add','券包':'Coupon Set','商品包':'SKU','月':' month','请输入':'Please enter ','请选择':'Please select ','例如：':'Example: ','韩国默认':'South Korea Default','韩国活动':'South Korea Campaign','韩国标准':'South Korea Standard','线索搜集':'Lead Collection','支付':'Payment','页面皮肤':'Page Skin'});
       Object.assign(en,{'SKU ID / SKU名称':'SKU ID / SKU Name','适用 SKU 与':'Eligible SKUs and ','已绑定落地页':'Bound Landing Pages','Amy 8 月销售新客券包':'Amy August New Customer Coupon Set','Jisu KOL 夏季券包':'Jisu KOL Summer Coupon Set','韩国开学季通用券包':'South Korea Back-to-School General Coupon Set','先选业务线，再为该业务线的每个商品包设置优惠。':'Select a business line, then set an offer for each SKU in that line.','提交后进入审批；通过后才能在创建落地页时选用。':'After submission, the plan enters approval and can be used for landing pages only after approval.','审批材料（选填）':'Approval Evidence (Optional)','选择文件':'Choose File','未选择任何文件':'No file selected','可上传外部审批截图、邮件或审批单；附件仅供审批人查看。':'Upload an external approval screenshot, email, or approval form. Attachments are visible to approvers only.','“打折”填写如 9 折；“固定价”填写用户最终支付金额。':'For Discount, enter a value such as 9 (90% of list price). For Fixed Price, enter the final amount paid.','当前业务线没有可用于 Landing Page 的Publish SKU':'No published Landing Page SKU is available for this business line.','落地页详情':'Landing Page Details','最终用户链接':'Final User Link','链接配置':'Link Configuration','链接编号':'Link ID','自动优惠':'Auto-applied Offer','渠道归因':'Channel Attribution','落地页链接已复制':'Landing page link copied','编辑落地页':'Edit Landing Page','保存修改':'Save Changes','优惠码和有效期均由系统按所选渠道和优惠方案自动带入。':'Coupon code and validity are derived automatically from the selected channel and offer plan.','业务线、渠道类型、Ad ID、优惠码和有效期均由系统按所选渠道和优惠方案自动带入。':'Business line, channel type, Ad ID, coupon code, and validity are derived automatically from the selected channel and offer plan.'});
+      Object.assign(en,{'越南中秋新客券包':'Vietnam Mid-Autumn New Customer Coupon Set','Linh · 越南中秋新客优惠':'Linh · Vietnam Mid-Autumn New Customer Offer','Minh · TikTok 中秋合作':'Minh · TikTok Mid-Autumn Collaboration','越南 Meta 中秋投放':'Vietnam Meta Mid-Autumn Campaign','越南 Google 秋季拉新':'Vietnam Google Autumn Acquisition','越南销售组':'Vietnam Sales Team','越南中秋活动审批.pdf':'Vietnam Mid-Autumn Campaign Approval.pdf'});
       const replaceText=(raw)=>Object.keys(en).sort((a,b)=>b.length-a.length).reduce((text,key)=>text.split(key).join(en[key]),raw);
       const translate=()=>{const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);nodes.forEach(n=>{const raw=n.nodeValue||'',next=replaceText(raw);if(next!==raw)n.nodeValue=next});document.querySelectorAll('[placeholder]').forEach(el=>{const p=el.getAttribute('placeholder')||'',next=replaceText(p);if(next!==p)el.setAttribute('placeholder',next)})};
       translate();new MutationObserver(translate).observe(document.body,{childList:true,subtree:true});
