@@ -167,7 +167,7 @@
     function template(line){return line==='越南'?'越南 · 首次 LP 模板 B → 支付 LP 模板 B（2 个 SKU）':'韩国 · 首次 LP 模板 A → 支付 LP 模板 A（3 个 SKU）'}
     function lpLabel(type){return String(type)==='104'?'支付落地页':'线索搜集页'}
     function templateLabel(id){const names={KR_SKIN_A:'韩国标准样式',KR_SKIN_B:'韩国活动样式',VN_SKIN_A:'越南标准样式',VN_SKIN_B:'越南活动样式'};return names[id]||'默认页面样式'}
-    function initBusinessLineOptions(){['link-line','owner-line','sku-line','set-line','new-sku-line','new-set-line','owner-form-line','form-line'].forEach(id=>{const select=$(id),selected=select.value,isForm=id==='form-line',defaultToKorea=['new-sku-line','new-set-line','owner-form-line'].includes(id);select.innerHTML=(id.endsWith('-line')&&!defaultToKorea?'<option value="">'+(isForm?'请选择业务线':'业务线')+'</option>':'')+businessLines.map(line=>'<option>'+line+'</option>').join('');select.value=businessLines.includes(selected)?selected:(defaultToKorea?'韩国':'')})}
+    function initBusinessLineOptions(){['link-line','owner-line','sku-line','set-line','new-set-line','owner-form-line','form-line'].forEach(id=>{const select=$(id);if(!select)return;const selected=select.value,isForm=id==='form-line',defaultToKorea=['new-set-line','owner-form-line'].includes(id);select.innerHTML=(id.endsWith('-line')&&!defaultToKorea?'<option value="">'+(isForm?'请选择业务线':'业务线')+'</option>':'')+businessLines.map(line=>'<option>'+line+'</option>').join('');select.value=businessLines.includes(selected)?selected:(defaultToKorea?'韩国':'')})}
     function urlOf(x){return 'https://'+(x.line==='越南'?'vn':'kr')+'.dinoai.ai/lp?link_id='+x.id+'&promo='+encodeURIComponent(x.promo)}
     function tagType(t){return t==='销售'?'blue':t==='KOL'?'orange':'purple'}
     function tagStatus(s){return s==='已上架'?'green':s==='已下架'?'gray':'orange'}
