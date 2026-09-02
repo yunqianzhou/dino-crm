@@ -31,7 +31,7 @@ const MODULE_PATH: { module: ModuleKey; path: string }[] = [
   { module: 'usersV2', path: '/users-v2' },
   { module: 'sales', path: '/sales' },
   { module: 'salesV3', path: '/sales-v3' },
-  { module: 'marketingV2', path: '/marketing-center' },
+  { module: 'marketingV2', path: '/marketing-center/landing' },
   { module: 'marketing', path: '/marketing-backup' },
   { module: 'orders', path: '/orders' },
   { module: 'ordersV3', path: '/orders-v3' },
@@ -84,7 +84,11 @@ export default function App() {
           <Route path="sales/:studentId" element={<Guard module="sales"><UserDetail variant="sales" backPath="/sales" backText="返回销售中心" /></Guard>} />
           <Route path="sales-v3" element={<Guard module="salesV3"><SalesCenterP3 /></Guard>} />
           <Route path="sales-v3/:studentId" element={<Guard module="salesV3"><UserDetail variant="sales" backPath="/sales-v3" backText="返回销售中心" /></Guard>} />
-          <Route path="marketing-center" element={<Guard module="marketingV2"><MarketingCenterPrototype /></Guard>} />
+          <Route path="marketing-center" element={<Navigate to="/marketing-center/landing" replace />} />
+          <Route path="marketing-center/channels" element={<Guard module="marketingV2_channels"><MarketingCenterPrototype page="channels" /></Guard>} />
+          <Route path="marketing-center/skus" element={<Guard module="marketingV2_skus"><MarketingCenterPrototype page="skus" /></Guard>} />
+          <Route path="marketing-center/offers" element={<Guard module="marketingV2_offers"><MarketingCenterPrototype page="sets" /></Guard>} />
+          <Route path="marketing-center/landing" element={<Guard module="marketingV2_landing"><MarketingCenterPrototype page="links" /></Guard>} />
           <Route path="marketing-backup" element={<Guard module="marketing"><MarketingCenterBackup /></Guard>} />
           <Route path="users-v2" element={<Guard module="usersV2"><UserCenter phase3 /></Guard>} />
           <Route path="users-v2/:studentId" element={<Guard module="usersV2"><UserDetail /></Guard>} />

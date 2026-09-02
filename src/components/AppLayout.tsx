@@ -34,7 +34,10 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/users': 'users',
   '/sales': 'sales',
   '/sales-v3': 'salesV3',
-  '/marketing-center': 'marketingV2',
+  '/marketing-center/channels': 'marketingV2_channels',
+  '/marketing-center/skus': 'marketingV2_skus',
+  '/marketing-center/offers': 'marketingV2_offers',
+  '/marketing-center/landing': 'marketingV2_landing',
   '/marketing-backup': 'marketing',
   '/users-v2': 'usersV2',
   '/orders': 'orders',
@@ -51,6 +54,7 @@ export default function AppLayout() {
   const location = useLocation()
   // 取一级路径，保证子路由（如 /users-v2/:id 详情页）也能高亮菜单并显示标题
   const basePath = `/${location.pathname.split('/')[1] ?? ''}`
+  const selectedPath = location.pathname.startsWith('/marketing-center/') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
   const session = useSession()
   const { t, lang, setLang } = useI18n()
   const { can } = usePerm()
@@ -90,8 +94,11 @@ export default function AppLayout() {
     { key: '/coupons', icon: <TagsOutlined />, label: t('app.nav.coupons') },
   ].filter((n) => visible(n.key))
 
-  const marketingV2Nav = [
-    { key: '/marketing-center', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心') },
+  const marketingV2Children = [
+    { key: '/marketing-center/channels', icon: <ApartmentOutlined />, label: lang === 'en' ? 'Channel Management' : '渠道管理' },
+    { key: '/marketing-center/skus', icon: <AppstoreOutlined />, label: lang === 'en' ? 'SKU Catalog' : 'SKU 管理' },
+    { key: '/marketing-center/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Offer Plans / Coupon Sets' : '优惠方案 / 券包' },
+    { key: '/marketing-center/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
   ].filter((n) => visible(n.key))
 
   // 销售中心（二期）
@@ -119,7 +126,7 @@ export default function AppLayout() {
     ...usersV2Nav,
     ...ordersV3Nav,
     ...salesV3Nav,
-    ...marketingV2Nav,
+    ...(marketingV2Children.length ? [{ key: 'marketing-v2', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心'), children: marketingV2Children }] : []),
     ...(marketingBackupChildren.length
       ? [
           {
@@ -138,7 +145,10 @@ export default function AppLayout() {
     '/users': t('app.nav.users'),
     '/sales': t('app.nav.sales'),
     '/sales-v3': t('app.nav.sales'),
-    '/marketing-center': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center/channels': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center/skus': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center/offers': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-center/landing': lang === 'en' ? 'Marketing Center' : '营销中心',
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
     '/orders': t('app.nav.orders'),
@@ -193,7 +203,7 @@ export default function AppLayout() {
         <Menu
           theme="dark"
           mode="inline"
-          selectedKeys={[basePath]}
+          selectedKeys={[selectedPath]}
           openKeys={openKeys}
           onOpenChange={(keys) => setOpenKeys(keys as string[])}
           items={NAV}
@@ -214,7 +224,7 @@ export default function AppLayout() {
           }}
         >
           <Text strong style={{ fontSize: 18 }}>
-            {TITLES[basePath] ?? t('app.brand')}
+            {TITLES[selectedPath] ?? TITLES[basePath] ?? t('app.brand')}
           </Text>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <Dropdown

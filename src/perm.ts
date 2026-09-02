@@ -69,6 +69,10 @@ export function usePerm() {
     if (m === 'salesV3') return role.perms.sales
     // 旧角色未配置新营销中心时，沿用其旧营销中心总权限；管理员可在系统配置中单独调整。
     if (m === 'marketingV2') return role.perms.marketing
+    if (m === 'marketingV2_channels') return role.perms.channels
+    if (m === 'marketingV2_skus') return role.perms.packages
+    if (m === 'marketingV2_offers') return role.perms.coupons
+    if (m === 'marketingV2_landing') return role.perms.landing
     const phase3Copy: Partial<Record<ModuleKey, ModuleKey>> = {
       usersV2_edit: 'users_edit',
       usersV2_phone_view: 'users_phone_view',
