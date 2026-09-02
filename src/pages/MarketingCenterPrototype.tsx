@@ -18,7 +18,7 @@ export default function MarketingCenterPrototype({ page = 'links' }: { page?: 'c
         : routePage === 'landing'
           ? 'links'
           : page
-  const src = `/dino-crm/marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&v=20260902-routefix1`
+  const src = `/dino-crm/marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&v=20260902-routefix2`
   return (
     <iframe
       key={src}
