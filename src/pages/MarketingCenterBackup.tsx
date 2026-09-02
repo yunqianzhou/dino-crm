@@ -1,16 +1,21 @@
 import { Button, Card, Col, Divider, Row, Table, Tag, Typography } from 'antd'
 import { HistoryOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
-import { useStore } from '../store'
 import { useI18n } from '../i18n'
 
 const { Title, Paragraph, Text } = Typography
 
 export default function MarketingCenterBackup() {
   const navigate = useNavigate()
-  const roles = useStore((s) => s.roles)
   const { lang } = useI18n()
   const en = lang === 'en'
+  const roleSnapshot = [
+    { id: 'role_growth', zh: '市场投放 / 增长', en: 'Growth / Acquisition', scope: 'line', permission: 'operate' },
+    { id: 'role_ops', zh: '运营 / 商业化', en: 'Operations / Monetization', scope: 'line', permission: 'operate' },
+    { id: 'role_support', zh: '客服 / 用户支持', en: 'Customer Support', scope: 'line', permission: 'none' },
+    { id: 'role_admin', zh: '超级管理员', en: 'Super Administrator', scope: 'all', permission: 'operate' },
+    { id: 'role_sales_leader', zh: '销售组长', en: 'Sales Lead', scope: 'line', permission: 'none' },
+  ]
   const legacyPages = [
     { path: '/channels', zh: '渠道管理', en: 'Channel management' },
     { path: '/landing', zh: '落地页管理', en: 'Landing page management' },
@@ -37,11 +42,11 @@ export default function MarketingCenterBackup() {
       <Title level={5}><SafetyCertificateOutlined /> {en ? 'Role-permission snapshot' : '角色权限快照'}</Title>
       <Table
         size="small" rowKey="id" pagination={false}
-        dataSource={roles}
+        dataSource={roleSnapshot}
         columns={[
-          { title: en ? 'Role' : '角色', dataIndex: 'name' },
-          { title: en ? 'Data scope' : '数据范围', dataIndex: 'dataScope', render: (v) => <Tag>{v === 'all' ? (en ? 'All lines' : '全部业务线') : (en ? 'Assigned lines' : '指定业务线')}</Tag> },
-          { title: en ? 'Legacy marketing center' : '旧营销中心', render: (_, r) => <Tag color={r.perms.marketing === 'operate' ? 'green' : r.perms.marketing === 'view' ? 'blue' : 'default'}>{r.perms.marketing === 'operate' ? (en ? 'Operate' : '可操作') : r.perms.marketing === 'view' ? (en ? 'View' : '只读') : (en ? 'No access' : '无权限')}</Tag> },
+          { title: en ? 'Role' : '角色', render: (_, r) => en ? r.en : r.zh },
+          { title: en ? 'Data scope' : '数据范围', dataIndex: 'scope', render: (v) => <Tag>{v === 'all' ? (en ? 'All lines' : '全部业务线') : (en ? 'Assigned lines' : '指定业务线')}</Tag> },
+          { title: en ? 'Legacy marketing center' : '旧营销中心', dataIndex: 'permission', render: (v) => <Tag color={v === 'operate' ? 'green' : 'default'}>{v === 'operate' ? (en ? 'Operate' : '可操作') : (en ? 'No access' : '无权限')}</Tag> },
         ]}
       />
     </Card>
