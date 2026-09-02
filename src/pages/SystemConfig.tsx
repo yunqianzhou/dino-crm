@@ -58,6 +58,15 @@ const MODULE_HIERARCHY: ModuleNode[] = [
       { key: 'coupons', children: [{ key: 'coupons_create' }, { key: 'coupons_extend' }, { key: 'coupons_revoke' }, { key: 'coupons_edit' }] },
     ],
   },
+  {
+    key: 'marketingV2',
+    children: [
+      { key: 'marketingV2_channels' },
+      { key: 'marketingV2_skus' },
+      { key: 'marketingV2_offers', children: [{ key: 'marketingV2_offers_edit' }, { key: 'marketingV2_offers_approve' }] },
+      { key: 'marketingV2_landing', children: [{ key: 'marketingV2_landing_create' }, { key: 'marketingV2_landing_edit' }, { key: 'marketingV2_landing_status' }] },
+    ],
+  },
 ]
 
 const flattenModules = (nodes: ModuleNode[], depth = 0, ancestors: ModuleKey[] = []): ModuleRow[] =>
@@ -78,7 +87,7 @@ const EMPTY_PERMS = (): Record<ModuleKey, PermLevel> =>
 type RoleModal = { mode: 'create' } | { mode: 'edit'; role: Role } | null
 
 export default function SystemConfig() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { can, actor } = usePerm()
   const canEditRoles = can('system') === 'operate' || can('system_role_edit') === 'operate'
   const canAddRoles = can('system') === 'operate' || can('system_role_add') === 'operate'
@@ -93,6 +102,16 @@ export default function SystemConfig() {
   const lines = BUSINESS_LINES
 
   const moduleLabel = (m: ModuleKey) => {
+    const marketingV2Labels: Partial<Record<ModuleKey, string>> = lang === 'en' ? {
+      marketingV2: 'Marketing Center', marketingV2_channels: 'Channel management', marketingV2_skus: 'SKU catalog (view only)',
+      marketingV2_offers: 'Offer plans', marketingV2_offers_edit: 'Create and edit offer plans', marketingV2_offers_approve: 'Approve offer plans',
+      marketingV2_landing: 'Landing page management', marketingV2_landing_create: 'Create landing pages', marketingV2_landing_edit: 'Edit landing pages', marketingV2_landing_status: 'Publish / unpublish landing pages',
+    } : {
+      marketingV2: '营销中心', marketingV2_channels: '渠道管理', marketingV2_skus: 'SKU 管理（仅查看）',
+      marketingV2_offers: '优惠方案', marketingV2_offers_edit: '新建及编辑优惠方案', marketingV2_offers_approve: '审批优惠方案',
+      marketingV2_landing: '落地页管理', marketingV2_landing_create: '新建落地页', marketingV2_landing_edit: '编辑落地页', marketingV2_landing_status: '落地页上下架',
+    }
+    if (marketingV2Labels[m]) return marketingV2Labels[m]!
     if (m === 'usersV2') return t('app.nav.users')
     if (m === 'ordersV3') return t('app.nav.orders')
     if (m === 'salesV3') return t('app.nav.sales')

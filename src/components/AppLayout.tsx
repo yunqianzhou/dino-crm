@@ -15,6 +15,7 @@ import {
   UserSwitchOutlined,
   ShopOutlined,
   SolutionOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { logout, useSession } from '../auth'
@@ -33,7 +34,8 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/users': 'users',
   '/sales': 'sales',
   '/sales-v3': 'salesV3',
-  '/marketing-prototype': 'marketing',
+  '/marketing-center': 'marketingV2',
+  '/marketing-backup': 'marketing',
   '/users-v2': 'usersV2',
   '/orders': 'orders',
   '/orders-v3': 'ordersV3',
@@ -80,13 +82,16 @@ export default function AppLayout() {
     { key: '/orders-v3', icon: <ProfileOutlined />, label: phase3Label('订单中心') },
   ].filter((n) => visible(n.key))
 
-  // 营销中心（四期）子菜单
-  const marketingChildren = [
-    { key: '/marketing-prototype', icon: <ShopOutlined />, label: '营销中心原型' },
+  // 旧营销中心：仅作为备份留存
+  const marketingBackupChildren = [
     { key: '/channels', icon: <ApartmentOutlined />, label: t('app.nav.channels') },
     { key: '/landing', icon: <LinkOutlined />, label: t('app.nav.landing') },
     { key: '/packages', icon: <AppstoreOutlined />, label: t('app.nav.packages') },
     { key: '/coupons', icon: <TagsOutlined />, label: t('app.nav.coupons') },
+  ].filter((n) => visible(n.key))
+
+  const marketingV2Nav = [
+    { key: '/marketing-center', icon: <ShopOutlined />, label: phase4Label(lang === 'en' ? 'Marketing Center' : '营销中心') },
   ].filter((n) => visible(n.key))
 
   // 销售中心（二期）
@@ -114,13 +119,14 @@ export default function AppLayout() {
     ...usersV2Nav,
     ...ordersV3Nav,
     ...salesV3Nav,
-    ...(marketingChildren.length
+    ...marketingV2Nav,
+    ...(marketingBackupChildren.length
       ? [
           {
-            key: 'marketing',
-            icon: <ShopOutlined />,
-            label: phase4Label(t('app.nav.marketing')),
-            children: marketingChildren,
+            key: 'marketing-backup',
+            icon: <HistoryOutlined />,
+            label: phase4Label(lang === 'en' ? 'Marketing Center Backup' : '营销中心备份'),
+            children: [{ key: '/marketing-backup', icon: <HistoryOutlined />, label: lang === 'en' ? 'Backup overview' : '备份说明' }, ...marketingBackupChildren],
           },
         ]
       : []),
@@ -132,7 +138,8 @@ export default function AppLayout() {
     '/users': t('app.nav.users'),
     '/sales': t('app.nav.sales'),
     '/sales-v3': t('app.nav.sales'),
-    '/marketing-prototype': '营销中心原型',
+    '/marketing-center': lang === 'en' ? 'Marketing Center' : '营销中心',
+    '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
     '/orders': t('app.nav.orders'),
     '/orders-v3': '订单中心',
