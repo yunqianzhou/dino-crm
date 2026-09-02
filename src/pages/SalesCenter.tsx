@@ -256,20 +256,22 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     return counts
   }, [callScoped])
   const callSummary = useMemo(() => {
-    const byAgent = new Map<string, { agent: string; total: number; answered: number; unanswered: number; seconds: number; leads: Set<string>; days: Set<string> }>()
+    const byAgentAndCountry = new Map<string, { agent: string; country: string; total: number; answered: number; unanswered: number; seconds: number; leads: Set<string>; days: Set<string> }>()
     callData.forEach((call) => {
-      const item = byAgent.get(call.agent) || { agent: call.agent, total: 0, answered: 0, unanswered: 0, seconds: 0, leads: new Set<string>(), days: new Set<string>() }
+      const country = call.businessLine || '未填写'
+      const key = `${call.agent}::${country}`
+      const item = byAgentAndCountry.get(key) || { agent: call.agent, country, total: 0, answered: 0, unanswered: 0, seconds: 0, leads: new Set<string>(), days: new Set<string>() }
       item.total += 1
       item.answered += call.result === '已接通' ? 1 : 0
       item.unanswered += call.result === '无人接听' ? 1 : 0
       item.seconds += durationToSeconds(call.duration)
       item.leads.add(call.studentId)
       item.days.add(dayjs.utc(call.time).format('YYYY-MM-DD'))
-      byAgent.set(call.agent, item)
+      byAgentAndCountry.set(key, item)
     })
-    const rows = [...byAgent.values()].map((item) => ({
+    const rows = [...byAgentAndCountry.values()].map((item) => ({
       ...item,
-      key: item.agent,
+      key: `${item.agent}::${item.country}`,
       calledLeads: item.leads.size,
       dailyAverage: item.days.size ? Number((item.total / item.days.size).toFixed(1)) : 0,
     })).sort((a, b) => b.total - a.total)
@@ -815,8 +817,9 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     { title: t('sales.call.agent'), dataIndex: 'agent', width: 190 },
   ]
 
-  const callSummaryColumns: ColumnsType<{ key: string; agent: string; total: number; answered: number; unanswered: number; seconds: number; calledLeads: number; dailyAverage: number }> = [
+  const callSummaryColumns: ColumnsType<{ key: string; agent: string; country: string; total: number; answered: number; unanswered: number; seconds: number; calledLeads: number; dailyAverage: number }> = [
     { title: 'CC', dataIndex: 'agent', width: 170, render: (email: string) => accounts.find((item) => item.email === email)?.name || email },
+    { title: '国家', dataIndex: 'country', width: 110, render: (country: string) => <Tag>{country}</Tag> },
     { title: '总通话', dataIndex: 'total', width: 100 },
     { title: '已接通', dataIndex: 'answered', width: 100, render: (value: number) => <Tag color="green">{value}</Tag> },
     { title: '未接通', dataIndex: 'unanswered', width: 100, render: (value: number) => <Tag color="red">{value}</Tag> },
