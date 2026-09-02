@@ -110,6 +110,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   )
 
   const [tab, setTab] = useState('follow')
+  const [callView, setCallView] = useState('details')
   const [keyword, setKeyword] = useState('')
   const [purchaseIntentionFilter, setPurchaseIntentionFilter] = useState<string[]>([])
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>()
@@ -953,40 +954,39 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               <>
                 {filterBar}
                 <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('sales.callsBanner')} />
-                {isLeader && (
-                  <section className="sales-call-summary" aria-label="销售通话汇总">
-                    <div className="sales-call-summary-head">
-                      <div>
-                        <Text strong>销售通话汇总</Text>
-                        <Text type="secondary">仅管理视角可见；随上方国家、通话结果、CC、通话时间和关键词筛选实时变化</Text>
-                      </div>
-                    </div>
-                    <div className="sales-call-metrics">
-                      <Card size="small"><Statistic title="总通话" value={callSummary.total} suffix="次" /></Card>
-                      <Card size="small"><Statistic title="已接通" value={callSummary.answered} suffix="次" valueStyle={{ color: '#389e0d' }} /></Card>
-                      <Card size="small"><Statistic title="未接通" value={callSummary.unanswered} suffix="次" valueStyle={{ color: '#cf1322' }} /></Card>
-                      <Card size="small"><Statistic title="已外呼 Lead" value={callSummary.calledLeads} suffix="人" /></Card>
-                      <Card size="small"><Statistic title="未外呼 Lead" value={callSummary.uncalledLeads} suffix="人" /></Card>
-                      <Card size="small"><Statistic title="累计通话时长" value={fmtDuration(callSummary.totalSeconds)} /></Card>
-                    </div>
-                    <Table
-                      size="small"
-                      rowKey="key"
-                      columns={callSummaryColumns}
-                      dataSource={callSummary.rows}
-                      pagination={false}
-                      scroll={{ x: 870 }}
-                      locale={{ emptyText: '当前筛选条件下暂无通话汇总' }}
-                    />
-                  </section>
-                )}
-                <Table
-                  rowKey="id"
-                  columns={callColumns}
-                  dataSource={callData}
-                  scroll={{ x: 1210 }}
-                  locale={{ emptyText: t('sales.emptyCalls') }}
-                  pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
+                <Tabs
+                  className="sales-call-view-tabs"
+                  size="small"
+                  activeKey={callView}
+                  onChange={setCallView}
+                  items={[
+                    {
+                      key: 'details',
+                      label: '通话明细',
+                      children: <Table rowKey="id" columns={callColumns} dataSource={callData} scroll={{ x: 1210 }} locale={{ emptyText: t('sales.emptyCalls') }} pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }} />,
+                    },
+                    ...(isLeader ? [{
+                      key: 'summary',
+                      label: '销售汇总',
+                      children: <section className="sales-call-summary" aria-label="销售通话汇总">
+                        <div className="sales-call-summary-head">
+                          <div>
+                            <Text strong>销售通话汇总</Text>
+                            <Text type="secondary">仅管理视角可见；随上方筛选条件实时变化</Text>
+                          </div>
+                        </div>
+                        <div className="sales-call-metrics">
+                          <Card size="small"><Statistic title="总通话" value={callSummary.total} suffix="次" /></Card>
+                          <Card size="small"><Statistic title="已接通" value={callSummary.answered} suffix="次" valueStyle={{ color: '#389e0d' }} /></Card>
+                          <Card size="small"><Statistic title="未接通" value={callSummary.unanswered} suffix="次" valueStyle={{ color: '#cf1322' }} /></Card>
+                          <Card size="small"><Statistic title="已外呼 Lead" value={callSummary.calledLeads} suffix="人" /></Card>
+                          <Card size="small"><Statistic title="未外呼 Lead" value={callSummary.uncalledLeads} suffix="人" /></Card>
+                          <Card size="small"><Statistic title="累计通话时长" value={fmtDuration(callSummary.totalSeconds)} /></Card>
+                        </div>
+                        <Table size="small" rowKey="key" columns={callSummaryColumns} dataSource={callSummary.rows} pagination={false} scroll={{ x: 870 }} locale={{ emptyText: '当前筛选条件下暂无通话汇总' }} />
+                      </section>,
+                    }] : []),
+                  ]}
                 />
               </>
             ),
