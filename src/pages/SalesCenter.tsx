@@ -12,6 +12,7 @@ import {
   Modal,
   Select,
   Space,
+  Statistic,
   Switch,
   Table,
   Tabs,
@@ -49,6 +50,11 @@ function fmtDuration(sec: number) {
   const m = Math.floor(sec / 60)
   const s = sec % 60
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function durationToSeconds(duration: string) {
+  const [minutes, seconds] = duration.split(':').map(Number)
+  return Number.isFinite(minutes) && Number.isFinite(seconds) ? minutes * 60 + seconds : 0
 }
 
 const USER_TYPE_COLOR: Record<UserType, string> = {
@@ -241,6 +247,43 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       }),
     [callScoped, keyword, callResultFilter, callAgentFilter, callDateRange, students, phase3],
   )
+
+  // 仅管理视角使用：按当前业务线与通话筛选汇总 CC 的通话效率；普通销售不展示也不可推断团队数据。
+  const leadCallCounts = useMemo(() => {
+    const counts = new Map<string, number>()
+    callScoped.forEach((call) => counts.set(call.studentId, (counts.get(call.studentId) || 0) + 1))
+    return counts
+  }, [callScoped])
+  const callSummary = useMemo(() => {
+    const byAgent = new Map<string, { agent: string; total: number; answered: number; unanswered: number; seconds: number; leads: Set<string>; days: Set<string> }>()
+    callData.forEach((call) => {
+      const item = byAgent.get(call.agent) || { agent: call.agent, total: 0, answered: 0, unanswered: 0, seconds: 0, leads: new Set<string>(), days: new Set<string>() }
+      item.total += 1
+      item.answered += call.result === '已接通' ? 1 : 0
+      item.unanswered += call.result === '无人接听' ? 1 : 0
+      item.seconds += durationToSeconds(call.duration)
+      item.leads.add(call.studentId)
+      item.days.add(dayjs.utc(call.time).format('YYYY-MM-DD'))
+      byAgent.set(call.agent, item)
+    })
+    const rows = [...byAgent.values()].map((item) => ({
+      ...item,
+      key: item.agent,
+      calledLeads: item.leads.size,
+      dailyAverage: item.days.size ? Number((item.total / item.days.size).toFixed(1)) : 0,
+    })).sort((a, b) => b.total - a.total)
+    const calledLeadIds = new Set(callData.map((call) => call.studentId))
+    const totalSeconds = callData.reduce((sum, call) => sum + durationToSeconds(call.duration), 0)
+    return {
+      rows,
+      total: callData.length,
+      answered: callData.filter((call) => call.result === '已接通').length,
+      unanswered: callData.filter((call) => call.result === '无人接听').length,
+      calledLeads: calledLeadIds.size,
+      uncalledLeads: salesLeads.filter((lead) => !leadCallCounts.has(lead.studentId)).length,
+      totalSeconds,
+    }
+  }, [callData, salesLeads, leadCallCounts])
 
   const claim = (s: Student) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -639,6 +682,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         return <span>{acc?.name || v}</span>
       },
     },
+    ...(isLeader ? [{
+      title: '外呼情况',
+      key: 'callCount',
+      width: 120,
+      render: (_: unknown, row: Student) => {
+        const count = leadCallCounts.get(row.studentId) || 0
+        return count ? <Tag color="blue">已外呼 · {count} 次</Tag> : <Text type="secondary">未外呼</Text>
+      },
+    }] : []),
   ]
 
   const poolColumns: ColumnsType<Student> = [
@@ -760,6 +812,16 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       render: (v: string) => v || <Text type="secondary">—</Text>,
     },
     { title: t('sales.call.agent'), dataIndex: 'agent', width: 190 },
+  ]
+
+  const callSummaryColumns: ColumnsType<{ key: string; agent: string; total: number; answered: number; unanswered: number; seconds: number; calledLeads: number; dailyAverage: number }> = [
+    { title: 'CC', dataIndex: 'agent', width: 170, render: (email: string) => accounts.find((item) => item.email === email)?.name || email },
+    { title: '总通话', dataIndex: 'total', width: 100 },
+    { title: '已接通', dataIndex: 'answered', width: 100, render: (value: number) => <Tag color="green">{value}</Tag> },
+    { title: '未接通', dataIndex: 'unanswered', width: 100, render: (value: number) => <Tag color="red">{value}</Tag> },
+    { title: '已外呼 Lead', dataIndex: 'calledLeads', width: 130 },
+    { title: '日均通话', dataIndex: 'dailyAverage', width: 120 },
+    { title: '累计通话时长', dataIndex: 'seconds', width: 150, render: (value: number) => fmtDuration(value) },
   ]
 
   const [showIntro, setShowIntro] = useState(false)
@@ -917,6 +979,33 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             children: (
               <>
                 <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('sales.callsBanner')} />
+                {isLeader && (
+                  <section className="sales-call-summary" aria-label="销售通话汇总">
+                    <div className="sales-call-summary-head">
+                      <div>
+                        <Text strong>销售通话汇总</Text>
+                        <Text type="secondary">仅管理视角可见；随上方国家、通话结果、CC、通话时间和关键词筛选实时变化</Text>
+                      </div>
+                    </div>
+                    <div className="sales-call-metrics">
+                      <Card size="small"><Statistic title="总通话" value={callSummary.total} suffix="次" /></Card>
+                      <Card size="small"><Statistic title="已接通" value={callSummary.answered} suffix="次" valueStyle={{ color: '#389e0d' }} /></Card>
+                      <Card size="small"><Statistic title="未接通" value={callSummary.unanswered} suffix="次" valueStyle={{ color: '#cf1322' }} /></Card>
+                      <Card size="small"><Statistic title="已外呼 Lead" value={callSummary.calledLeads} suffix="人" /></Card>
+                      <Card size="small"><Statistic title="未外呼 Lead" value={callSummary.uncalledLeads} suffix="人" /></Card>
+                      <Card size="small"><Statistic title="累计通话时长" value={fmtDuration(callSummary.totalSeconds)} /></Card>
+                    </div>
+                    <Table
+                      size="small"
+                      rowKey="key"
+                      columns={callSummaryColumns}
+                      dataSource={callSummary.rows}
+                      pagination={false}
+                      scroll={{ x: 870 }}
+                      locale={{ emptyText: '当前筛选条件下暂无通话汇总' }}
+                    />
+                  </section>
+                )}
                 <Table
                   rowKey="id"
                   columns={callColumns}
