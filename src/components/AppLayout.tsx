@@ -33,6 +33,7 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/users': 'users',
   '/sales': 'sales',
   '/sales-v3': 'salesV3',
+  '/marketing-prototype': 'marketing',
   '/users-v2': 'usersV2',
   '/orders': 'orders',
   '/orders-v3': 'ordersV3',
@@ -81,6 +82,7 @@ export default function AppLayout() {
 
   // 营销中心（四期）子菜单
   const marketingChildren = [
+    { key: '/marketing-prototype', icon: <ShopOutlined />, label: '营销中心原型' },
     { key: '/channels', icon: <ApartmentOutlined />, label: t('app.nav.channels') },
     { key: '/landing', icon: <LinkOutlined />, label: t('app.nav.landing') },
     { key: '/packages', icon: <AppstoreOutlined />, label: t('app.nav.packages') },
@@ -130,6 +132,7 @@ export default function AppLayout() {
     '/users': t('app.nav.users'),
     '/sales': t('app.nav.sales'),
     '/sales-v3': t('app.nav.sales'),
+    '/marketing-prototype': '营销中心原型',
     '/users-v2': t('app.nav.usersV2'),
     '/orders': t('app.nav.orders'),
     '/orders-v3': '订单中心',

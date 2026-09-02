@@ -9,6 +9,7 @@ import UserCenter from './pages/UserCenter'
 import UserCenterP1 from './pages/UserCenterP1'
 import UserDetail from './pages/UserDetail'
 import SalesCenter from './pages/SalesCenter'
+import SalesCenterP3 from './pages/SalesCenterP3'
 import MarketingCenterPrototype from './pages/MarketingCenterPrototype'
 import OrderCenter from './pages/OrderCenter'
 import OrderCenterP3 from './pages/OrderCenterP3'
@@ -29,6 +30,7 @@ const MODULE_PATH: { module: ModuleKey; path: string }[] = [
   { module: 'usersV2', path: '/users-v2' },
   { module: 'sales', path: '/sales' },
   { module: 'salesV3', path: '/sales-v3' },
+  { module: 'marketing', path: '/marketing-prototype' },
   { module: 'orders', path: '/orders' },
   { module: 'ordersV3', path: '/orders-v3' },
   { module: 'channels', path: '/channels' },
@@ -78,6 +80,9 @@ export default function App() {
           <Route path="users" element={<Guard module="users"><UserCenterP1 /></Guard>} />
           <Route path="sales" element={<Guard module="sales"><SalesCenter /></Guard>} />
           <Route path="sales/:studentId" element={<Guard module="sales"><UserDetail variant="sales" backPath="/sales" backText="返回销售中心" /></Guard>} />
+          <Route path="sales-v3" element={<Guard module="salesV3"><SalesCenterP3 /></Guard>} />
+          <Route path="sales-v3/:studentId" element={<Guard module="salesV3"><UserDetail variant="sales" backPath="/sales-v3" backText="返回销售中心" /></Guard>} />
+          <Route path="marketing-prototype" element={<Guard module="marketing"><MarketingCenterPrototype /></Guard>} />
           <Route path="users-v2" element={<Guard module="usersV2"><UserCenter phase3 /></Guard>} />
           <Route path="users-v2/:studentId" element={<Guard module="usersV2"><UserDetail /></Guard>} />
           <Route path="orders" element={<Guard module="orders"><OrderCenter /></Guard>} />
@@ -88,7 +93,6 @@ export default function App() {
           <Route path="coupons" element={<Guard module="coupons"><CouponPage /></Guard>} />
           <Route path="system" element={<Guard module="system"><SystemConfig /></Guard>} />
         </Route>
-        <Route path="/sales-v3" element={<RequireAuth><Guard module="salesV3"><MarketingCenterPrototype /></Guard></RequireAuth>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>
