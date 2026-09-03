@@ -580,6 +580,7 @@ function seed(): AppState {
       studentId: '2060199610824356008', name: 'Ahmad', localName: 'Ahmad', userType: '正式用户', gender: '男',
       birthday: '2016-10-05', ageGroup: '6-8', loginMethod: '手机号', account: '+60 12-345 6789', phone: '+60 12-345 6789', businessLine: '马来', registerChannel: 'TikTok', channelSource: 'MY_TIKTOK_01', adChannel: 'TikTok Ads',
       countryCode: '+60', channelCode: '', country: '马来西亚', appChannel: 'Google Play', registerTime: now.subtract(4, 'hour').format('YYYY-MM-DD HH:mm:ss'), status: '未付费-未体验', salesProgress: '待领取',
+      landingCallbackAt: now.add(3, 'hour').format('YYYY-MM-DD HH:mm:ss'), landingCallbackSubmittedAt: now.subtract(15, 'minute').format('YYYY-MM-DD HH:mm:ss'),
     },
     {
       // VN Follow (用来演示超过 30 天未付费，被系统自动踢入公海，且销售更新时间已经过去两天的场景)
@@ -596,6 +597,7 @@ function seed(): AppState {
       studentId: '2060199610824356010', name: 'Budi Santoso', localName: 'Budi', userType: '正式用户', gender: '男',
       birthday: '2016-12-12', ageGroup: '6-8', loginMethod: '手机号', account: '+62 811-2233-4455', phone: '+62 811-2233-4455', businessLine: '印尼', registerChannel: 'Google', channelSource: 'ID_GOOGLE_01', adChannel: 'Google Search',
       countryCode: '+62', channelCode: '', country: '印尼', appChannel: 'Google Play', registerTime: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'), status: '未付费-未体验',
+      landingCallbackAt: now.subtract(45, 'minute').format('YYYY-MM-DD HH:mm:ss'), landingCallbackSubmittedAt: now.subtract(3, 'hour').format('YYYY-MM-DD HH:mm:ss'),
       salesOwner: 'sales.lead@dinoai.ai', salesProgress: '跟进中', salesLatestNote: '晚上回电', salesUpdatedAt: now.subtract(2, 'hour').format('YYYY-MM-DD HH:mm:ss'),
       salesHistory: [
         { progress: '跟进中', note: '晚上回电', time: now.subtract(2, 'hour').format('YYYY-MM-DD HH:mm:ss'), owner: 'sales.lead@dinoai.ai' },

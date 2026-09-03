@@ -123,6 +123,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const [callAgentFilter, setCallAgentFilter] = useState<string | undefined>()
   const [callDateRange, setCallDateRange] = useState<any>(null)
   const [consultationStageFilter, setConsultationStageFilter] = useState<string[]>([])
+  const [landingCallbackFilter, setLandingCallbackFilter] = useState<string | undefined>()
 
   const [editing, setEditing] = useState<Student | null>(null)
   const [dialing, setDialing] = useState<Student | null>(null)
@@ -193,6 +194,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const matchesLeadFilters = (s: Student) => {
     const kw = keyword.trim().toLowerCase()
     const owner = s.salesOwner || '__unassigned__'
+    const callbackAt = s.landingCallbackAt ? dayjs.utc(s.landingCallbackAt) : undefined
+    const now = dayjs.utc()
+    const callbackMatches = !landingCallbackFilter
+      || (landingCallbackFilter === 'filled' && !!callbackAt)
+      || (landingCallbackFilter === 'due' && !!callbackAt && !callbackAt.isAfter(now))
+      || (landingCallbackFilter === 'upcoming' && !!callbackAt && callbackAt.isAfter(now) && callbackAt.diff(now, 'hour', true) <= 24)
     return (
       (!kw || leadText(s).includes(kw)) &&
       (!purchaseIntentionFilter.length || purchaseIntentionFilter.includes(s.purchaseIntention || '未填写')) &&
@@ -202,18 +209,19 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       (!registerChannelFilter.length || registerChannelFilter.includes(s.registerChannel)) &&
       (!userTypeFilter.length || userTypeFilter.includes(resolveUserType(s))) &&
       matchesDateRange(s.registerTime, registerDateRange) &&
-      matchesDateRange(s.salesUpdatedAt, followDateRange)
+      matchesDateRange(s.salesUpdatedAt, followDateRange) &&
+      callbackMatches
     )
   }
 
   const poolData = useMemo(
     () => poolAll.filter(matchesLeadFilters),
-    [poolAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange],
+    [poolAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter],
   )
 
   const followData = useMemo(
     () => followAll.filter(matchesLeadFilters).filter((s) => consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))),
-    [followAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, callRecords],
+    [followAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -632,6 +640,17 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const consultationColumns: ColumnsType<Student> = [
     { title: t('sales.consultation.stage'), key: 'consultationStage', width: 170, render: (_: unknown, s) => { const stage = consultationStage(s, callRecords); return s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag> : <Text type="secondary">—</Text> } },
   ]
+  const callbackStatus = (student: Student) => {
+    if (!student.landingCallbackAt) return <Text type="secondary">—</Text>
+    const callbackAt = dayjs.utc(student.landingCallbackAt)
+    const now = dayjs.utc()
+    const due = !callbackAt.isAfter(now)
+    const within24Hours = !due && callbackAt.diff(now, 'hour', true) <= 24
+    return <Space direction="vertical" size={2}>
+      <Tag color={due ? 'red' : within24Hours ? 'orange' : 'blue'}>{due ? '待外呼' : within24Hours ? '即将外呼' : '已预约外呼'}</Tag>
+      <LocalTime time={student.landingCallbackAt} country={student.country || student.businessLine} />
+    </Space>
+  }
   // 基于「用户中心-二期」字段增加
   const userColumns: ColumnsType<Student> = [
     {
@@ -676,6 +695,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       render: (v: string | undefined) => (v ? <Tag color="purple">{v}</Tag> : <Text type="secondary">—</Text>),
     },
     { title: t('user.col.account'), dataIndex: 'account', width: 200, render: (v) => <Text>{v}</Text> },
+    {
+      title: '预约外呼时间',
+      key: 'landingCallbackAt',
+      width: 210,
+      render: (_: unknown, r: Student) => callbackStatus(r),
+    },
     {
       title: t('user.col.channelSourceLp'),
       dataIndex: 'adChannelLp',
@@ -879,6 +904,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     setRegisterDateRange(null)
     setFollowDateRange(null)
     setConsultationStageFilter([])
+    setLandingCallbackFilter(undefined)
   }
 
   const filterBar = (
@@ -903,6 +929,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       ) : <>
         {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />}
         {tab === 'follow' && showVietnamStageFilter && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
+        <Select className="sales-filter-control" allowClear placeholder="预约外呼" value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: '已填写预约外呼', value: 'filled' }, { label: '待外呼（已到时间）', value: 'due' }, { label: '即将外呼（24小时内）', value: 'upcoming' }]} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="购买意向" value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value) => ({ label: value, value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="用户类型" value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: value, value }))} />
