@@ -251,6 +251,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     () => callScoped.filter((call) => (!callAgentFilter || call.agent === callAgentFilter) && matchesCallDate(call)),
     [callScoped, callAgentFilter, callDateRange],
   )
+  // 汇总漏斗的底数必须与 CC / 国家筛选同口径；否则会出现筛选了某 CC、表中仍显示另一 CC 当前 Lead 的情况。
+  const summaryFollowLeads = useMemo(
+    () => followAll.filter((lead) => !callAgentFilter || lead.salesOwner === callAgentFilter),
+    [followAll, callAgentFilter],
+  )
 
   // Lead 列表中的累计外呼次数：不受统计周期影响，只受当前数据权限和国家范围约束。
   const leadCallCounts = useMemo(() => {
@@ -266,7 +271,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       byAgentAndCountry.set(key, item)
       return item
     }
-    followAll.forEach((lead) => {
+    summaryFollowLeads.forEach((lead) => {
       const agent = lead.salesOwner || '未分配'
       const country = businessLineOf(channels, lead) || lead.businessLine || lead.country || '未填写'
       getItem(agent, country).currentLeads.add(lead.studentId)
@@ -297,7 +302,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       connectionRate: item.attemptedLeads.size ? Number((item.connectedLeads.size / item.attemptedLeads.size * 100).toFixed(1)) : 0,
       seconds: item.seconds,
     })).sort((a, b) => b.total - a.total)
-    const currentLeadIds = new Set(followAll.map((lead) => lead.studentId))
+    const currentLeadIds = new Set(summaryFollowLeads.map((lead) => lead.studentId))
     const attemptedLeadIds = new Set(summaryCallData.map((call) => call.studentId))
     const connectedLeadIds = new Set(summaryCallData.filter((call) => call.result === '已接通').map((call) => call.studentId))
     const totalSeconds = summaryCallData.reduce((sum, call) => sum + durationToSeconds(call.duration), 0)
@@ -313,7 +318,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       unanswered: summaryCallData.filter((call) => call.result === '无人接听').length,
       totalSeconds,
     }
-  }, [summaryCallData, followAll, channels])
+  }, [summaryCallData, summaryFollowLeads, channels])
 
   const claim = (s: Student) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
