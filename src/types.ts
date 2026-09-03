@@ -348,7 +348,7 @@ export type ModuleKey =
   // 主模块
   | 'marketing' | 'channels' | 'landing' | 'packages' | 'coupons' | 'users' | 'usersV2' | 'sales' | 'salesV3' | 'orders' | 'ordersV3' | 'system' | 'lifecycle'
   // 新营销中心
-  | 'marketingV2' | 'marketingV2_channels' | 'marketingV2_skus' | 'marketingV2_offers' | 'marketingV2_offers_edit' | 'marketingV2_offers_approve' | 'marketingV2_landing' | 'marketingV2_landing_create' | 'marketingV2_landing_edit' | 'marketingV2_landing_status'
+  | 'marketingV2' | 'marketingV2_channels' | 'marketingV2_channels_edit' | 'marketingV2_channels_status' | 'marketingV2_skus' | 'marketingV2_offers' | 'marketingV2_offers_edit' | 'marketingV2_offers_status' | 'marketingV2_offers_approve' | 'marketingV2_landing' | 'marketingV2_landing_create' | 'marketingV2_landing_edit' | 'marketingV2_landing_preview' | 'marketingV2_landing_copy' | 'marketingV2_landing_status'
   // 子权限 - channels
   | 'channels_create' | 'channels_edit' | 'channels_delete' | 'channels_gen_code' | 'channels_params'
   // 子权限 - landing
@@ -378,7 +378,7 @@ export const PERMISSION_MODULES: ModuleKey[] = [
   'landing', 'landing_create', 'landing_edit',
   'packages', 'packages_create', 'packages_edit', 'packages_status',
   'coupons', 'coupons_create', 'coupons_extend', 'coupons_revoke', 'coupons_edit',
-  'marketingV2', 'marketingV2_channels', 'marketingV2_skus', 'marketingV2_offers', 'marketingV2_offers_edit', 'marketingV2_offers_approve', 'marketingV2_landing', 'marketingV2_landing_create', 'marketingV2_landing_edit', 'marketingV2_landing_status',
+  'marketingV2', 'marketingV2_channels', 'marketingV2_channels_edit', 'marketingV2_channels_status', 'marketingV2_skus', 'marketingV2_offers', 'marketingV2_offers_edit', 'marketingV2_offers_status', 'marketingV2_offers_approve', 'marketingV2_landing', 'marketingV2_landing_create', 'marketingV2_landing_edit', 'marketingV2_landing_preview', 'marketingV2_landing_copy', 'marketingV2_landing_status',
   'users', 'users_edit', 'users_phone_view', 'users_export', 'usersV2', 'usersV2_edit', 'usersV2_phone_view', 'usersV2_export', 'usersV2_view_report', 'usersV2_view_replay',
   'sales', 'sales_claim', 'sales_dial', 'sales_update', 'sales_reassign', 'sales_config', 'salesV3', 'salesV3_claim', 'salesV3_dial', 'salesV3_update', 'salesV3_reassign', 'salesV3_config', 'salesV3_import_leads', 'salesV3_view_report', 'salesV3_view_replay',
   'orders', 'orders_export', 'ordersV3', 'ordersV3_export',

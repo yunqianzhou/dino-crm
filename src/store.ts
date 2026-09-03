@@ -734,7 +734,7 @@ function seed(): AppState {
       dataScope: 'line',
       perms: {
         marketing: 'operate',
-        marketingV2: 'operate', marketingV2_channels: 'operate', marketingV2_skus: 'view', marketingV2_offers: 'view', marketingV2_offers_edit: 'none', marketingV2_offers_approve: 'none', marketingV2_landing: 'operate', marketingV2_landing_create: 'operate', marketingV2_landing_edit: 'operate', marketingV2_landing_status: 'operate',
+        marketingV2: 'operate', marketingV2_channels: 'operate', marketingV2_channels_edit: 'operate', marketingV2_channels_status: 'operate', marketingV2_skus: 'view', marketingV2_offers: 'view', marketingV2_offers_edit: 'none', marketingV2_offers_status: 'none', marketingV2_offers_approve: 'none', marketingV2_landing: 'operate', marketingV2_landing_create: 'operate', marketingV2_landing_edit: 'operate', marketingV2_landing_preview: 'operate', marketingV2_landing_copy: 'operate', marketingV2_landing_status: 'operate',
         channels: 'operate',
         channels_create: 'operate',
         channels_edit: 'operate',
@@ -799,7 +799,7 @@ function seed(): AppState {
       dataScope: 'line',
       perms: {
         marketing: 'operate',
-        marketingV2: 'operate', marketingV2_channels: 'view', marketingV2_skus: 'view', marketingV2_offers: 'operate', marketingV2_offers_edit: 'operate', marketingV2_offers_approve: 'operate', marketingV2_landing: 'operate', marketingV2_landing_create: 'operate', marketingV2_landing_edit: 'operate', marketingV2_landing_status: 'operate',
+        marketingV2: 'operate', marketingV2_channels: 'view', marketingV2_channels_edit: 'none', marketingV2_channels_status: 'none', marketingV2_skus: 'view', marketingV2_offers: 'operate', marketingV2_offers_edit: 'operate', marketingV2_offers_status: 'operate', marketingV2_offers_approve: 'none', marketingV2_landing: 'operate', marketingV2_landing_create: 'operate', marketingV2_landing_edit: 'operate', marketingV2_landing_preview: 'operate', marketingV2_landing_copy: 'operate', marketingV2_landing_status: 'operate',
         channels: 'view',
         channels_create: 'view',
         channels_edit: 'view',
@@ -864,7 +864,7 @@ function seed(): AppState {
       dataScope: 'line',
       perms: {
         marketing: 'none',
-        marketingV2: 'none', marketingV2_channels: 'none', marketingV2_skus: 'none', marketingV2_offers: 'none', marketingV2_offers_edit: 'none', marketingV2_offers_approve: 'none', marketingV2_landing: 'none', marketingV2_landing_create: 'none', marketingV2_landing_edit: 'none', marketingV2_landing_status: 'none',
+        marketingV2: 'none', marketingV2_channels: 'none', marketingV2_channels_edit: 'none', marketingV2_channels_status: 'none', marketingV2_skus: 'none', marketingV2_offers: 'none', marketingV2_offers_edit: 'none', marketingV2_offers_status: 'none', marketingV2_offers_approve: 'none', marketingV2_landing: 'none', marketingV2_landing_create: 'none', marketingV2_landing_edit: 'none', marketingV2_landing_preview: 'none', marketingV2_landing_copy: 'none', marketingV2_landing_status: 'none',
         channels: 'none',
         channels_create: 'none',
         channels_edit: 'none',
@@ -929,7 +929,7 @@ function seed(): AppState {
       dataScope: 'all',
       perms: {
         marketing: 'operate',
-        marketingV2: 'operate', marketingV2_channels: 'operate', marketingV2_skus: 'operate', marketingV2_offers: 'operate', marketingV2_offers_edit: 'operate', marketingV2_offers_approve: 'operate', marketingV2_landing: 'operate', marketingV2_landing_create: 'operate', marketingV2_landing_edit: 'operate', marketingV2_landing_status: 'operate',
+        marketingV2: 'operate', marketingV2_channels: 'operate', marketingV2_channels_edit: 'operate', marketingV2_channels_status: 'operate', marketingV2_skus: 'operate', marketingV2_offers: 'operate', marketingV2_offers_edit: 'operate', marketingV2_offers_status: 'operate', marketingV2_offers_approve: 'none', marketingV2_landing: 'operate', marketingV2_landing_create: 'operate', marketingV2_landing_edit: 'operate', marketingV2_landing_preview: 'operate', marketingV2_landing_copy: 'operate', marketingV2_landing_status: 'operate',
         channels: 'operate',
         channels_create: 'operate',
         channels_edit: 'operate',
@@ -994,7 +994,7 @@ function seed(): AppState {
       dataScope: 'line',
       perms: {
         marketing: 'none',
-        marketingV2: 'none', marketingV2_channels: 'none', marketingV2_skus: 'none', marketingV2_offers: 'none', marketingV2_offers_edit: 'none', marketingV2_offers_approve: 'none', marketingV2_landing: 'none', marketingV2_landing_create: 'none', marketingV2_landing_edit: 'none', marketingV2_landing_status: 'none',
+        marketingV2: 'none', marketingV2_channels: 'none', marketingV2_channels_edit: 'none', marketingV2_channels_status: 'none', marketingV2_skus: 'none', marketingV2_offers: 'none', marketingV2_offers_edit: 'none', marketingV2_offers_status: 'none', marketingV2_offers_approve: 'none', marketingV2_landing: 'none', marketingV2_landing_create: 'none', marketingV2_landing_edit: 'none', marketingV2_landing_preview: 'none', marketingV2_landing_copy: 'none', marketingV2_landing_status: 'none',
         channels: 'none',
         channels_create: 'none',
         channels_edit: 'none',

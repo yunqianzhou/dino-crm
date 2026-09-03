@@ -73,6 +73,12 @@ export function usePerm() {
     if (m === 'marketingV2_skus') return role.perms.packages
     if (m === 'marketingV2_offers') return role.perms.coupons
     if (m === 'marketingV2_landing') return role.perms.landing
+    // Newly split marketing-center action permissions inherit the former page
+    // permission for existing roles until an administrator saves the role again.
+    if (m === 'marketingV2_channels_edit' || m === 'marketingV2_channels_status') return role.perms.marketingV2_channels ?? role.perms.channels
+    if (m === 'marketingV2_offers_status') return role.perms.marketingV2_offers ?? role.perms.coupons
+    if (m === 'marketingV2_landing_preview') return role.perms.marketingV2_landing_create ?? role.perms.landing
+    if (m === 'marketingV2_landing_copy') return role.perms.marketingV2_landing ?? role.perms.landing
     const phase3Copy: Partial<Record<ModuleKey, ModuleKey>> = {
       usersV2_edit: 'users_edit',
       usersV2_phone_view: 'users_phone_view',
