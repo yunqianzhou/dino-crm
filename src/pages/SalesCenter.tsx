@@ -723,7 +723,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       width: 120,
       render: (_: unknown, row: Student) => {
         const count = leadCallCounts.get(row.studentId) || 0
-        return count ? <Tag color="blue">已外呼 · {count} 次</Tag> : <Text type="secondary">未外呼</Text>
+        return count ? <Tag color="blue">{t('sales.outreach.called', { n: count })}</Tag> : <Text type="secondary">{t('sales.outreach.notCalled')}</Text>
       },
     }] : []),
   ]
@@ -850,19 +850,19 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   ]
 
   const callSummaryColumns: ColumnsType<{ key: string; agent: string; country: string; currentLeads: number; attemptedLeads: number; connectedLeads: number; unconnectedLeads: number; uncalledLeads: number; total: number; answered: number; unanswered: number; coverageRate: number; connectionRate: number; seconds: number }> = [
-    { title: 'CC', dataIndex: 'agent', width: 170, render: (email: string) => accounts.find((item) => item.email === email)?.name || email },
-    { title: '国家', dataIndex: 'country', width: 110, render: (country: string) => <Tag>{country}</Tag> },
-    { title: '当前在跟 Lead', dataIndex: 'currentLeads', width: 130 },
-    { title: '已尝试外呼', dataIndex: 'attemptedLeads', width: 120 },
-    { title: '已接通 Lead', dataIndex: 'connectedLeads', width: 120, render: (value: number) => <Tag color="green">{value}</Tag> },
-    { title: '已拨未接 Lead', dataIndex: 'unconnectedLeads', width: 130, render: (value: number) => <Tag color="orange">{value}</Tag> },
-    { title: '未外呼 Lead', dataIndex: 'uncalledLeads', width: 120, render: (value: number) => <Tag color="default">{value}</Tag> },
-    { title: '总通话', dataIndex: 'total', width: 100 },
-    { title: '已接通', dataIndex: 'answered', width: 100, render: (value: number) => <Tag color="green">{value}</Tag> },
-    { title: '未接通', dataIndex: 'unanswered', width: 100, render: (value: number) => <Tag color="red">{value}</Tag> },
-    { title: '覆盖率', dataIndex: 'coverageRate', width: 100, render: (value: number) => `${value}%` },
-    { title: 'Lead 接通率', dataIndex: 'connectionRate', width: 120, render: (value: number) => `${value}%` },
-    { title: '累计通话时长', dataIndex: 'seconds', width: 150, render: (value: number) => fmtDuration(value) },
+    { title: t('user.col.cc'), dataIndex: 'agent', width: 170, render: (email: string) => accounts.find((item) => item.email === email)?.name || email },
+    { title: t('user.col.country'), dataIndex: 'country', width: 110, render: (country: string) => <Tag>{country}</Tag> },
+    { title: t('sales.outreach.currentLeads'), dataIndex: 'currentLeads', width: 130 },
+    { title: t('sales.outreach.attemptedLeads'), dataIndex: 'attemptedLeads', width: 120 },
+    { title: t('sales.outreach.connectedLeads'), dataIndex: 'connectedLeads', width: 120, render: (value: number) => <Tag color="green">{value}</Tag> },
+    { title: t('sales.outreach.unconnectedLeads'), dataIndex: 'unconnectedLeads', width: 130, render: (value: number) => <Tag color="orange">{value}</Tag> },
+    { title: t('sales.outreach.uncalledLeads'), dataIndex: 'uncalledLeads', width: 120, render: (value: number) => <Tag color="default">{value}</Tag> },
+    { title: t('sales.outreach.totalDials'), dataIndex: 'total', width: 100 },
+    { title: t('sales.callResult.已接通'), dataIndex: 'answered', width: 100, render: (value: number) => <Tag color="green">{value}</Tag> },
+    { title: t('sales.callResult.无人接听'), dataIndex: 'unanswered', width: 100, render: (value: number) => <Tag color="red">{value}</Tag> },
+    { title: t('sales.outreach.coverageRate'), dataIndex: 'coverageRate', width: 100, render: (value: number) => `${value}%` },
+    { title: t('sales.outreach.leadConnectionRate'), dataIndex: 'connectionRate', width: 120, render: (value: number) => `${value}%` },
+    { title: t('sales.outreach.totalTalkDuration'), dataIndex: 'seconds', width: 150, render: (value: number) => fmtDuration(value) },
   ]
 
   const [showIntro, setShowIntro] = useState(false)
@@ -897,11 +897,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       {(tab === 'calls' || tab === 'summary') ? (
         <>
           {tab === 'calls' && <Select className="sales-filter-control" allowClear placeholder={t('sales.call.result')} value={callResultFilter} onChange={setCallResultFilter} options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))} />}
-          {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder="坐席" value={callAgentFilter} onChange={setCallAgentFilter} options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))} />}
-          <DatePicker.RangePicker className="sales-filter-date" onChange={setCallDateRange} allowClear placeholder={['开始时间', '结束时间']} />
+          {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('sales.call.agent')} value={callAgentFilter} onChange={setCallAgentFilter} options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))} />}
+          <DatePicker.RangePicker className="sales-filter-date" onChange={setCallDateRange} allowClear placeholder={[t('pkg.startTime'), t('pkg.endTime')]} />
         </>
       ) : <>
-        {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder="CC" value={ownerFilter} onChange={setOwnerFilter} options={[{ label: '未分配', value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />}
+        {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />}
         {tab === 'follow' && showVietnamStageFilter && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="购买意向" value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value) => ({ label: value, value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
@@ -1000,28 +1000,28 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           },
           {
             key: 'summary',
-            label: '销售触达汇总',
+            label: t('sales.outreach.tab'),
             children: (
               <>
                 {filterBar}
-                <Alert type="info" showIcon style={{ marginBottom: 16 }} message={seeAllOwners ? '按 CC 与国家查看当前 Lead 触达漏斗及通话效率；统计随上方筛选实时变化。' : '仅展示本人权限范围内的 Lead 触达漏斗及通话效率。'} />
-                <section className="sales-call-summary" aria-label="销售触达汇总">
+                <Alert type="info" showIcon style={{ marginBottom: 16 }} message={seeAllOwners ? t('sales.outreach.managerTip') : t('sales.outreach.personalTip')} />
+                <section className="sales-call-summary" aria-label={t('sales.outreach.title')}>
                   <div className="sales-call-summary-head">
                     <div>
-                      <Text strong>销售触达汇总</Text>
-                      <Text type="secondary">当前在跟 Lead → 已尝试外呼 → 已接通 / 已拨未接 / 未外呼</Text>
+                      <Text strong>{t('sales.outreach.title')}</Text>
+                      <Text type="secondary">{t('sales.outreach.flow')}</Text>
                     </div>
                   </div>
                   <div className="sales-call-metrics">
-                    <Card size="small"><Statistic title="当前在跟 Lead" value={callSummary.currentLeads} suffix="人" /></Card>
-                    <Card size="small"><Statistic title="已尝试外呼" value={callSummary.attemptedLeads} suffix="人" /></Card>
-                    <Card size="small"><Statistic title="已接通 Lead" value={callSummary.connectedLeads} suffix="人" valueStyle={{ color: '#389e0d' }} /></Card>
-                    <Card size="small"><Statistic title="已拨未接 Lead" value={callSummary.unconnectedLeads} suffix="人" valueStyle={{ color: '#fa8c16' }} /></Card>
-                    <Card size="small"><Statistic title="未外呼 Lead" value={callSummary.uncalledLeads} suffix="人" /></Card>
-                    <Card size="small"><Statistic title="总拨打" value={callSummary.total} suffix="次" /></Card>
-                    <Card size="small"><Statistic title="累计通话时长" value={fmtDuration(callSummary.totalSeconds)} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.currentLeads')} value={callSummary.currentLeads} suffix={t('sales.outreach.people')} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.attemptedLeads')} value={callSummary.attemptedLeads} suffix={t('sales.outreach.people')} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.connectedLeads')} value={callSummary.connectedLeads} suffix={t('sales.outreach.people')} valueStyle={{ color: '#389e0d' }} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.unconnectedLeads')} value={callSummary.unconnectedLeads} suffix={t('sales.outreach.people')} valueStyle={{ color: '#fa8c16' }} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.uncalledLeads')} value={callSummary.uncalledLeads} suffix={t('sales.outreach.people')} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.totalDials')} value={callSummary.total} suffix={t('sales.outreach.calls')} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.totalTalkDuration')} value={fmtDuration(callSummary.totalSeconds)} /></Card>
                   </div>
-                  <Table size="small" rowKey="key" columns={callSummaryColumns} dataSource={callSummary.rows} pagination={false} scroll={{ x: 1710 }} locale={{ emptyText: '当前筛选条件下暂无触达汇总' }} />
+                  <Table size="small" rowKey="key" columns={callSummaryColumns} dataSource={callSummary.rows} pagination={false} scroll={{ x: 1710 }} locale={{ emptyText: t('sales.outreach.empty') }} />
                 </section>
               </>
             ),
