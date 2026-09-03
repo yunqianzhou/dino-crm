@@ -638,19 +638,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     },
   }
   const consultationColumns: ColumnsType<Student> = [
-    { title: t('sales.consultation.stage'), key: 'consultationStage', width: 170, render: (_: unknown, s) => { const stage = consultationStage(s, callRecords); return s.businessLine === '越南' ? <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag> : <Text type="secondary">—</Text> } },
+    {
+      title: t('sales.consultation.stage'),
+      key: 'consultationStage',
+      width: 210,
+      render: (_: unknown, s) => {
+        const stage = consultationStage(s, callRecords)
+        if (s.businessLine !== '越南') return <Text type="secondary">—</Text>
+        return <Space direction="vertical" size={2}>
+          <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag>
+          {stage === '待外呼' && s.landingCallbackAt && <span style={{ whiteSpace: 'nowrap' }}>预约外呼：<LocalTime time={s.landingCallbackAt} country={s.country || s.businessLine} /></span>}
+        </Space>
+      },
+    },
   ]
-  const callbackStatus = (student: Student) => {
-    if (!student.landingCallbackAt) return <Text type="secondary">—</Text>
-    const callbackAt = dayjs.utc(student.landingCallbackAt)
-    const now = dayjs.utc()
-    const due = !callbackAt.isAfter(now)
-    const within24Hours = !due && callbackAt.diff(now, 'hour', true) <= 24
-    return <Space direction="vertical" size={2}>
-      <Tag color={due ? 'red' : within24Hours ? 'orange' : 'blue'}>{due ? '待外呼' : within24Hours ? '即将外呼' : '已预约外呼'}</Tag>
-      <LocalTime time={student.landingCallbackAt} country={student.country || student.businessLine} />
-    </Space>
-  }
   // 基于「用户中心-二期」字段增加
   const userColumns: ColumnsType<Student> = [
     {
@@ -695,12 +696,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       render: (v: string | undefined) => (v ? <Tag color="purple">{v}</Tag> : <Text type="secondary">—</Text>),
     },
     { title: t('user.col.account'), dataIndex: 'account', width: 200, render: (v) => <Text>{v}</Text> },
-    {
-      title: '预约外呼时间',
-      key: 'landingCallbackAt',
-      width: 210,
-      render: (_: unknown, r: Student) => callbackStatus(r),
-    },
     {
       title: t('user.col.channelSourceLp'),
       dataIndex: 'adChannelLp',

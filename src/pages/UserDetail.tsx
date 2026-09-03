@@ -158,7 +158,6 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
           <Descriptions.Item label={t('user.col.channelSourceApp')}>{appChannelSourceText(student) === '—' ? <Text type="secondary">—</Text> : appChannelSourceText(student)}</Descriptions.Item>
           <Descriptions.Item label={t('user.col.country')}><Tag>{lineLabel(student)}</Tag></Descriptions.Item>
           <Descriptions.Item label={t('user.col.regTime')}><LocalTime time={student.registerTime} country={student.country || student.businessLine} /></Descriptions.Item>
-          {variant === 'sales' && <Descriptions.Item label="用户预约外呼时间"><LocalTime time={student.landingCallbackAt} country={student.country || student.businessLine} /></Descriptions.Item>}
           {variant === 'user' ? <>
             <Descriptions.Item label={t('user.col.expireTime')}><LocalTime time={student.expireTime} country={student.country || student.businessLine} /></Descriptions.Item>
             <Descriptions.Item label="优惠码">{student.couponCode ? <Tag color="blue">{student.couponCode}</Tag> : <Text type="secondary">—</Text>}</Descriptions.Item>
