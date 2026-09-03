@@ -110,7 +110,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   )
 
   const [tab, setTab] = useState('follow')
-  const [callView, setCallView] = useState('details')
   const [keyword, setKeyword] = useState('')
   const [purchaseIntentionFilter, setPurchaseIntentionFilter] = useState<string[]>([])
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>()
@@ -224,6 +223,14 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     return list
   }, [callRecords, lineSel, matchLine, seeAllOwners, actor])
 
+  const matchesCallDate = (call: CallRecord) => {
+    if (!callDateRange || callDateRange.length !== 2) return true
+    const [start, end] = callDateRange
+    if (!start || !end) return true
+    const callTime = dayjs.utc(call.time)
+    return !callTime.isBefore(start.startOf('day')) && !callTime.isAfter(end.endOf('day'))
+  }
+
   const callData = useMemo(
     () =>
       callScoped.filter((c) => {
@@ -234,59 +241,79 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           : `${c.phone} ${c.studentId} ${c.customer}`.toLowerCase()
         const matchResult = !callResultFilter || c.result === callResultFilter
         const matchAgent = !callAgentFilter || c.agent === callAgentFilter
-        let matchDate = true
-        if (callDateRange && callDateRange.length === 2) {
-          const [start, end] = callDateRange
-          const callTime = dayjs.utc(c.time)
-          // 比较时统一转成本地时间或都在 UTC 比较。由于选择器选的是当地日期的开头和结尾，这里我们用 isAfter / isBefore。
-          // 这里简化处理，直接判断时间戳是否在范围内
-          if (start && end) {
-            matchDate = callTime.isAfter(start.startOf('day')) && callTime.isBefore(end.endOf('day'))
-          }
-        }
-        return (!kw || text.includes(kw)) && matchResult && matchAgent && matchDate
+        return (!kw || text.includes(kw)) && matchResult && matchAgent && matchesCallDate(c)
       }),
     [callScoped, keyword, callResultFilter, callAgentFilter, callDateRange, students, phase3],
   )
 
-  // 仅管理视角使用：按当前业务线与通话筛选汇总 CC 的通话效率；普通销售不展示也不可推断团队数据。
+  // 触达汇总不受关键词、单次通话结果筛选影响；只按国家、CC 和统计周期确定漏斗范围。
+  const summaryCallData = useMemo(
+    () => callScoped.filter((call) => (!callAgentFilter || call.agent === callAgentFilter) && matchesCallDate(call)),
+    [callScoped, callAgentFilter, callDateRange],
+  )
+
+  // Lead 列表中的累计外呼次数：不受统计周期影响，只受当前数据权限和国家范围约束。
   const leadCallCounts = useMemo(() => {
     const counts = new Map<string, number>()
     callScoped.forEach((call) => counts.set(call.studentId, (counts.get(call.studentId) || 0) + 1))
     return counts
   }, [callScoped])
   const callSummary = useMemo(() => {
-    const byAgentAndCountry = new Map<string, { agent: string; country: string; total: number; answered: number; unanswered: number; seconds: number; leads: Set<string>; days: Set<string> }>()
-    callData.forEach((call) => {
+    const byAgentAndCountry = new Map<string, { agent: string; country: string; currentLeads: Set<string>; attemptedLeads: Set<string>; connectedLeads: Set<string>; total: number; answered: number; unanswered: number; seconds: number }>()
+    const getItem = (agent: string, country: string) => {
+      const key = `${agent}::${country}`
+      const item = byAgentAndCountry.get(key) || { agent, country, currentLeads: new Set<string>(), attemptedLeads: new Set<string>(), connectedLeads: new Set<string>(), total: 0, answered: 0, unanswered: 0, seconds: 0 }
+      byAgentAndCountry.set(key, item)
+      return item
+    }
+    followAll.forEach((lead) => {
+      const agent = lead.salesOwner || '未分配'
+      const country = businessLineOf(channels, lead) || lead.businessLine || lead.country || '未填写'
+      getItem(agent, country).currentLeads.add(lead.studentId)
+    })
+    summaryCallData.forEach((call) => {
       const country = call.businessLine || '未填写'
-      const key = `${call.agent}::${country}`
-      const item = byAgentAndCountry.get(key) || { agent: call.agent, country, total: 0, answered: 0, unanswered: 0, seconds: 0, leads: new Set<string>(), days: new Set<string>() }
+      const item = getItem(call.agent, country)
       item.total += 1
       item.answered += call.result === '已接通' ? 1 : 0
       item.unanswered += call.result === '无人接听' ? 1 : 0
       item.seconds += durationToSeconds(call.duration)
-      item.leads.add(call.studentId)
-      item.days.add(dayjs.utc(call.time).format('YYYY-MM-DD'))
-      byAgentAndCountry.set(key, item)
+      item.attemptedLeads.add(call.studentId)
+      if (call.result === '已接通') item.connectedLeads.add(call.studentId)
     })
     const rows = [...byAgentAndCountry.values()].map((item) => ({
-      ...item,
       key: `${item.agent}::${item.country}`,
-      calledLeads: item.leads.size,
-      dailyAverage: item.days.size ? Number((item.total / item.days.size).toFixed(1)) : 0,
+      agent: item.agent,
+      country: item.country,
+      currentLeads: item.currentLeads.size,
+      attemptedLeads: item.attemptedLeads.size,
+      connectedLeads: item.connectedLeads.size,
+      unconnectedLeads: [...item.attemptedLeads].filter((id) => !item.connectedLeads.has(id)).length,
+      uncalledLeads: [...item.currentLeads].filter((id) => !item.attemptedLeads.has(id)).length,
+      total: item.total,
+      answered: item.answered,
+      unanswered: item.unanswered,
+      coverageRate: item.currentLeads.size ? Number((item.attemptedLeads.size / item.currentLeads.size * 100).toFixed(1)) : 0,
+      connectionRate: item.attemptedLeads.size ? Number((item.connectedLeads.size / item.attemptedLeads.size * 100).toFixed(1)) : 0,
+      seconds: item.seconds,
     })).sort((a, b) => b.total - a.total)
-    const calledLeadIds = new Set(callData.map((call) => call.studentId))
-    const totalSeconds = callData.reduce((sum, call) => sum + durationToSeconds(call.duration), 0)
+    const currentLeadIds = new Set(followAll.map((lead) => lead.studentId))
+    const attemptedLeadIds = new Set(summaryCallData.map((call) => call.studentId))
+    const connectedLeadIds = new Set(summaryCallData.filter((call) => call.result === '已接通').map((call) => call.studentId))
+    const totalSeconds = summaryCallData.reduce((sum, call) => sum + durationToSeconds(call.duration), 0)
     return {
       rows,
-      total: callData.length,
-      answered: callData.filter((call) => call.result === '已接通').length,
-      unanswered: callData.filter((call) => call.result === '无人接听').length,
-      calledLeads: calledLeadIds.size,
-      uncalledLeads: salesLeads.filter((lead) => !leadCallCounts.has(lead.studentId)).length,
+      currentLeads: currentLeadIds.size,
+      attemptedLeads: attemptedLeadIds.size,
+      connectedLeads: connectedLeadIds.size,
+      unconnectedLeads: [...attemptedLeadIds].filter((id) => !connectedLeadIds.has(id)).length,
+      uncalledLeads: [...currentLeadIds].filter((id) => !attemptedLeadIds.has(id)).length,
+      total: summaryCallData.length,
+      answered: summaryCallData.filter((call) => call.result === '已接通').length,
+      unanswered: summaryCallData.filter((call) => call.result === '无人接听').length,
       totalSeconds,
     }
-  }, [callData, salesLeads, leadCallCounts])
+  }, [summaryCallData, followAll, channels])
 
   const claim = (s: Student) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -817,14 +844,19 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     { title: t('sales.call.agent'), dataIndex: 'agent', width: 190 },
   ]
 
-  const callSummaryColumns: ColumnsType<{ key: string; agent: string; country: string; total: number; answered: number; unanswered: number; seconds: number; calledLeads: number; dailyAverage: number }> = [
+  const callSummaryColumns: ColumnsType<{ key: string; agent: string; country: string; currentLeads: number; attemptedLeads: number; connectedLeads: number; unconnectedLeads: number; uncalledLeads: number; total: number; answered: number; unanswered: number; coverageRate: number; connectionRate: number; seconds: number }> = [
     { title: 'CC', dataIndex: 'agent', width: 170, render: (email: string) => accounts.find((item) => item.email === email)?.name || email },
     { title: '国家', dataIndex: 'country', width: 110, render: (country: string) => <Tag>{country}</Tag> },
+    { title: '当前在跟 Lead', dataIndex: 'currentLeads', width: 130 },
+    { title: '已尝试外呼', dataIndex: 'attemptedLeads', width: 120 },
+    { title: '已接通 Lead', dataIndex: 'connectedLeads', width: 120, render: (value: number) => <Tag color="green">{value}</Tag> },
+    { title: '已拨未接 Lead', dataIndex: 'unconnectedLeads', width: 130, render: (value: number) => <Tag color="orange">{value}</Tag> },
+    { title: '未外呼 Lead', dataIndex: 'uncalledLeads', width: 120, render: (value: number) => <Tag color="default">{value}</Tag> },
     { title: '总通话', dataIndex: 'total', width: 100 },
     { title: '已接通', dataIndex: 'answered', width: 100, render: (value: number) => <Tag color="green">{value}</Tag> },
     { title: '未接通', dataIndex: 'unanswered', width: 100, render: (value: number) => <Tag color="red">{value}</Tag> },
-    { title: '已外呼 Lead', dataIndex: 'calledLeads', width: 130 },
-    { title: '日均通话', dataIndex: 'dailyAverage', width: 120 },
+    { title: '覆盖率', dataIndex: 'coverageRate', width: 100, render: (value: number) => `${value}%` },
+    { title: 'Lead 接通率', dataIndex: 'connectionRate', width: 120, render: (value: number) => `${value}%` },
     { title: '累计通话时长', dataIndex: 'seconds', width: 150, render: (value: number) => fmtDuration(value) },
   ]
 
@@ -846,20 +878,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const filterBar = (
     <div className="sales-filter-bar">
-      <Input
+      {tab !== 'summary' && <Input
         className="sales-filter-search"
         allowClear
         prefix={<SearchOutlined />}
         placeholder={tab === 'calls' ? (phase3 ? '搜索用户ID / 姓名 / 登录账号' : t('sales.searchCalls')) : t('sales.searchFollow')}
         value={keyword}
         onChange={(e) => setKeyword(e.target.value)}
-      />
+      />}
       <div className="sales-filter-control">
         <LineFilter value={lineSel} onChange={setLineSel} options={filterOptions(lineOptions)} width={0} placeholder={t('user.col.country')} disabled={lineDisabled} />
       </div>
-      {tab === 'calls' ? (
+      {(tab === 'calls' || tab === 'summary') ? (
         <>
-          <Select className="sales-filter-control" allowClear placeholder={t('sales.call.result')} value={callResultFilter} onChange={setCallResultFilter} options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))} />
+          {tab === 'calls' && <Select className="sales-filter-control" allowClear placeholder={t('sales.call.result')} value={callResultFilter} onChange={setCallResultFilter} options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))} />}
           {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder="坐席" value={callAgentFilter} onChange={setCallAgentFilter} options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))} />}
           <DatePicker.RangePicker className="sales-filter-date" onChange={setCallDateRange} allowClear placeholder={['开始时间', '结束时间']} />
         </>
@@ -875,8 +907,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         <DatePicker.RangePicker className="sales-filter-date" value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['最后跟进开始日期', '最后跟进结束日期']} />
       </>}
       <div className="sales-filter-actions">
-        {tab !== 'calls' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
-        {importAction}
+        {tab !== 'calls' && tab !== 'summary' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
+        {tab !== 'summary' && importAction}
       </div>
     </div>
   )
@@ -957,40 +989,35 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               <>
                 {filterBar}
                 <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('sales.callsBanner')} />
-                <Tabs
-                  className="sales-call-view-tabs"
-                  size="small"
-                  activeKey={callView}
-                  onChange={setCallView}
-                  items={[
-                    {
-                      key: 'details',
-                      label: '通话明细',
-                      children: <Table rowKey="id" columns={callColumns} dataSource={callData} scroll={{ x: 1210 }} locale={{ emptyText: t('sales.emptyCalls') }} pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }} />,
-                    },
-                    ...(isLeader ? [{
-                      key: 'summary',
-                      label: '销售汇总',
-                      children: <section className="sales-call-summary" aria-label="销售通话汇总">
-                        <div className="sales-call-summary-head">
-                          <div>
-                            <Text strong>销售通话汇总</Text>
-                            <Text type="secondary">仅管理视角可见；随上方筛选条件实时变化</Text>
-                          </div>
-                        </div>
-                        <div className="sales-call-metrics">
-                          <Card size="small"><Statistic title="总通话" value={callSummary.total} suffix="次" /></Card>
-                          <Card size="small"><Statistic title="已接通" value={callSummary.answered} suffix="次" valueStyle={{ color: '#389e0d' }} /></Card>
-                          <Card size="small"><Statistic title="未接通" value={callSummary.unanswered} suffix="次" valueStyle={{ color: '#cf1322' }} /></Card>
-                          <Card size="small"><Statistic title="已外呼 Lead" value={callSummary.calledLeads} suffix="人" /></Card>
-                          <Card size="small"><Statistic title="未外呼 Lead" value={callSummary.uncalledLeads} suffix="人" /></Card>
-                          <Card size="small"><Statistic title="累计通话时长" value={fmtDuration(callSummary.totalSeconds)} /></Card>
-                        </div>
-                        <Table size="small" rowKey="key" columns={callSummaryColumns} dataSource={callSummary.rows} pagination={false} scroll={{ x: 870 }} locale={{ emptyText: '当前筛选条件下暂无通话汇总' }} />
-                      </section>,
-                    }] : []),
-                  ]}
-                />
+                <Table rowKey="id" columns={callColumns} dataSource={callData} scroll={{ x: 1210 }} locale={{ emptyText: t('sales.emptyCalls') }} pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }} />
+              </>
+            ),
+          },
+          {
+            key: 'summary',
+            label: '销售触达汇总',
+            children: (
+              <>
+                {filterBar}
+                <Alert type="info" showIcon style={{ marginBottom: 16 }} message={seeAllOwners ? '按 CC 与国家查看当前 Lead 触达漏斗及通话效率；统计随上方筛选实时变化。' : '仅展示本人权限范围内的 Lead 触达漏斗及通话效率。'} />
+                <section className="sales-call-summary" aria-label="销售触达汇总">
+                  <div className="sales-call-summary-head">
+                    <div>
+                      <Text strong>销售触达汇总</Text>
+                      <Text type="secondary">当前在跟 Lead → 已尝试外呼 → 已接通 / 已拨未接 / 未外呼</Text>
+                    </div>
+                  </div>
+                  <div className="sales-call-metrics">
+                    <Card size="small"><Statistic title="当前在跟 Lead" value={callSummary.currentLeads} suffix="人" /></Card>
+                    <Card size="small"><Statistic title="已尝试外呼" value={callSummary.attemptedLeads} suffix="人" /></Card>
+                    <Card size="small"><Statistic title="已接通 Lead" value={callSummary.connectedLeads} suffix="人" valueStyle={{ color: '#389e0d' }} /></Card>
+                    <Card size="small"><Statistic title="已拨未接 Lead" value={callSummary.unconnectedLeads} suffix="人" valueStyle={{ color: '#fa8c16' }} /></Card>
+                    <Card size="small"><Statistic title="未外呼 Lead" value={callSummary.uncalledLeads} suffix="人" /></Card>
+                    <Card size="small"><Statistic title="总拨打" value={callSummary.total} suffix="次" /></Card>
+                    <Card size="small"><Statistic title="累计通话时长" value={fmtDuration(callSummary.totalSeconds)} /></Card>
+                  </div>
+                  <Table size="small" rowKey="key" columns={callSummaryColumns} dataSource={callSummary.rows} pagination={false} scroll={{ x: 1710 }} locale={{ emptyText: '当前筛选条件下暂无触达汇总' }} />
+                </section>
               </>
             ),
           },
