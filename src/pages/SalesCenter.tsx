@@ -851,8 +851,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     { title: t('user.col.cc'), dataIndex: 'agent', width: 170, render: (email: string) => accounts.find((item) => item.email === email)?.name || email },
     { title: t('user.col.country'), dataIndex: 'country', width: 110, render: (country: string) => <Tag>{country}</Tag> },
     { title: t('sales.outreach.outboundLeads'), dataIndex: 'outboundLeads', width: 120 },
-    { title: t('sales.outreach.answeredCalls'), dataIndex: 'answered', width: 110, render: (value: number) => <Tag color="green">{value}</Tag> },
     { title: t('sales.outreach.connectedLeads'), dataIndex: 'connectedLeads', width: 130, render: (value: number) => <Tag color="green">{value}</Tag> },
+    { title: t('sales.outreach.answeredCalls'), dataIndex: 'answered', width: 110, render: (value: number) => <Tag color="green">{value}</Tag> },
     { title: t('sales.outreach.totalDials'), dataIndex: 'total', width: 100 },
     { title: t('sales.outreach.totalTalkDuration'), dataIndex: 'seconds', width: 150, render: (value: number) => fmtDuration(value) },
   ]
@@ -1008,8 +1008,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                   </div>
                   <div className="sales-call-metrics">
                     <Card size="small"><Statistic title={t('sales.outreach.outboundLeads')} value={callSummary.outboundLeads} suffix={t('sales.outreach.people')} /></Card>
-                    <Card size="small"><Statistic title={t('sales.outreach.answeredCalls')} value={callSummary.answered} suffix={t('sales.outreach.calls')} valueStyle={{ color: '#389e0d' }} /></Card>
                     <Card size="small"><Statistic title={t('sales.outreach.connectedLeads')} value={callSummary.connectedLeads} suffix={t('sales.outreach.people')} valueStyle={{ color: '#389e0d' }} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.answeredCalls')} value={callSummary.answered} suffix={t('sales.outreach.calls')} valueStyle={{ color: '#389e0d' }} /></Card>
                     <Card size="small"><Statistic title={t('sales.outreach.totalDials')} value={callSummary.total} suffix={t('sales.outreach.calls')} /></Card>
                     <Card size="small"><Statistic title={t('sales.outreach.totalTalkDuration')} value={fmtDuration(callSummary.totalSeconds)} /></Card>
                   </div>
