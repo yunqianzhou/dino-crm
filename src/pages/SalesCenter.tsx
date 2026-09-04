@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Card,
+  Cascader,
   DatePicker,
   Dropdown,
   Form,
@@ -115,7 +116,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>()
   const [ageGroupFilter, setAgeGroupFilter] = useState<string[]>([])
   const [courseLevelFilter, setCourseLevelFilter] = useState<string[]>([])
-  const [registerChannelFilter, setRegisterChannelFilter] = useState<string[]>([])
+  const [sourceLpFilter, setSourceLpFilter] = useState<string | undefined>()
+  const [sourceAppFilter, setSourceAppFilter] = useState<string[] | undefined>()
   const [userTypeFilter, setUserTypeFilter] = useState<string[]>([])
   const [registerDateRange, setRegisterDateRange] = useState<any>(null)
   const [followDateRange, setFollowDateRange] = useState<any>(null)
@@ -180,7 +182,26 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     Array.from(new Set(salesLeads.map(pick).filter((value): value is string => Boolean(value)))).sort()
   const ageGroupOptions = useMemo(() => filterOptionsFromLeads((s) => s.ageGroup), [salesLeads])
   const courseLevelOptions = useMemo(() => filterOptionsFromLeads((s) => s.courseLevel), [salesLeads])
-  const registerChannelOptions = useMemo(() => filterOptionsFromLeads((s) => s.registerChannel), [salesLeads])
+  // 与用户中心保持同一渠道归因口径：落地页渠道按 channelCode 解析，App 渠道按一级/二级来源解析。
+  const sourceLpOptions = useMemo(
+    () => Array.from(new Set(salesLeads.map((s) => lpChannelSourceText(channels, s)).filter((v) => v && v !== '—'))),
+    [salesLeads, channels],
+  )
+  const sourceAppOptions = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const s of salesLeads) {
+      if (s.channelCode) continue
+      const l1 = s.adChannel || s.channelSource || s.registerChannel
+      if (!l1) continue
+      if (!map.has(l1)) map.set(l1, new Set())
+      if (s.adChannel && s.subChannel) map.get(l1)!.add(s.subChannel)
+    }
+    return Array.from(map.entries()).map(([value, children]) => {
+      const option: any = { value, label: value }
+      if (children.size) option.children = Array.from(children).map((child) => ({ value: child, label: child }))
+      return option
+    })
+  }, [salesLeads])
 
   const matchesDateRange = (value: string | undefined, range: any) => {
     if (!range || range.length !== 2) return true
@@ -200,13 +221,27 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       || (landingCallbackFilter === 'filled' && !!callbackAt)
       || (landingCallbackFilter === 'due' && !!callbackAt && !callbackAt.isAfter(now))
       || (landingCallbackFilter === 'upcoming' && !!callbackAt && callbackAt.isAfter(now) && callbackAt.diff(now, 'hour', true) <= 24)
+    const sourceLpMatches = !sourceLpFilter || lpChannelSourceText(channels, s) === sourceLpFilter
+    let sourceAppMatches = true
+    if (sourceAppFilter?.length) {
+      if (s.channelCode) {
+        sourceAppMatches = false
+      } else {
+        const l1 = s.adChannel || s.channelSource || s.registerChannel || ''
+        const l2 = s.subChannel || ''
+        sourceAppMatches = sourceAppFilter.length === 1
+          ? l1 === sourceAppFilter[0]
+          : l1 === sourceAppFilter[0] && l2 === sourceAppFilter[1]
+      }
+    }
     return (
       (!kw || leadText(s).includes(kw)) &&
       (!purchaseIntentionFilter.length || purchaseIntentionFilter.includes(s.purchaseIntention || '未填写')) &&
       (!ownerFilter || ownerFilter === owner) &&
       (!ageGroupFilter.length || (!!s.ageGroup && ageGroupFilter.includes(s.ageGroup))) &&
       (!courseLevelFilter.length || (!!s.courseLevel && courseLevelFilter.includes(s.courseLevel))) &&
-      (!registerChannelFilter.length || registerChannelFilter.includes(s.registerChannel)) &&
+      sourceLpMatches &&
+      sourceAppMatches &&
       (!userTypeFilter.length || userTypeFilter.includes(resolveUserType(s))) &&
       matchesDateRange(s.registerTime, registerDateRange) &&
       matchesDateRange(s.salesUpdatedAt, followDateRange) &&
@@ -216,12 +251,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const poolData = useMemo(
     () => poolAll.filter(matchesLeadFilters),
-    [poolAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter],
+    [poolAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter, channels],
   )
 
   const followData = useMemo(
     () => followAll.filter(matchesLeadFilters).filter((s) => consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))),
-    [followAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, registerChannelFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords],
+    [followAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -866,7 +901,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     setOwnerFilter(undefined)
     setAgeGroupFilter([])
     setCourseLevelFilter([])
-    setRegisterChannelFilter([])
+    setSourceLpFilter(undefined)
+    setSourceAppFilter(undefined)
     setUserTypeFilter([])
     setRegisterDateRange(null)
     setFollowDateRange(null)
@@ -901,7 +937,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="用户类型" value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: value, value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="年龄段" value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
-        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="注册来源" value={registerChannelFilter} onChange={setRegisterChannelFilter} options={registerChannelOptions.map((value) => ({ label: value, value }))} />
+        <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.channelSourceLp')} value={sourceLpFilter} onChange={setSourceLpFilter} options={sourceLpOptions.map((value) => ({ label: value, value }))} />
+        <Cascader className="sales-filter-control" allowClear changeOnSelect placeholder={t('user.col.channelSourceApp')} value={sourceAppFilter} onChange={(value) => setSourceAppFilter(value as string[] | undefined)} options={sourceAppOptions} />
         <DatePicker.RangePicker className="sales-filter-date" value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={['注册开始日期', '注册结束日期']} />
         <DatePicker.RangePicker className="sales-filter-date" value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['最后跟进开始日期', '最后跟进结束日期']} />
       </>}
