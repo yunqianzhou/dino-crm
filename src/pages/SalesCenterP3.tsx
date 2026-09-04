@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Form, Modal, Upload, message } from 'antd'
+import { Button, Form, Input, Modal, Space, Upload, message } from 'antd'
 import { ImportOutlined, InboxOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import * as XLSX from 'xlsx'
@@ -8,6 +8,7 @@ import { setState, uid, useStore } from '../store'
 import type { BusinessLine, Student } from '../types'
 import { usePerm } from '../perm'
 import { downloadCsv } from '../export'
+import { parseWhatsAppGroupMessages, phoneKey, WHATSAPP_LEAD_CHANNEL_CODE } from '../whatsAppLead'
 
 type LeadRow = { phone: string; areaCode?: string; channelCode?: string; followNote?: string }
 
@@ -26,10 +27,6 @@ const AREA_CODE_LOCATION: Record<string, { country: string; businessLine: Busine
   '886': { country: '中国台湾', businessLine: '其他' },
   '86': { country: '中国', businessLine: '其他' },
   '1': { country: '美国/加拿大', businessLine: '其他' },
-}
-
-function phoneKey(phone: string) {
-  return phone.replace(/[^\d+]/g, '')
 }
 
 function locationOf(areaCode?: string) {
@@ -76,6 +73,8 @@ function LeadImportButton() {
   const [open, setOpen] = useState(false)
   const [form] = Form.useForm()
   const [fileName, setFileName] = useState('')
+  const [whatsAppOpen, setWhatsAppOpen] = useState(false)
+  const [whatsAppMessages, setWhatsAppMessages] = useState('')
 
   const readFile = async (file: File) => {
     const isExcel = /\.(xlsx|xls)$/i.test(file.name)
@@ -169,10 +168,46 @@ function LeadImportButton() {
     setOpen(false)
   }
 
+  const importWhatsAppMessages = () => {
+    const parsed = parseWhatsAppGroupMessages(whatsAppMessages)
+    if (!parsed.length) {
+      message.warning('未识别到 WhatsApp 机器人消息，请粘贴包含 Customer name 和 Mobile number 的完整消息。')
+      return
+    }
+    const existing = new Set(students.map((student) => phoneKey(student.phone ?? '')).filter(Boolean))
+    const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
+    const created: Student[] = []
+    for (const lead of parsed) {
+      const key = phoneKey(lead.phone)
+      if (existing.has(key)) continue
+      existing.add(key)
+      const note = '【静默注册】WhatsApp 群消息监听'
+      created.push({
+        studentId: uid('wa_'), name: lead.nickname, userType: '正式用户', loginMethod: '手机号',
+        account: lead.phone, phone: lead.phone, businessLine: lead.businessLine,
+        registerChannel: 'WhatsApp（群消息监听）', countryCode: lead.countryCode, country: lead.country,
+        channelCode: WHATSAPP_LEAD_CHANNEL_CODE, channelSource: 'WhatsApp', registerTime: now,
+        status: '未付费-未体验', salesProgress: '待领取', salesLatestNote: note, salesUpdatedAt: now,
+        salesHistory: [{ progress: '待领取', note, time: now, owner: actor }],
+      })
+    }
+    if (!created.length) {
+      message.warning('识别到的手机号都已注册，未创建新 Lead。')
+      return
+    }
+    setState((prev) => ({ ...prev, students: [...created, ...prev.students] }))
+    message.success(`已静默注册 ${created.length} 条 WhatsApp Leads；跳过 ${parsed.length - created.length} 条重复数据。`)
+    setWhatsAppOpen(false)
+    setWhatsAppMessages('')
+  }
+
   if (!canImport) return null
   return (
     <>
-      <Button icon={<ImportOutlined />} onClick={() => { form.resetFields(); setFileName(''); setOpen(true) }}>导入 Leads</Button>
+      <Space>
+        <Button icon={<ImportOutlined />} onClick={() => { form.resetFields(); setFileName(''); setOpen(true) }}>导入 Leads</Button>
+        <Button onClick={() => setWhatsAppOpen(true)}>导入 WhatsApp 群消息</Button>
+      </Space>
       <Modal
         open={open}
         title={<span>上传 Leads <Button type="link" size="small" style={{ padding: 0, marginLeft: 6, color: '#ff4d4f' }} onClick={downloadTemplate}>下载模板</Button></span>}
@@ -199,6 +234,10 @@ function LeadImportButton() {
             <div style={{ color: '#8c8c8c', fontSize: 12, marginTop: 4 }}>表头：Phone Number、Phone Country Code、Channel Code、FOLLOW Remark；系统将按手机区号自动映射国家与业务线，重复手机号会自动跳过。{fileName ? '已读取：' + fileName : ''}</div>
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal open={whatsAppOpen} title="导入 WhatsApp 群消息" onCancel={() => setWhatsAppOpen(false)} onOk={importWhatsAppMessages} okText="识别并静默注册" width={720}>
+        <p style={{ color: '#8c8c8c' }}>粘贴机器人转发到 Lark 群里的完整消息。系统会识别 Customer name 与 Mobile number，以 <code>{WHATSAPP_LEAD_CHANNEL_CODE}</code> 写入渠道码；已注册手机号会跳过，新 Lead 会按国家的现有自动分配规则处理。</p>
+        <Input.TextArea value={whatsAppMessages} onChange={(e) => setWhatsAppMessages(e.target.value)} autoSize={{ minRows: 10, maxRows: 20 }} placeholder={'Customer name : Jovial Ooi\nMobile number : 601172048821'} />
       </Modal>
     </>
   )

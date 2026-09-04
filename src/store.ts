@@ -249,7 +249,9 @@ export function resetState() {
 }
 
 export function setState(updater: (prev: AppState) => AppState) {
-  state = updater(state)
+  // Every lead-creation path (including an external WhatsApp listener) uses this
+  // entry point. Apply the country-level allocation rule before persisting.
+  state = autoAllocate(updater(state))
   emit()
 }
 
