@@ -209,7 +209,14 @@ function load(): AppState {
     if (raw) {
       // 合并种子默认值：即使旧数据缺少新增字段（如 callRecords），也不会因 undefined 而崩溃
       const merged = { ...seeded, ...(JSON.parse(raw) as Partial<AppState>) }
-      return autoAllocate(normalizePaymentMethods(merged))
+      const normalized = normalizePaymentMethods(merged)
+      // 已保存的浏览器演示数据会覆盖整个 students 数组；补回新加入的预约外呼示例，
+      // 以便旧会话也能立即验证“待外呼”阶段内的时间展示，而不重置用户已有演示数据。
+      const callbackDemo = seeded.students.find((student) => student.studentId === 'demo_callback_lead_001')!
+      const withCallbackDemo = normalized.students.some((student) => student.studentId === callbackDemo.studentId)
+        ? normalized
+        : { ...normalized, students: [callbackDemo, ...normalized.students] }
+      return autoAllocate(withCallbackDemo)
     }
   } catch {
     /* ignore */
