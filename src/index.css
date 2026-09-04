@@ -77,11 +77,31 @@ body {
 
 .sales-call-summary-head .ant-typography-secondary { font-size: 12px; }
 
+.sales-call-metric-groups {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) minmax(390px, 3fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sales-call-metric-group {
+  padding: 12px;
+  border: 1px solid #e6f0ff;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.sales-call-metric-group-title {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .sales-call-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .sales-call-metrics .ant-card { border-color: #e6f0ff; }
@@ -96,10 +116,12 @@ body {
   .sales-filter-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sales-filter-search,
   .sales-filter-date { grid-column: span 2; }
+  .sales-call-metric-groups { grid-template-columns: 1fr; }
   .sales-call-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (min-width: 901px) and (max-width: 1440px) {
+  .sales-call-metric-groups { grid-template-columns: 1fr; }
   .sales-call-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
