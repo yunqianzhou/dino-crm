@@ -605,6 +605,15 @@ function seed(): AppState {
         { progress: '跟进中', note: '晚上回电', time: now.subtract(2, 'hour').format('YYYY-MM-DD HH:mm:ss'), owner: 'sales.lead@dinoai.ai' },
       ],
     },
+    {
+      // VN Follow：预约外呼时间在「待外呼」阶段内展示的示例
+      studentId: 'demo_callback_lead_001', name: '预约外呼示例', localName: 'Demo', userType: '测试用户', gender: '其他',
+      birthday: '2017-06-18', ageGroup: '6-8', loginMethod: '手机号', account: '+84 000-000-0000', phone: '+84 000-000-0000', businessLine: '越南', registerChannel: 'Landing Page / Meta', channelSource: 'VN_META_LP_DEMO', adChannel: 'Meta Ads',
+      countryCode: '+84', channelCode: 'VNLP_DEMO', country: '越南', appChannel: 'Google Play', registerTime: now.subtract(30, 'minute').format('YYYY-MM-DD HH:mm:ss'), status: '未付费-未体验',
+      landingCallbackAt: now.add(2, 'hour').format('YYYY-MM-DD HH:mm:ss'), landingCallbackSubmittedAt: now.subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss'),
+      salesOwner: 'sales.lead@dinoai.ai', salesProgress: '跟进中', salesLatestNote: '【Landing Page】用户已填写预约外呼时间', salesUpdatedAt: now.subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss'),
+      salesHistory: [{ progress: '跟进中', note: '【Landing Page】用户已填写预约外呼时间', time: now.subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss'), owner: '系统' }],
+    },
   ]
 
   const orders: Order[] = [
