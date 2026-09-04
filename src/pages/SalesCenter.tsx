@@ -259,11 +259,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     () => callScoped.filter((call) => (!callAgentFilter || call.agent === callAgentFilter) && matchesCallDate(call)),
     [callScoped, callAgentFilter, callDateRange],
   )
-  // 汇总漏斗的底数必须与 CC / 国家筛选同口径；否则会出现筛选了某 CC、表中仍显示另一 CC 当前 Lead 的情况。
-  const summaryFollowLeads = useMemo(
-    () => followAll.filter((lead) => !callAgentFilter || lead.salesOwner === callAgentFilter),
-    [followAll, callAgentFilter],
-  )
 
   // Lead 列表中的累计外呼次数：不受统计周期影响，只受当前数据权限和国家范围约束。
   const leadCallCounts = useMemo(() => {
@@ -272,61 +267,44 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     return counts
   }, [callScoped])
   const callSummary = useMemo(() => {
-    const byAgentAndCountry = new Map<string, { agent: string; country: string; currentLeads: Set<string>; attemptedLeads: Set<string>; connectedLeads: Set<string>; total: number; answered: number; unanswered: number; seconds: number }>()
+    const byAgentAndCountry = new Map<string, { agent: string; country: string; outboundLeads: Set<string>; connectedLeads: Set<string>; total: number; answered: number; seconds: number }>()
     const getItem = (agent: string, country: string) => {
       const key = `${agent}::${country}`
-      const item = byAgentAndCountry.get(key) || { agent, country, currentLeads: new Set<string>(), attemptedLeads: new Set<string>(), connectedLeads: new Set<string>(), total: 0, answered: 0, unanswered: 0, seconds: 0 }
+      const item = byAgentAndCountry.get(key) || { agent, country, outboundLeads: new Set<string>(), connectedLeads: new Set<string>(), total: 0, answered: 0, seconds: 0 }
       byAgentAndCountry.set(key, item)
       return item
     }
-    summaryFollowLeads.forEach((lead) => {
-      const agent = lead.salesOwner || '未分配'
-      const country = businessLineOf(channels, lead) || lead.businessLine || lead.country || '未填写'
-      getItem(agent, country).currentLeads.add(lead.studentId)
-    })
     summaryCallData.forEach((call) => {
       const country = call.businessLine || '未填写'
       const item = getItem(call.agent, country)
       item.total += 1
       item.answered += call.result === '已接通' ? 1 : 0
-      item.unanswered += call.result === '无人接听' ? 1 : 0
       item.seconds += durationToSeconds(call.duration)
-      item.attemptedLeads.add(call.studentId)
+      item.outboundLeads.add(call.studentId)
       if (call.result === '已接通') item.connectedLeads.add(call.studentId)
     })
     const rows = [...byAgentAndCountry.values()].map((item) => ({
       key: `${item.agent}::${item.country}`,
       agent: item.agent,
       country: item.country,
-      currentLeads: item.currentLeads.size,
-      attemptedLeads: item.attemptedLeads.size,
+      outboundLeads: item.outboundLeads.size,
       connectedLeads: item.connectedLeads.size,
-      unconnectedLeads: [...item.attemptedLeads].filter((id) => !item.connectedLeads.has(id)).length,
-      uncalledLeads: [...item.currentLeads].filter((id) => !item.attemptedLeads.has(id)).length,
       total: item.total,
       answered: item.answered,
-      unanswered: item.unanswered,
-      coverageRate: item.currentLeads.size ? Number((item.attemptedLeads.size / item.currentLeads.size * 100).toFixed(1)) : 0,
-      connectionRate: item.attemptedLeads.size ? Number((item.connectedLeads.size / item.attemptedLeads.size * 100).toFixed(1)) : 0,
       seconds: item.seconds,
     })).sort((a, b) => b.total - a.total)
-    const currentLeadIds = new Set(summaryFollowLeads.map((lead) => lead.studentId))
-    const attemptedLeadIds = new Set(summaryCallData.map((call) => call.studentId))
+    const outboundLeadIds = new Set(summaryCallData.map((call) => call.studentId))
     const connectedLeadIds = new Set(summaryCallData.filter((call) => call.result === '已接通').map((call) => call.studentId))
     const totalSeconds = summaryCallData.reduce((sum, call) => sum + durationToSeconds(call.duration), 0)
     return {
       rows,
-      currentLeads: currentLeadIds.size,
-      attemptedLeads: attemptedLeadIds.size,
+      outboundLeads: outboundLeadIds.size,
       connectedLeads: connectedLeadIds.size,
-      unconnectedLeads: [...attemptedLeadIds].filter((id) => !connectedLeadIds.has(id)).length,
-      uncalledLeads: [...currentLeadIds].filter((id) => !attemptedLeadIds.has(id)).length,
       total: summaryCallData.length,
       answered: summaryCallData.filter((call) => call.result === '已接通').length,
-      unanswered: summaryCallData.filter((call) => call.result === '无人接听').length,
       totalSeconds,
     }
-  }, [summaryCallData, summaryFollowLeads, channels])
+  }, [summaryCallData])
 
   const claim = (s: Student) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -869,19 +847,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     { title: t('sales.call.agent'), dataIndex: 'agent', width: 190 },
   ]
 
-  const callSummaryColumns: ColumnsType<{ key: string; agent: string; country: string; currentLeads: number; attemptedLeads: number; connectedLeads: number; unconnectedLeads: number; uncalledLeads: number; total: number; answered: number; unanswered: number; coverageRate: number; connectionRate: number; seconds: number }> = [
+  const callSummaryColumns: ColumnsType<{ key: string; agent: string; country: string; outboundLeads: number; connectedLeads: number; total: number; answered: number; seconds: number }> = [
     { title: t('user.col.cc'), dataIndex: 'agent', width: 170, render: (email: string) => accounts.find((item) => item.email === email)?.name || email },
     { title: t('user.col.country'), dataIndex: 'country', width: 110, render: (country: string) => <Tag>{country}</Tag> },
-    { title: t('sales.outreach.currentLeads'), dataIndex: 'currentLeads', width: 130 },
-    { title: t('sales.outreach.attemptedLeads'), dataIndex: 'attemptedLeads', width: 120 },
-    { title: t('sales.outreach.connectedLeads'), dataIndex: 'connectedLeads', width: 120, render: (value: number) => <Tag color="green">{value}</Tag> },
-    { title: t('sales.outreach.unconnectedLeads'), dataIndex: 'unconnectedLeads', width: 130, render: (value: number) => <Tag color="orange">{value}</Tag> },
-    { title: t('sales.outreach.uncalledLeads'), dataIndex: 'uncalledLeads', width: 120, render: (value: number) => <Tag color="default">{value}</Tag> },
+    { title: t('sales.outreach.outboundLeads'), dataIndex: 'outboundLeads', width: 120 },
+    { title: t('sales.outreach.answeredCalls'), dataIndex: 'answered', width: 110, render: (value: number) => <Tag color="green">{value}</Tag> },
+    { title: t('sales.outreach.connectedLeads'), dataIndex: 'connectedLeads', width: 130, render: (value: number) => <Tag color="green">{value}</Tag> },
     { title: t('sales.outreach.totalDials'), dataIndex: 'total', width: 100 },
-    { title: t('sales.callResult.已接通'), dataIndex: 'answered', width: 100, render: (value: number) => <Tag color="green">{value}</Tag> },
-    { title: t('sales.callResult.无人接听'), dataIndex: 'unanswered', width: 100, render: (value: number) => <Tag color="red">{value}</Tag> },
-    { title: t('sales.outreach.coverageRate'), dataIndex: 'coverageRate', width: 100, render: (value: number) => `${value}%` },
-    { title: t('sales.outreach.leadConnectionRate'), dataIndex: 'connectionRate', width: 120, render: (value: number) => `${value}%` },
     { title: t('sales.outreach.totalTalkDuration'), dataIndex: 'seconds', width: 150, render: (value: number) => fmtDuration(value) },
   ]
 
@@ -1035,15 +1007,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                     </div>
                   </div>
                   <div className="sales-call-metrics">
-                    <Card size="small"><Statistic title={t('sales.outreach.currentLeads')} value={callSummary.currentLeads} suffix={t('sales.outreach.people')} /></Card>
-                    <Card size="small"><Statistic title={t('sales.outreach.attemptedLeads')} value={callSummary.attemptedLeads} suffix={t('sales.outreach.people')} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.outboundLeads')} value={callSummary.outboundLeads} suffix={t('sales.outreach.people')} /></Card>
+                    <Card size="small"><Statistic title={t('sales.outreach.answeredCalls')} value={callSummary.answered} suffix={t('sales.outreach.calls')} valueStyle={{ color: '#389e0d' }} /></Card>
                     <Card size="small"><Statistic title={t('sales.outreach.connectedLeads')} value={callSummary.connectedLeads} suffix={t('sales.outreach.people')} valueStyle={{ color: '#389e0d' }} /></Card>
-                    <Card size="small"><Statistic title={t('sales.outreach.unconnectedLeads')} value={callSummary.unconnectedLeads} suffix={t('sales.outreach.people')} valueStyle={{ color: '#fa8c16' }} /></Card>
-                    <Card size="small"><Statistic title={t('sales.outreach.uncalledLeads')} value={callSummary.uncalledLeads} suffix={t('sales.outreach.people')} /></Card>
                     <Card size="small"><Statistic title={t('sales.outreach.totalDials')} value={callSummary.total} suffix={t('sales.outreach.calls')} /></Card>
                     <Card size="small"><Statistic title={t('sales.outreach.totalTalkDuration')} value={fmtDuration(callSummary.totalSeconds)} /></Card>
                   </div>
-                  <Table size="small" rowKey="key" columns={callSummaryColumns} dataSource={callSummary.rows} pagination={false} scroll={{ x: 1710 }} locale={{ emptyText: t('sales.outreach.empty') }} />
+                  <Table size="small" rowKey="key" columns={callSummaryColumns} dataSource={callSummary.rows} pagination={false} scroll={{ x: 940 }} locale={{ emptyText: t('sales.outreach.empty') }} />
                 </section>
               </>
             ),
