@@ -935,7 +935,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       </>}
       <div className="sales-filter-actions">
         {tab !== 'calls' && tab !== 'summary' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
-        {tab !== 'summary' && importAction}
+        {tab !== 'calls' && tab !== 'summary' && importAction}
       </div>
     </div>
   )
