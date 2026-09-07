@@ -69,7 +69,7 @@
           <div class="card">
             <div class="section-head"><div><div class="section-title">SKU 管理</div><div class="section-note">SKU 由商品系统统一维护；营销中心仅用于查询和选择已有商品包。</div></div></div>
             <div class="filters"><input class="input search-input" id="sku-keyword" placeholder="商品包 ID / 商品包名称"><select class="select" id="sku-line"><option value="">业务线</option><option>韩国</option><option>越南</option></select><select class="select" id="sku-scope"><option value="">适用端</option><option>In App</option><option>Landing Page</option></select><select class="select" id="sku-status"><option value="">SKU 状态</option><option>上架</option><option>下架</option></select></div>
-            <table><thead><tr><th>SKU Name</th><th>业务线</th><th>原价</th><th>售卖有效期</th><th>适用端</th><th>展示策略</th><th>状态</th></tr></thead><tbody id="sku-rows"></tbody></table>
+            <table><thead><tr><th>Package Name</th><th>SKU ID</th><th>业务线</th><th>原价</th><th>售卖有效期</th><th>适用端</th><th>展示策略</th><th>状态</th></tr></thead><tbody id="sku-rows"></tbody></table>
           </div>
         </section>
 
@@ -141,6 +141,7 @@
       {id:'VN-H-2026',name:'Dino English 半年包',line:'越南',price:'1,790,000 VND',valid:'购买后 180 天',scope:'Landing Page',best:false,status:'上架'},
       {id:'VN-Y-2026',name:'Dino English 年度包',line:'越南',price:'2,990,000 VND',valid:'购买后 365 天',scope:'Landing Page',best:true,status:'上架'}
     ];
+    skus.forEach(sku=>sku.packageName=sku.packageName||sku.name);
     let distributors=[
       {id:'sales_amy_zhang',name:'Amy Zhang',type:'销售',channel:'销售',line:'韩国',account:'—',manager:'韩国销售组',source:'手工创建',enabled:true},
       {id:'kol_jisu_mom',name:'@jisu_mom',type:'KOL',channel:'KOL',line:'韩国',account:'TikTok @jisu_mom',manager:'Mia',source:'手工创建',enabled:true},
@@ -205,7 +206,7 @@
       $('link-rows').innerHTML=rows.length?rows.map(x=>'<tr><td><b>'+esc(x.name)+'</b>'+auditLabel(x)+'</td><td>'+esc(x.line)+'</td><td><span class="tag '+tagType(x.type)+'">'+x.type+'</span></td><td>'+esc(x.owner)+'</td><td>'+esc(linkPlanLabel(x))+'</td><td>'+lpLabel(x.lpType)+'</td><td>'+templateLabel(x.templateId)+'</td><td>'+x.clicks+' 次</td><td>'+x.paid+'</td><td><span class="tag '+tagStatus(x.status)+'">'+x.status+'</span></td><td><button class="btn link" data-detail="'+x.id+'">详情</button><button class="btn link" data-link-edit="'+x.id+'">编辑</button><button class="btn link" data-copy="'+x.id+'">复制链接</button></td></tr>').join(''):'<tr><td colspan="11"><div class="empty">暂无匹配的落地页</div></td></tr>';
       document.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>detail(b.dataset.detail));document.querySelectorAll('[data-link-edit]').forEach(b=>b.onclick=()=>openLinkEdit(b.dataset.linkEdit));document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copy(b.dataset.copy));
     }
-    function renderSkus(){const key=$('sku-keyword').value.toLowerCase(),line=$('sku-line').value,scope=$('sku-scope').value,status=$('sku-status').value;const rows=skus.filter(x=>(!key||(x.id+x.name).toLowerCase().includes(key))&&(!line||x.line===line)&&(!scope||x.scope===scope)&&(!status||x.status===status));$('sku-rows').innerHTML=rows.length?rows.map(x=>'<tr><td><b>'+x.name+'</b><div class="sub">'+x.id+'</div></td><td><span class="tag purple">'+x.line+'</span></td><td>'+x.price+'</td><td>'+x.valid+'</td><td><span class="tag blue">'+x.scope+'</span></td><td>'+(x.best?'<span class="best">Best Value</span>':'—')+'</td><td><span class="tag '+(x.status==='上架'?'green':'gray')+'">'+x.status+'</span></td></tr>').join(''):'<tr><td colspan="7"><div class="empty">暂无匹配的 SKU</div></td></tr>'}
+    function renderSkus(){const key=$('sku-keyword').value.toLowerCase(),line=$('sku-line').value,scope=$('sku-scope').value,status=$('sku-status').value;const rows=skus.filter(x=>(!key||(x.id+x.packageName).toLowerCase().includes(key))&&(!line||x.line===line)&&(!scope||x.scope===scope)&&(!status||x.status===status));$('sku-rows').innerHTML=rows.length?rows.map(x=>'<tr><td><b>'+x.packageName+'</b></td><td><code>'+x.id+'</code></td><td><span class="tag purple">'+x.line+'</span></td><td>'+x.price+'</td><td>'+x.valid+'</td><td><span class="tag blue">'+x.scope+'</span></td><td>'+(x.best?'<span class="best">Best Value</span>':'—')+'</td><td><span class="tag '+(x.status==='上架'?'green':'gray')+'">'+x.status+'</span></td></tr>').join(''):'<tr><td colspan="8"><div class="empty">暂无匹配的 SKU</div></td></tr>'}
     function skuPriceInfo(sku){const value=Number(sku.price.match(/[\d,]+/)[0].replaceAll(',','')),currency=sku.price.replace(/[\d,\s]/g,'');return {value,currency}}
     function planFinalPrice(sku,mode,value){const price=skuPriceInfo(sku);if(mode==='原价售卖')return price.value;const n=Number(value||0),discount=mode==='折扣'?price.value*n/100:n;return price.value-discount}
     function planRuleLabel(plan,sku){if(plan.mode==='原价售卖')return '原价售卖';const unit=plan.mode==='折扣'?'%':skuPriceInfo(sku).currency;return plan.mode+' · '+plan.value+unit}
