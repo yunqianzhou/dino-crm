@@ -23,16 +23,13 @@ export default function MarketingCenterPrototype({ page = 'links' }: { page?: 'c
   const allowed = (permission: ReturnType<typeof can>) => permission === 'operate'
   const permissions = new URLSearchParams({
     perm_channelWrite: allowed(can('marketingV2_channels_edit')) ? '1' : '0',
-    perm_channelStatus: allowed(can('marketingV2_channels_status')) ? '1' : '0',
     perm_offerWrite: allowed(can('marketingV2_offers_edit')) ? '1' : '0',
-    perm_offerStatus: allowed(can('marketingV2_offers_status')) ? '1' : '0',
     perm_landingCreate: allowed(can('marketingV2_landing_create')) ? '1' : '0',
     perm_landingEdit: allowed(can('marketingV2_landing_edit')) ? '1' : '0',
-    perm_landingStatus: allowed(can('marketingV2_landing_status')) ? '1' : '0',
     perm_landingCopy: can('marketingV2_landing_copy') === 'none' ? '0' : '1',
     perm_landingPreview: allowed(can('marketingV2_landing_preview')) ? '1' : '0',
   })
-  const src = `/dino-crm/marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&${permissions.toString()}&v=20260903-channel-code`
+  const src = `/dino-crm/marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&${permissions.toString()}&v=20260907-price-plan-actions`
   return (
     <iframe
       key={src}

@@ -97,7 +97,7 @@ export default function AppLayout() {
   const marketingV2Children = [
     { key: '/marketing-center/channels', icon: <ApartmentOutlined />, label: lang === 'en' ? 'Channel Management' : '渠道管理' },
     { key: '/marketing-center/skus', icon: <AppstoreOutlined />, label: lang === 'en' ? 'SKU Catalog' : 'SKU 管理' },
-    { key: '/marketing-center/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Offer Plans / Coupon Sets' : '优惠方案 / 券包' },
+    { key: '/marketing-center/offers', icon: <TagsOutlined />, label: lang === 'en' ? 'Channel SKU Price Plans' : '渠道 SKU 价格方案' },
     { key: '/marketing-center/landing', icon: <LinkOutlined />, label: lang === 'en' ? 'Landing Page Management' : '落地页管理' },
   ].filter((n) => visible(n.key))
 
