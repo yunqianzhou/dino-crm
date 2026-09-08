@@ -22,7 +22,7 @@ import {
   Typography,
   message,
 } from 'antd'
-import { CheckOutlined, DownOutlined, EditOutlined, PhoneOutlined, SearchOutlined, SettingOutlined, SwapOutlined, RollbackOutlined } from '@ant-design/icons'
+import { CheckOutlined, DownOutlined, DownloadOutlined, EditOutlined, PhoneOutlined, SearchOutlined, SettingOutlined, SwapOutlined, RollbackOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { genCallId, setState, uid, updateSalesSettings, useStore } from '../store'
@@ -39,6 +39,7 @@ import { businessLineOf, lineLabel, lpChannelSourceText, appChannelSourceText } 
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
 import { CONSULTATION_STAGE_COLOR, CONSULTATION_STAGES, consultationStage, currentAppointment } from '../salesLifecycle'
+import { downloadCsv } from '../export'
 
 const { Text } = Typography
 
@@ -910,6 +911,40 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     setLandingCallbackFilter(undefined)
   }
 
+  // 下载当前标签页、当前筛选范围内的数据，避免用户还需手动复刻页面筛选条件。
+  const downloadData = () => {
+    const filename = `销售中心-${tab === 'pool' ? '待领取注册用户' : tab === 'follow' ? '我的跟进' : tab === 'calls' ? '通话记录' : '销售触达汇总'}-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+    if (tab === 'calls') {
+      downloadCsv(filename, ['通话时间', '用户ID', '学生姓名', '手机号', '通话结果', '通话时长', '通话备注', 'CC'], callData.map((call) => [
+        call.time, call.studentId, call.customer, call.phone, call.result, call.duration, call.note, accounts.find((item) => item.email === call.agent)?.name || call.agent,
+      ]))
+    } else if (tab === 'summary') {
+      downloadCsv(filename, ['CC', '国家', '外呼线索数', '接通线索数', '总外呼次数', '已接通次数', '总通话时长'], callSummary.rows.map((row) => [
+        accounts.find((item) => item.email === row.agent)?.name || row.agent, row.country, row.outboundLeads, row.connectedLeads, row.total, row.answered, fmtDuration(row.seconds),
+      ]))
+    } else {
+      const leads = tab === 'pool' ? poolData : followData
+      downloadCsv(filename, ['用户ID', '学生姓名', '登录账号', '手机号', '国家', '购买意向', '用户状态', '用户类型', '年龄段', '课程等级', '当前跟进阶段', 'CC', '注册时间', '最后跟进时间', '渠道来源'], leads.map((student) => [
+        student.studentId,
+        student.localName ?? student.name,
+        student.account,
+        student.phone,
+        student.country,
+        student.purchaseIntention || '未填写',
+        resolveUserStatus(student, lessons),
+        resolveUserType(student),
+        student.ageGroup,
+        student.courseLevel,
+        student.salesProgress,
+        accounts.find((item) => item.email === student.salesOwner)?.name || student.salesOwner,
+        student.registerTime,
+        student.salesUpdatedAt,
+        student.channelCode ? lpChannelSourceText(channels, student) : appChannelSourceText(student),
+      ]))
+    }
+    message.success('数据下载已开始')
+  }
+
   const filterBar = (
     <div className="sales-filter-bar">
       {tab !== 'summary' && <Input
@@ -944,6 +979,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       </>}
       <div className="sales-filter-actions">
         {tab !== 'calls' && tab !== 'summary' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
+        <Button icon={<DownloadOutlined />} onClick={downloadData}>下载数据</Button>
         {tab !== 'calls' && tab !== 'summary' && importAction}
       </div>
     </div>
