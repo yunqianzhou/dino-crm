@@ -440,7 +440,7 @@ const zh: Dict = {
   'sales.optional': '选填',
   'sales.consultation.filter': '当前跟进阶段',
   'sales.consultation.stage': '当前跟进阶段',
-  'sales.consultation.stage.待外呼': '待外呼', 'sales.consultation.stage.未接通待跟进': '未接通', 'sales.consultation.stage.已接通待预约': '待预约', 'sales.consultation.stage.未出勤待跟进': '未出勤', 'sales.consultation.stage.咨询未完成待跟进': '咨询未完成', 'sales.consultation.stage.咨询完成待支付': '待支付',
+  'sales.consultation.stage.待外呼': '待外呼', 'sales.consultation.stage.未接通待跟进': '未接通 · 待跟进', 'sales.consultation.stage.已接通待预约': '已接通 · 待预约', 'sales.consultation.stage.未出勤待跟进': '未出勤 · 待跟进', 'sales.consultation.stage.咨询未完成待跟进': '咨询未完成 · 待跟进', 'sales.consultation.stage.咨询完成待支付': '咨询已完成 · 待支付',
   'sales.consultation.stage.待预约': '待预约', 'sales.consultation.stage.已预约': '已预约', 'sales.consultation.stage.待出勤确认': '待出勤确认', 'sales.consultation.stage.已出勤': '已出勤', 'sales.consultation.stage.未出勤': '未出勤', 'sales.consultation.stage.咨询完成待付费': '咨询完成待付费', 'sales.consultation.stage.已成交': '已成交', 'sales.consultation.stage.暂不跟进': '暂不跟进', 'sales.consultation.stage.已关闭': '已关闭',
   'sales.consultation.latestAppointment': '最近预约时间', 'sales.consultation.attendance': '出勤', 'sales.consultation.completed': '咨询完成',
   'sales.consultation.attendance.待标记': '待标记', 'sales.consultation.attendance.已出勤': '已出勤', 'sales.consultation.attendance.No Show': '未出勤',

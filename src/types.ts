@@ -158,6 +158,10 @@ export type Student = {
   // 它是销售的联系偏好，不等同于销售确认后的咨询预约（salesAppointments）。
   landingCallbackAt?: string
   landingCallbackSubmittedAt?: string
+  // Landing Page 二次留资。展示在销售中心/用户中心详情，不与销售确认后的咨询预约混用。
+  landingEnglishLevel?: string
+  landingLearningGoal?: string
+  landingCurrentLearningMethod?: string
 }
 
 // 销售跟进进度（线索在销售中心的状态；转「已体验/已付费」时改写 status 并离开销售中心）

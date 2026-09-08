@@ -370,7 +370,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       note: '',
       purchaseIntention: s.purchaseIntention || '未填写',
       lifecycleAction: 'continue',
-      occurredAt: dayjs(),
       scheduledStartAt: undefined,
       meetingLink: '',
       reason: '',
@@ -388,7 +387,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       continue: '继续跟进', pause: '暂不跟进', create: '新建预约', reschedule: '已改期', cancel: '已取消预约', attended: '已出勤',
       noShow: '未出勤', completed: '咨询完成', incomplete: '咨询未完成', close: '已关闭', reactivate: '已重新激活',
     }
-    const occurredAt = v.occurredAt?.format?.('YYYY-MM-DD HH:mm:ss') || now
+    // 业务发生时间暂不由销售手动填写，事件发生时间与本次保存时间保持一致。
+    const occurredAt = now
     setState((prev) => ({
       ...prev,
       students: prev.students.map((x) => {
@@ -739,6 +739,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       title: t('user.col.regTime'),
       dataIndex: 'registerTime',
       width: 200,
+      sorter: (a: Student, b: Student) => dayjs(a.registerTime).valueOf() - dayjs(b.registerTime).valueOf(),
       render: (v: string | undefined, r: Student) => <LocalTime time={v} country={r.country || r.businessLine} />,
     },
     {
@@ -791,7 +792,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       ellipsis: true,
       render: (v: string | undefined) => v || <Text type="secondary">—</Text>,
     },
-    { title: t('sales.col.updatedAt'), dataIndex: 'salesUpdatedAt', width: 170, render: (v) => v || <Text type="secondary">—</Text> },
+    {
+      title: t('sales.col.updatedAt'),
+      dataIndex: 'salesUpdatedAt',
+      width: 170,
+      sorter: (a: Student, b: Student) => dayjs(a.salesUpdatedAt || 0).valueOf() - dayjs(b.salesUpdatedAt || 0).valueOf(),
+      render: (v) => v || <Text type="secondary">—</Text>,
+    },
     ...(canEdit || canDial || canReassign
       ? [
           {
@@ -1212,12 +1219,12 @@ function Modal_Consultation({ student, paid, hasConnectedCall, onCancel, onSave 
   const active = student ? currentAppointment(student) : undefined
   const appointments = student?.salesAppointments ?? []
   const closed = student?.salesLifecycleStatus === '已关闭'
-  const start = (next: string) => { setAction(next); form.resetFields(); form.setFieldValue('occurredAt', dayjs()); if (next === 'create') form.setFieldValue('timezone', 'Asia/Ho_Chi_Minh') }
-  const submit = async () => { const v = await form.validateFields(); onSave(action, { ...v, scheduledStartAt: v.scheduledStartAt?.format('YYYY-MM-DD HH:mm:ss'), occurredAt: v.occurredAt?.format('YYYY-MM-DD HH:mm:ss') }) }
+  const start = (next: string) => { setAction(next); form.resetFields(); if (next === 'create') form.setFieldValue('timezone', 'Asia/Ho_Chi_Minh') }
+  const submit = async () => { const v = await form.validateFields(); onSave(action, { ...v, scheduledStartAt: v.scheduledStartAt?.format('YYYY-MM-DD HH:mm:ss') }) }
   const title: Record<string, string> = { create: '创建销售咨询预约', reschedule: '改期销售咨询', cancel: '取消预约', attended: '标记已出勤', noShow: '标记 No Show', completed: '标记咨询完成', incomplete: '标记咨询未完成', contact: '记录其他渠道联系', close: '关闭 Lead', reactivate: '重新激活 Lead' }
   return <Modal open={!!student} title={`销售咨询链路标记 · ${student?.localName || student?.name || ''}`} width={720} destroyOnClose onCancel={onCancel} footer={action ? [<Button key="back" onClick={() => setAction(null)}>返回</Button>, <Button key="save" type="primary" onClick={submit}>确认</Button>] : [<Button key="close" onClick={onCancel}>关闭</Button>]}>
     {student && !action && <>
-      <Alert type={paid ? 'success' : closed ? 'warning' : 'info'} showIcon style={{ marginBottom: 16 }} message={paid ? '已成交：支付状态来自订单中心' : closed ? '链路状态：已关闭' : `当前阶段：${consultationStage(student)}`} description="所有变更均会记录原因、说明、业务发生时间和操作人。" />
+      <Alert type={paid ? 'success' : closed ? 'warning' : 'info'} showIcon style={{ marginBottom: 16 }} message={paid ? '已成交：支付状态来自订单中心' : closed ? '链路状态：已关闭' : `当前阶段：${consultationStage(student)}`} description="所有变更均会记录原因、说明和操作人。" />
       {active ? <Card size="small" title="当前有效预约" style={{ marginBottom: 16 }}><Space direction="vertical"><span>预约时间：<LocalTime time={active.scheduledStartAt} country="越南" /></span><span>出勤：<Tag>{active.attendanceStatus}</Tag>　咨询完成：<Tag>{active.consultationStatus}</Tag></span></Space></Card> : <Alert type="warning" showIcon style={{ marginBottom: 16 }} message="当前无有效预约" />}
       {!paid && !closed && <Space wrap style={{ marginBottom: 16 }}>
         {!active && (hasConnectedCall || appointments.length > 0) && <Button type="primary" onClick={() => start('create')}>创建预约</Button>}
@@ -1235,7 +1242,7 @@ function Modal_Consultation({ student, paid, hasConnectedCall, onCancel, onSave 
       {['create', 'reschedule'].includes(action) && <><Form.Item name="scheduledStartAt" label="预约开始时间" rules={[{ required: true, message: '请选择预约开始时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="timezone" label="时区" rules={[{ required: true }]}><Select options={[{ label: '越南（Asia/Ho_Chi_Minh）', value: 'Asia/Ho_Chi_Minh' }]} /></Form.Item><Form.Item name="meetingLink" label="Google Meet 链接"><Input /></Form.Item></>}
       {action === 'contact' && <><Form.Item name="contactChannel" label="联系渠道" rules={[{ required: true, message: '请选择联系渠道' }]}><Select options={['Zalo', 'WhatsApp', '用户主动联系', '其他'].map((value) => ({ label: value, value }))} /></Form.Item><Form.Item name="contactResult" label="联系结果" rules={[{ required: true, message: '请选择联系结果' }]}><Select options={['已联系成功', '未联系成功'].map((value) => ({ label: value, value }))} /></Form.Item></>}
       {['reschedule', 'cancel', 'noShow', 'incomplete', 'close'].includes(action) && <Form.Item name="reason" label="原因" rules={[{ required: true, message: '请填写原因' }]}><Input.TextArea rows={3} /></Form.Item>}
-      <Form.Item name="occurredAt" label="业务发生时间" rules={[{ required: true, message: '请选择业务发生时间' }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item><Form.Item name="note" label="标记说明" rules={[{ required: true, message: '请填写本次标记说明' }]}><Input.TextArea rows={3} /></Form.Item>
+      <Form.Item name="note" label="标记说明" rules={[{ required: true, message: '请填写本次标记说明' }]}><Input.TextArea rows={3} /></Form.Item>
     </Form>}
   </Modal>
 }
@@ -1455,7 +1462,6 @@ function Modal_Follow({
           </>}
           {requiresReason && <Form.Item name="reason" label={t('sales.consultation.reason')} rules={[{ required: true, message: t('sales.consultation.reasonRequired') }]}><Select options={(reasonOptions[lifecycleAction] || []).map((value) => ({ label: t(`sales.consultation.reasonOption.${value}`), value }))} /></Form.Item>}
           {requiresReason && reasonValue === '其他' && <Form.Item name="reasonOther" label={t('sales.consultation.reasonOther')} rules={[{ required: true, message: t('sales.consultation.reasonOtherRequired') }]}><Input.TextArea rows={2} /></Form.Item>}
-          {lifecycleAction && lifecycleAction !== 'continue' && <Form.Item name="occurredAt" label={t('sales.consultation.occurredAt')} rules={[{ required: true, message: t('sales.consultation.occurredAtRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>}
         </>}
         <Form.Item name="note" label={requiresReason ? t('sales.consultation.noteOptional') : t('sales.f.note')} rules={[{ required: !requiresReason, message: t('sales.f.noteRequired') }]}>
           <Input.TextArea rows={requiresReason ? 2 : 3} placeholder={requiresReason ? t('sales.consultation.noteOptionalPlaceholder') : t('sales.f.notePlaceholder')} />

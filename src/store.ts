@@ -619,6 +619,7 @@ function seed(): AppState {
       countryCode: '+84', channelCode: 'VNLP_DEMO', country: '越南', appChannel: 'Google Play', registerTime: now.subtract(30, 'minute').format('YYYY-MM-DD HH:mm:ss'), status: '未付费-未体验',
       landingCallbackAt: now.add(2, 'hour').format('YYYY-MM-DD HH:mm:ss'), landingCallbackSubmittedAt: now.subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss'),
       salesOwner: 'sales.lead@dinoai.ai', salesProgress: '跟进中', salesLatestNote: '【Landing Page】用户已填写预约外呼时间', salesUpdatedAt: now.subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss'),
+      landingEnglishLevel: '初级（可进行简单日常交流）', landingLearningGoal: '提升日常英语表达', landingCurrentLearningMethod: '线下英语班',
       salesHistory: [{ progress: '跟进中', note: '【Landing Page】用户已填写预约外呼时间', time: now.subtract(10, 'minute').format('YYYY-MM-DD HH:mm:ss'), owner: '系统' }],
     },
   ]
