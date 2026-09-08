@@ -1,3 +1,13 @@
+import * as XLSX from 'xlsx'
+
+export function downloadXlsx(filename: string, headers: string[], rows: unknown[][]) {
+  const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows])
+  sheet['!cols'] = headers.map(() => ({ wch: 24 }))
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, sheet, '当前筛选结果')
+  XLSX.writeFile(workbook, filename)
+}
+
 function escapeCsv(value: unknown): string {
   const text = value == null ? '' : String(value)
   return `"${text.replace(/"/g, '""')}"`

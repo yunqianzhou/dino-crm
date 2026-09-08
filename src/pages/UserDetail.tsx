@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import dayjs from 'dayjs'
 import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, FileTextOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -167,7 +168,7 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
             <Descriptions.Item label="领取人">{student.salesOwner || <Text type="secondary">—</Text>}</Descriptions.Item>
           </>}
           <Descriptions.Item label="CC">{student.ccName || <Text type="secondary">—</Text>}</Descriptions.Item>
-          <Descriptions.Item label="是否预约外呼">{student.landingCallbackAt ? <Tag color="blue">已预约</Tag> : <Text type="secondary">未预约</Text>}</Descriptions.Item>
+          <Descriptions.Item label="是否预约外呼">{student.landingCallbackAt && dayjs.utc(student.landingCallbackAt).isValid() ? <Tag color="blue">已填写</Tag> : <Text type="secondary">未填写</Text>}</Descriptions.Item>
           <Descriptions.Item label="预约外呼时间"><LocalTime time={student.landingCallbackAt} country={student.country || student.businessLine} /></Descriptions.Item>
           <Descriptions.Item label="英语学习程度">{student.landingEnglishLevel || <Text type="secondary">—</Text>}</Descriptions.Item>
           <Descriptions.Item label="学习目的">{student.landingLearningGoal || <Text type="secondary">—</Text>}</Descriptions.Item>

@@ -39,7 +39,8 @@ import { businessLineOf, lineLabel, lpChannelSourceText, appChannelSourceText } 
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
 import { CONSULTATION_STAGE_COLOR, CONSULTATION_STAGES, consultationStage, currentAppointment } from '../salesLifecycle'
-import { downloadCsv } from '../export'
+import { downloadXlsx } from '../export'
+import { callSeconds, matchesCallback, matchesLocalDateRange, reportTime, validCallback } from '../salesReporting'
 
 const { Text } = Typography
 
@@ -52,11 +53,6 @@ function fmtDuration(sec: number) {
   const m = Math.floor(sec / 60)
   const s = sec % 60
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-}
-
-function durationToSeconds(duration: string) {
-  const [minutes, seconds] = duration.split(':').map(Number)
-  return Number.isFinite(minutes) && Number.isFinite(seconds) ? minutes * 60 + seconds : 0
 }
 
 const USER_TYPE_COLOR: Record<UserType, string> = {
@@ -107,8 +103,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   // 可被分配的销售：启用状态、非系统管理员、且角色具备销售模块「操作」权限
   const salesAccounts = useMemo(
-    () => accounts.filter((a) => a.status === '启用' && a.roleId !== 'role_admin' && roles.find((r) => r.id === a.roleId)?.perms.sales === 'operate'),
-    [accounts, roles],
+    () => accounts.filter((a) => a.status === '启用' && a.roleId !== 'role_admin' && roles.find((r) => r.id === a.roleId)?.perms.sales === 'operate' && a.businessLines.some(matchLine)),
+    [accounts, roles, matchLine, lineSel],
   )
 
   const [tab, setTab] = useState('follow')
@@ -127,6 +123,22 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const [callDateRange, setCallDateRange] = useState<any>(null)
   const [consultationStageFilter, setConsultationStageFilter] = useState<string[]>([])
   const [landingCallbackFilter, setLandingCallbackFilter] = useState<string | undefined>()
+  const [pages, setPages] = useState<Record<string, { current: number; pageSize: number }>>({})
+  const [sorts, setSorts] = useState<Record<string, { field?: string; order?: string }>>({})
+  useEffect(() => {
+    setPages((prev) => ({ ...prev, pool: { ...prev.pool, current: 1, pageSize: prev.pool?.pageSize || 10 }, follow: { ...prev.follow, current: 1, pageSize: prev.follow?.pageSize || 10 } }))
+  }, [keyword, lineSel, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter])
+  useEffect(() => { setPages((prev) => ({ ...prev, follow: { current: 1, pageSize: prev.follow?.pageSize || 10 } })) }, [consultationStageFilter])
+  useEffect(() => { setPages((prev) => ({ ...prev, calls: { current: 1, pageSize: prev.calls?.pageSize || 10 } })) }, [keyword, lineSel, callResultFilter, callAgentFilter, callDateRange])
+  useEffect(() => {
+    if (ownerFilter && ownerFilter !== '__unassigned__' && !salesAccounts.some((a) => a.email === ownerFilter)) setOwnerFilter(undefined)
+    if (callAgentFilter && !salesAccounts.some((a) => a.email === callAgentFilter)) setCallAgentFilter(undefined)
+  }, [salesAccounts, ownerFilter, callAgentFilter])
+  const paginationFor = (key: string) => ({ current: pages[key]?.current || 1, pageSize: pages[key]?.pageSize || 10, showTotal: (n: number) => t('common.total', { n }), showSizeChanger: true })
+  const tableChanged = (key: string, pagination: any, sorter: any) => {
+    setPages((prev) => ({ ...prev, [key]: { current: pagination.current || 1, pageSize: pagination.pageSize || 10 } }))
+    setSorts((prev) => ({ ...prev, [key]: { field: sorter.field, order: sorter.order } }))
+  }
 
   const [editing, setEditing] = useState<Student | null>(null)
   const [dialing, setDialing] = useState<Student | null>(null)
@@ -204,24 +216,19 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     })
   }, [salesLeads])
 
-  const matchesDateRange = (value: string | undefined, range: any) => {
-    if (!range || range.length !== 2) return true
-    if (!value) return false
-    const [start, end] = range
-    if (!start || !end) return true
-    const time = dayjs.utc(value).valueOf()
-    return time >= start.startOf('day').valueOf() && time <= end.endOf('day').valueOf()
-  }
+  useEffect(() => {
+    if (sourceLpFilter && !sourceLpOptions.includes(sourceLpFilter)) setSourceLpFilter(undefined)
+    if (sourceAppFilter?.length) {
+      const parent = sourceAppOptions.find((option) => option.value === sourceAppFilter[0])
+      if (!parent || (sourceAppFilter[1] && !parent.children?.some((child: any) => child.value === sourceAppFilter[1]))) setSourceAppFilter(undefined)
+    }
+    setAgeGroupFilter((selected) => selected.some((value) => !ageGroupOptions.includes(value)) ? selected.filter((value) => ageGroupOptions.includes(value)) : selected)
+    setCourseLevelFilter((selected) => selected.some((value) => !courseLevelOptions.includes(value)) ? selected.filter((value) => courseLevelOptions.includes(value)) : selected)
+  }, [sourceLpOptions, sourceAppOptions, ageGroupOptions, courseLevelOptions, sourceLpFilter, sourceAppFilter])
 
   const matchesLeadFilters = (s: Student) => {
     const kw = keyword.trim().toLowerCase()
     const owner = s.salesOwner || '__unassigned__'
-    const callbackAt = s.landingCallbackAt ? dayjs.utc(s.landingCallbackAt) : undefined
-    const now = dayjs.utc()
-    const callbackMatches = !landingCallbackFilter
-      || (landingCallbackFilter === 'filled' && !!callbackAt)
-      || (landingCallbackFilter === 'due' && !!callbackAt && !callbackAt.isAfter(now))
-      || (landingCallbackFilter === 'upcoming' && !!callbackAt && callbackAt.isAfter(now) && callbackAt.diff(now, 'hour', true) <= 24)
     const sourceLpMatches = !sourceLpFilter || lpChannelSourceText(channels, s) === sourceLpFilter
     let sourceAppMatches = true
     if (sourceAppFilter?.length) {
@@ -244,9 +251,9 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       sourceLpMatches &&
       sourceAppMatches &&
       (!userTypeFilter.length || userTypeFilter.includes(resolveUserType(s))) &&
-      matchesDateRange(s.registerTime, registerDateRange) &&
-      matchesDateRange(s.salesUpdatedAt, followDateRange) &&
-      callbackMatches
+      matchesLocalDateRange(s.registerTime, registerDateRange, s.country || s.businessLine) &&
+      matchesLocalDateRange(s.salesUpdatedAt, followDateRange, s.country || s.businessLine) &&
+      matchesCallback(s.landingCallbackAt, landingCallbackFilter)
     )
   }
 
@@ -268,11 +275,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   }, [callRecords, lineSel, matchLine, seeAllOwners, actor])
 
   const matchesCallDate = (call: CallRecord) => {
-    if (!callDateRange || callDateRange.length !== 2) return true
-    const [start, end] = callDateRange
-    if (!start || !end) return true
-    const callTime = dayjs.utc(call.time)
-    return !callTime.isBefore(start.startOf('day')) && !callTime.isAfter(end.endOf('day'))
+    return matchesLocalDateRange(call.time, callDateRange, call.businessLine)
   }
 
   const callData = useMemo(
@@ -315,7 +318,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       const item = getItem(call.agent, country)
       item.total += 1
       item.answered += call.result === '已接通' ? 1 : 0
-      item.seconds += durationToSeconds(call.duration)
+      item.seconds += callSeconds(call)
       item.outboundLeads.add(call.studentId)
       if (call.result === '已接通') item.connectedLeads.add(call.studentId)
     })
@@ -331,7 +334,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     })).sort((a, b) => b.total - a.total)
     const outboundLeadIds = new Set(summaryCallData.map((call) => call.studentId))
     const connectedLeadIds = new Set(summaryCallData.filter((call) => call.result === '已接通').map((call) => call.studentId))
-    const totalSeconds = summaryCallData.reduce((sum, call) => sum + durationToSeconds(call.duration), 0)
+    const totalSeconds = summaryCallData.reduce((sum, call) => sum + callSeconds(call), 0)
     return {
       rows,
       outboundLeads: outboundLeadIds.size,
@@ -343,7 +346,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   }, [summaryCallData])
 
   const claim = (s: Student) => {
-    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
     const note = t('sales.claimNote')
     setState((prev) => ({
       ...prev,
@@ -379,7 +382,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const persistFollow = (v: any) => {
     if (!editing) return
-    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
     const note = ((v.note as string) || '').trim()
     const reason = v.reason === '其他' ? `其他：${(v.reasonOther as string).trim()}` : v.reason
     const action = v.lifecycleAction as string | undefined
@@ -500,7 +503,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       ...prev,
       students: prev.students.map((student) =>
         student.studentId === trialLevelStudent.studentId
-          ? { ...student, courseLevel, salesUpdatedAt: dayjs().format('YYYY-MM-DD HH:mm:ss') }
+          ? { ...student, courseLevel, salesUpdatedAt: dayjs.utc().format('YYYY-MM-DD HH:mm:ss') }
           : student,
       ),
     }))
@@ -512,7 +515,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     if (!dropping) return
     const v = await dropForm.validateFields()
     const reason = v.reason?.trim()
-    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
     const note = `${t('sales.manualDropNote')}${reason}`
     setState((prev) => ({
       ...prev,
@@ -542,7 +545,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     }
     const target = salesAccounts.find((a) => a.email === reassignTo)
     const name = target?.name ?? reassignTo
-    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
     const note = t('sales.reassign.note', { name })
     setState((prev) => ({
       ...prev,
@@ -568,7 +571,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   // 保存外呼通话小结：生成通话记录 + 归档到该线索的销售跟进记录
   const saveCall = (note: string, intention: string, appointment?: { booked: boolean; scheduledStartAt?: string; meetingLink?: string }) => {
     if (!dialing) return
-    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
     // 模拟外呼录音链接
     const dummyAudio = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
     // 模拟外呼结果里携带的 AI 总结
@@ -615,7 +618,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const saveConsultation = (action: 'create' | 'reschedule' | 'cancel' | 'attended' | 'noShow' | 'completed' | 'incomplete' | 'contact' | 'close' | 'reactivate', values: any) => {
     if (!consulting) return
-    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
     const label: Record<string, string> = { create: '创建销售咨询预约', reschedule: '销售咨询已改期', cancel: '取消销售咨询预约', attended: '标记已出勤', noShow: '标记 No Show', completed: '标记咨询完成', incomplete: '标记咨询未完成', contact: '记录其他渠道联系', close: '关闭 Lead', reactivate: '重新激活 Lead' }
     setState((prev) => ({ ...prev, students: prev.students.map((student) => {
       if (student.studentId !== consulting.studentId) return student
@@ -669,7 +672,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               {appointmentTimezone} · UTC{dayjs.tz(appointment.scheduledStartAt, appointmentTimezone).format('Z')}
             </Text>
           </span>}
-          {stage === '待外呼' && s.landingCallbackAt && <span style={{ whiteSpace: 'nowrap' }}>预约外呼：<LocalTime time={s.landingCallbackAt} country={s.country || s.businessLine} /></span>}
         </Space>
       },
     },
@@ -744,6 +746,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     },
     { title: t('user.col.country'), dataIndex: 'country', width: 110, render: (_, r) => <Tag>{lineLabel(r)}</Tag> },
     {
+      title: '预约外呼', key: 'landingCallback', width: 240,
+      render: (_: unknown, r: Student) => validCallback(r.landingCallbackAt)
+        ? <Space direction="vertical" size={2}><Tag color="blue">已填写</Tag><LocalTime time={r.landingCallbackAt} country={r.country || r.businessLine} /></Space>
+        : <Text type="secondary">未填写</Text>,
+    },
+    {
       title: t('user.col.regTime'),
       dataIndex: 'registerTime',
       width: 200,
@@ -805,7 +813,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       dataIndex: 'salesUpdatedAt',
       width: 170,
       sorter: (a: Student, b: Student) => dayjs(a.salesUpdatedAt || 0).valueOf() - dayjs(b.salesUpdatedAt || 0).valueOf(),
-      render: (v) => v || <Text type="secondary">—</Text>,
+      render: (v, r) => <LocalTime time={v} country={r.country || r.businessLine} />,
     },
     ...(canEdit || canDial || canReassign
       ? [
@@ -870,7 +878,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   ]
 
   const callColumns: ColumnsType<CallRecord> = [
-    { title: t('sales.call.time'), dataIndex: 'time', width: 180 },
+    { title: t('sales.call.time'), dataIndex: 'time', width: 225, sorter: (a, b) => dayjs.utc(a.time).valueOf() - dayjs.utc(b.time).valueOf(), render: (v, r) => <LocalTime time={v} country={r.businessLine} /> },
     { title: t('sales.call.customer'), dataIndex: 'customer', width: 140 },
     ...(phase3 ? [{ title: '用户ID', dataIndex: 'studentId', width: 190, render: (v: string) => <Text code>{v}</Text> }] : []),
     { title: t('user.col.phone'), dataIndex: 'phone', width: 160 },
@@ -910,9 +918,26 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const [showIntro, setShowIntro] = useState(false)
 
-  const totalLeads = students.filter((s) => isSalesLead(s, lessons)).length
+  useEffect(() => {
+    const totals: Record<string, number> = { pool: poolData.length, follow: followData.length, calls: callData.length }
+    setPages((current) => {
+      let changed = false
+      const next = { ...current }
+      for (const [key, total] of Object.entries(totals)) {
+        const page = current[key]
+        if (!page) continue
+        const last = Math.max(1, Math.ceil(total / page.pageSize))
+        if (page.current > last) { next[key] = { ...page, current: last }; changed = true }
+      }
+      return changed ? next : current
+    })
+  }, [poolData.length, followData.length, callData.length])
+
+  const totalLeads = salesLeads.length
 
   const resetLeadFilters = () => {
+    setKeyword('')
+    setLineSel(allowedLines() || [])
     setPurchaseIntentionFilter([])
     setOwnerFilter(undefined)
     setAgeGroupFilter([])
@@ -928,34 +953,31 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   // 下载当前标签页、当前筛选范围内的数据，避免用户还需手动复刻页面筛选条件。
   const downloadData = () => {
-    const filename = `销售中心-${tab === 'pool' ? '待领取注册用户' : tab === 'follow' ? '我的跟进' : tab === 'calls' ? '通话记录' : '销售触达汇总'}-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+    const filename = `销售中心-${tab === 'pool' ? '待领取注册用户' : tab === 'follow' ? '我的跟进' : tab === 'calls' ? '通话记录' : '销售触达汇总'}-${dayjs().format('YYYYMMDD-HHmmss')}.xlsx`
+    const sorted = <T extends object,>(rows: T[]) => {
+      const sort = sorts[tab]
+      if (!sort?.field || !sort.order) return rows
+      const field = sort.field as keyof T
+      return [...rows].sort((a, b) => (dayjs.utc(String(a[field] || 0)).valueOf() - dayjs.utc(String(b[field] || 0)).valueOf()) * (sort.order === 'ascend' ? 1 : -1))
+    }
     if (tab === 'calls') {
-      downloadCsv(filename, ['通话时间', '用户ID', '学生姓名', '手机号', '通话结果', '通话时长', '通话备注', 'CC'], callData.map((call) => [
-        call.time, call.studentId, call.customer, call.phone, call.result, call.duration, call.note, accounts.find((item) => item.email === call.agent)?.name || call.agent,
+      downloadXlsx(filename, callColumns.map((column) => String(column.title)), sorted(callData).map((call) => [
+        reportTime(call.time, call.businessLine), call.customer, ...(phase3 ? [call.studentId] : []), call.phone, call.result, call.duration, call.audioUrl || '—', call.note, call.agent,
       ]))
     } else if (tab === 'summary') {
-      downloadCsv(filename, ['CC', '国家', '外呼线索数', '接通线索数', '总外呼次数', '已接通次数', '总通话时长'], callSummary.rows.map((row) => [
+      downloadXlsx(filename, callSummaryColumns.map((column) => String(column.title)), callSummary.rows.map((row) => [
         accounts.find((item) => item.email === row.agent)?.name || row.agent, row.country, row.outboundLeads, row.connectedLeads, row.total, row.answered, fmtDuration(row.seconds),
       ]))
     } else {
-      const leads = tab === 'pool' ? poolData : followData
-      downloadCsv(filename, ['用户ID', '学生姓名', '登录账号', '手机号', '国家', '购买意向', '用户状态', '用户类型', '年龄段', '课程等级', '当前跟进阶段', 'CC', '注册时间', '最后跟进时间', '渠道来源'], leads.map((student) => [
-        student.studentId,
-        student.localName ?? student.name,
-        student.account,
-        student.phone,
-        student.country,
-        student.purchaseIntention || '未填写',
-        resolveUserStatus(student, lessons),
-        resolveUserType(student),
-        student.ageGroup,
-        student.courseLevel,
-        student.salesProgress,
-        accounts.find((item) => item.email === student.salesOwner)?.name || student.salesOwner,
-        student.registerTime,
-        student.salesUpdatedAt,
-        student.channelCode ? lpChannelSourceText(channels, student) : appChannelSourceText(student),
-      ]))
+      const leads = sorted(tab === 'pool' ? poolData : followData)
+      const headers = (tab === 'pool' ? poolColumns : followColumns).filter((column) => column.key !== 'op').map((column) => String(column.title))
+      downloadXlsx(filename, headers, leads.map((s) => {
+        const country = s.country || s.businessLine
+        const stage = s.businessLine === '越南' ? consultationStage(s, callRecords) : '—'
+        const appointment = stage === '已预约' ? currentAppointment(s) : undefined
+        const stageText = appointment ? `${stage} · ${appointment.scheduledStartAt} ${appointment.timezone}` : stage
+        return [s.studentId, s.localName || s.name, s.purchaseIntention || '未填写', resolveUserStatus(s, lessons), resolveUserType(s), s.ageGroup || '—', s.courseLevel || '—', s.account, lpChannelSourceText(channels, s), s.channelCode || '—', appChannelSourceText(s), lineLabel(s), validCallback(s.landingCallbackAt) ? `已填写 · ${reportTime(s.landingCallbackAt, country)}` : '未填写', reportTime(s.registerTime, country), accounts.find((a) => a.email === s.salesOwner)?.name || s.salesOwner || '—', ...(tab === 'pool' && isLeader ? [leadCallCounts.get(s.studentId) || '未外呼'] : []), ...(tab === 'follow' ? [stageText, s.salesLatestNote || '—', reportTime(s.salesUpdatedAt, country)] : [])]
+      }))
     }
     message.success('数据下载已开始')
   }
@@ -977,7 +999,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         <>
           {tab === 'calls' && <Select className="sales-filter-control" allowClear placeholder={t('sales.call.result')} value={callResultFilter} onChange={setCallResultFilter} options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))} />}
           {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('sales.call.agent')} value={callAgentFilter} onChange={setCallAgentFilter} options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))} />}
-          <DatePicker.RangePicker className="sales-filter-date" onChange={setCallDateRange} allowClear placeholder={[t('pkg.startTime'), t('pkg.endTime')]} />
+          <DatePicker.RangePicker className="sales-filter-date" value={callDateRange} onChange={setCallDateRange} allowClear placeholder={[t('pkg.startTime'), t('pkg.endTime')]} />
         </>
       ) : <>
         {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />}
@@ -994,6 +1016,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       </>}
       <div className="sales-filter-actions">
         {tab !== 'calls' && tab !== 'summary' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
+        {(tab === 'calls' || tab === 'summary') && <Button type="link" onClick={() => { setKeyword(''); setCallResultFilter(undefined); setCallAgentFilter(undefined); setCallDateRange(null); setLineSel(allowedLines() || []) }}>重置筛选</Button>}
         <Button icon={<DownloadOutlined />} onClick={downloadData}>下载数据</Button>
         {tab !== 'calls' && tab !== 'summary' && importAction}
       </div>
@@ -1034,7 +1057,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         items={[
           {
             key: 'pool',
-            label: `${t('sales.tab.pool')} (${poolAll.length})`,
+            label: `${t('sales.tab.pool')} (${poolData.length})`,
             children: (
               <>
                 {filterBar}
@@ -1044,14 +1067,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                   dataSource={poolData}
                   scroll={{ x: 2180 + 90 }}
                   locale={{ emptyText: t('sales.emptyPool') }}
-                  pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
+                  pagination={paginationFor('pool')}
+                  onChange={(pagination, _, sorter) => tableChanged('pool', pagination, sorter)}
                 />
               </>
             ),
           },
           {
             key: 'follow',
-            label: `${t('sales.tab.follow')} (${followAll.length})`,
+            label: `${t('sales.tab.follow')} (${followData.length})`,
             children: (
               <>
                 {filterBar}
@@ -1064,19 +1088,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
                   dataSource={followData}
                   scroll={{ x: canReassign ? 2180 + 200 + 130 + 100 : 2180 + 200 + 130 }}
                   locale={{ emptyText: t('sales.emptyFollow') }}
-                  pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
+                  pagination={paginationFor('follow')}
+                  onChange={(pagination, _, sorter) => tableChanged('follow', pagination, sorter)}
                 />
               </>
             ),
           },
           {
             key: 'calls',
-            label: `${t('sales.tab.calls')} (${callScoped.length})`,
+            label: `${t('sales.tab.calls')} (${callData.length})`,
             children: (
               <>
                 {filterBar}
                 <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('sales.callsBanner')} />
-                <Table rowKey="id" columns={callColumns} dataSource={callData} scroll={{ x: 1210 }} locale={{ emptyText: t('sales.emptyCalls') }} pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }} />
+                <Table rowKey="id" columns={callColumns} dataSource={callData} scroll={{ x: 1210 }} locale={{ emptyText: t('sales.emptyCalls') }} pagination={paginationFor('calls')} onChange={(pagination, _, sorter) => tableChanged('calls', pagination, sorter)} />
               </>
             ),
           },

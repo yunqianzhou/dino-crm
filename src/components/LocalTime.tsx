@@ -1,11 +1,12 @@
 import { Typography } from 'antd'
 import { toLocalTime, tzLabel } from '../time'
+import dayjs from 'dayjs'
 
 const { Text } = Typography
 
 // 按用户注册国家换算后的当地时间展示
 export default function LocalTime({ time, country }: { time?: string; country?: string }) {
-  if (!time) return <Text type="secondary">—</Text>
+  if (!time || !dayjs.utc(time).isValid()) return <Text type="secondary">—</Text>
   return (
     <span>
       {toLocalTime(time, country)}{' '}

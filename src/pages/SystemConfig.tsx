@@ -61,10 +61,10 @@ const MODULE_HIERARCHY: ModuleNode[] = [
   {
     key: 'marketingV2',
     children: [
-      { key: 'marketingV2_channels', children: [{ key: 'marketingV2_channels_edit' }, { key: 'marketingV2_channels_status' }] },
+      { key: 'marketingV2_channels', children: [{ key: 'marketingV2_channels_edit' }, { key: 'marketingV2_channel_types' }] },
       { key: 'marketingV2_skus' },
-      { key: 'marketingV2_offers', children: [{ key: 'marketingV2_offers_edit' }, { key: 'marketingV2_offers_status' }] },
-      { key: 'marketingV2_landing', children: [{ key: 'marketingV2_landing_create' }, { key: 'marketingV2_landing_edit' }, { key: 'marketingV2_landing_preview' }, { key: 'marketingV2_landing_copy' }, { key: 'marketingV2_landing_status' }] },
+      { key: 'marketingV2_offers', children: [{ key: 'marketingV2_offers_edit' }] },
+      { key: 'marketingV2_landing', children: [{ key: 'marketingV2_landing_create' }, { key: 'marketingV2_landing_edit' }, { key: 'marketingV2_landing_preview' }, { key: 'marketingV2_landing_copy' }] },
     ],
   },
 ]
@@ -102,6 +102,7 @@ export default function SystemConfig() {
   const lines = BUSINESS_LINES
 
   const moduleLabel = (m: ModuleKey) => {
+    if (m === 'marketingV2_channel_types') return lang === 'en' ? 'Manage channel types' : '维护渠道类型（独立授权）'
     const marketingV2Labels: Partial<Record<ModuleKey, string>> = lang === 'en' ? {
       marketingV2: 'Marketing Center', marketingV2_channels: 'Channel management', marketingV2_channels_edit: 'Create and edit channels', marketingV2_channels_status: 'Enable / disable channels', marketingV2_skus: 'SKU catalog (view only)',
       marketingV2_offers: 'Offer plans', marketingV2_offers_edit: 'Create and edit offer plans', marketingV2_offers_status: 'Enable / end offer plans',
