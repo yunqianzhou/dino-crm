@@ -29,7 +29,7 @@ export default function MarketingCenterPrototype({ page = 'links' }: { page?: 'c
     perm_landingCopy: can('marketingV2_landing_copy') === 'none' ? '0' : '1',
     perm_landingPreview: allowed(can('marketingV2_landing_preview')) ? '1' : '0',
   })
-  const src = `/dino-crm/marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&${permissions.toString()}&v=20260908-sku-list-details`
+  const src = `/dino-crm/marketing-center-demo.html?embedded=1&lang=${lang === 'en' ? 'en' : 'zh'}&page=${currentPage}&${permissions.toString()}&v=20260908-lead-edit-fix`
   return (
     <iframe
       key={src}

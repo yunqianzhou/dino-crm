@@ -655,12 +655,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     {
       title: t('sales.consultation.stage'),
       key: 'consultationStage',
-      width: 210,
+      width: 245,
       render: (_: unknown, s) => {
         const stage = consultationStage(s, callRecords)
         if (s.businessLine !== '越南') return <Text type="secondary">—</Text>
+        const appointment = stage === '已预约' ? currentAppointment(s) : undefined
+        const appointmentTimezone = appointment?.timezone || 'Asia/Ho_Chi_Minh'
         return <Space direction="vertical" size={2}>
           <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag>
+          {appointment && <span data-testid="follow-appointment-time">
+            <span style={{ display: 'block', whiteSpace: 'nowrap' }}>{appointment.scheduledStartAt}</span>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {appointmentTimezone} · UTC{dayjs.tz(appointment.scheduledStartAt, appointmentTimezone).format('Z')}
+            </Text>
+          </span>}
           {stage === '待外呼' && s.landingCallbackAt && <span style={{ whiteSpace: 'nowrap' }}>预约外呼：<LocalTime time={s.landingCallbackAt} country={s.country || s.businessLine} /></span>}
         </Space>
       },
@@ -783,7 +791,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   ]
 
   const followColumns: ColumnsType<Student> = [
-    ...userColumns,
+    ...userColumns.filter((column) => column.key !== 'callCount'),
     ...consultationColumns,
     {
       title: t('sales.col.latestNote'),
