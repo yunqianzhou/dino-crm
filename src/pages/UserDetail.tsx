@@ -1,4 +1,4 @@
-import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
+import { useDashboardContext } from '../components/DashboardLinkContext'
 import { useMemo } from 'react'
 import dayjs from 'dayjs'
 import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
@@ -135,7 +135,6 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
 
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
-      <DashboardLinkContext />
       <Card
         className="page-card"
         bordered={false}

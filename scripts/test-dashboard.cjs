@@ -7,7 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/managementDemo.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
-  const { dashboardMetrics, dashboardPopulation, dashboardDateRows, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
+  const { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
   const user = (id, extra = {}) => ({ studentId: id, name: id, phone: '+840000000', account: id, businessLine: '越南', status: '未付费-未体验', userType: '正式用户', registerTime: '2026-09-01 00:00:00', ...extra })
   const a = user('a', { salesOwner: 'a@example.com' })
   const b = user('b', { salesOwner: 'b@example.com', salesProgress: '暂不跟进' })
@@ -90,5 +90,49 @@ try {
   assert.equal(dashboardDateRows(dateUsers, dailyCalls, [], { ...dateFilters, start: '2026-09-03' }).length, 0)
   const demoDays = dashboardDateRows(demo.students, demo.callRecords, demo.lessons, filters)
   assert.equal(demoDays.reduce((sum, row) => sum + row.metrics.total.length, 0), 180)
-  console.log('Dashboard checks passed: UTC+7 boundaries, deduplication, permissions, shared stages, filters and recorded activity.')
+  // Every non-date dimension partitions the same headline metric without losing users.
+  for (const grouping of ['cc', 'intent', 'age', 'registrationAge']) {
+    for (const source of [demoCurrent, demoPeriod]) {
+      const groups = dashboardGroupRows(source, grouping, '2026-09-16T08:00:00Z')
+      for (const key of Object.keys(source)) {
+        assert.equal(groups.reduce((sum, row) => sum + row.metrics[key].length, 0), source[key].length, grouping + ':' + key)
+      }
+    }
+  }
+  assert.equal(dashboardGroupKey(user('missing'), 'age'), '__unknown__')
+  assert.equal(dashboardGroupKey(user('missing'), 'intent'), '未填写')
+  assert.equal(dashboardGroupKey(user('boundary', { registerTime: '2026-09-08 17:00:00' }), 'registrationAge', '2026-09-16T08:00:00Z'), '0–7')
+  assert.equal(dashboardGroupKey(user('boundary', { registerTime: '2026-09-08 16:59:59' }), 'registrationAge', '2026-09-16T08:00:00Z'), '8–30')
+  assert.equal(dashboardGroupKey(user('old', { registerTime: '2026-08-01 00:00:00' }), 'registrationAge', '2026-09-16T08:00:00Z'), '31+')
+  assert.equal(dashboardGroupKey(user('future', { registerTime: '2026-10-01 00:00:00' }), 'registrationAge', '2026-09-16T08:00:00Z'), '__unknown__')
+  const pauseEvent = (reason, time) => ({ node: 'lead', result: '暂不跟进', reason, reportedAt: time })
+  const paused = user('reason', { salesOwner: 'cc-a', salesProgress: '暂不跟进', salesLifecycleEvents: [
+    pauseEvent('暂无需求', '2026-09-01 02:00:00'), pauseEvent('预算原因', '2026-09-02 02:00:00'), pauseEvent('预算原因', '2026-09-02 03:00:00'),
+  ] })
+  const noReason = user('no-reason', { salesProgress: '暂不跟进' })
+  const reasonPeople = [paused, noReason, user('test-reason', { userType: '测试用户', salesProgress: '暂不跟进' })]
+  const nowReasons = dashboardReasonRows(reasonPeople, [], [], filters, 'paused')
+  assert.deepEqual(new Set(nowReasons.map(r => r.id)), new Set(['预算原因', '__unknown__']))
+  assert.equal(nowReasons.reduce((sum, r) => sum + r.users.length, 0), 2)
+  const priorReasons = dashboardReasonRows(reasonPeople, [], [], { ...filters, mode: 'period', start: '2026-09-01', end: '2026-09-02' }, 'paused')
+  assert.equal(priorReasons.length, 2, 'period preserves multiple explicit reasons')
+  assert(priorReasons.every(r => r.users.length === 1), 'repeated events deduplicate within a reason')
+  assert.equal(dashboardReasonRows(reasonPeople, [], [], { ...filters, owner: 'cc-b' }, 'paused').length, 0)
+  assert.equal(dashboardReasonRows(reasonPeople, [], [], { ...filters, mode: 'period', start: '2026-09-03' }, 'paused').length, 0)
+  const freeText = { ...paused, salesLifecycleEvents: [pauseEvent('其他：客户自行填写', '2026-09-02 02:00:00')] }
+  assert.equal(dashboardReasonRows([freeText], [], [], filters, 'paused')[0].id, '其他')
+  const unknownReason = { ...paused, salesLifecycleEvents: [pauseEvent('', '2026-09-02 02:00:00')] }
+  assert.equal(dashboardReasonRows([unknownReason], [], [], filters, 'paused')[0].id, '__unknown__')
+  const demoReasons = dashboardReasonRows(demo.students, demo.callRecords, demo.lessons, filters, 'noShow')
+  assert.equal(demoReasons.reduce((sum, row) => sum + row.users.length, 0), 12)
+  assert(demoReasons.every(row => row.id !== '__unknown__'))
+  const crmNoShow = user('crm-no-show', { salesAppointments: [{ appointmentStatus: '已预约', attendanceStatus: 'No Show', consultationStatus: '待标记' }], salesLifecycleEvents: [{ node: 'attendance', result: '未出勤', reason: '无法联系', reportedAt: '2026-09-02 01:00:00' }] })
+  assert.equal(dashboardReasonRows([crmNoShow], [], [], filters, 'noShow')[0].id, '无法联系', 'Sales Center follow-up form uses 未出勤')
+  assert.equal(dashboardReasonRows([crmNoShow], [], [], { ...filters, mode: 'period' }, 'noShow')[0].users.length, 1)
+  const oldDemo = { ...demo, students: demo.students.map(s => ({ ...s, salesLifecycleEvents: s.salesLifecycleEvents?.map(e => ({ ...e, reason: undefined })) })) }
+  const enriched = withManagementDemo(oldDemo)
+  assert.equal(enriched.students.length, oldDemo.students.length)
+  assert(enriched.students.flatMap(s => s.salesLifecycleEvents || []).some(e => e.reason))
+  assert.equal(withManagementDemo(enriched), enriched)
+  console.log('Dashboard checks passed: UTC+7 boundaries, deduplication, permissions, shared stages, dimensional totals, reason history, demo migration and recorded activity.')
 } finally { rmSync(tmp, { recursive: true, force: true }) }

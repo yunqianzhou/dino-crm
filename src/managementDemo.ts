@@ -5,6 +5,14 @@ import { CONSULTATION_STAGES } from './salesLifecycle'
 
 dayjs.extend(utc)
 const DATASET = 'management-vietnam-v1'
+const REASON_DATASET = 'management-vietnam-reasons-v1'
+const demoReasons: Record<string, string[]> = {
+  'No Show': ['客户未到会', '无法联系', '会议技术问题'],
+  '咨询未完成': ['中途离开', '时间不足', '会议异常'],
+  '暂不跟进': ['暂无需求', '暂不方便', '预算原因'],
+  '已关闭': ['明确拒绝', '号码无效', '要求不联系'],
+}
+
 
 type DemoState = {
   students: Student[]
@@ -67,7 +75,7 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
     }
     const event = (node: SalesLifecycleEvent['node'], result: string, time: dayjs.Dayjs, appointmentId?: string) => {
       student.salesLifecycleEvents!.push({ eventId: `management-demo-event-${sequence}-${student.salesLifecycleEvents!.length}`,
-        node, result, description: '演示 / Demo', appointmentId,
+        node, result, reason: demoReasons[result]?.[i % 3], description: '演示 / Demo', appointmentId,
         occurredAt: fmt(time), reportedAt: fmt(time), reportedBy: owner.email, source: 'CC手动' })
     }
     if (stage !== '待外呼') {
@@ -125,18 +133,30 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
 
 /** One-time additive migration: preserve existing users, edits, deletes and dates. */
 export function withManagementDemo<T extends DemoState>(state: T, now?: string): T {
-  if (state.demoDatasets?.includes(DATASET)) return state
+  if (state.demoDatasets?.includes(DATASET)) return withReasonDemo(state)
   const demo = createManagementDemo(now)
   const append = <R,>(existing: R[], additions: R[], id: (row: R) => string) => {
     const ids = new Set(existing.map(id))
     return [...existing, ...additions.filter(row => !ids.has(id(row)))]
   }
-  return { ...state,
+  return withReasonDemo({ ...state,
     students: append(state.students, demo.students, s => s.studentId),
     accounts: append(state.accounts, demo.accounts, a => a.email),
     callRecords: append(state.callRecords, demo.callRecords, c => c.id),
     orders: append(state.orders, demo.orders, o => o.orderId),
     lessons: append(state.lessons, demo.lessons, l => l.id),
     demoDatasets: [...(state.demoDatasets ?? []), DATASET],
-  }
+  })
+}
+
+/** Enrich only original synthetic events. Existing reasons and customer records are untouched. */
+function withReasonDemo<T extends DemoState>(state: T): T {
+  if (state.demoDatasets?.includes(REASON_DATASET)) return state
+  return { ...state, students: state.students.map(s => {
+    if (!/^990000000000000\d{4}$/.test(s.studentId)) return s
+    const index = Number(s.studentId.slice(-4)) - 1
+    return { ...s, salesLifecycleEvents: s.salesLifecycleEvents?.map(e =>
+      e.eventId.startsWith('management-demo-event-') && !e.reason && demoReasons[e.result]
+        ? { ...e, reason: demoReasons[e.result][index % 3] } : e) }
+  }), demoDatasets: [...(state.demoDatasets || []), REASON_DATASET] }
 }
