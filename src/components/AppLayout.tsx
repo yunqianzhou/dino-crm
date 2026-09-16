@@ -74,6 +74,7 @@ export default function AppLayout() {
   const phase2Label = (text: string) => phaseLabel(text, t('app.phase2'), 'orange')
   const phase3Label = (text: string) => phaseLabel(text, t('app.phase3'), 'purple')
   const phase4Label = (text: string) => phaseLabel(text, '四期', 'cyan')
+  const phase5Label = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'green')
 
   const visible = (key: string) => can(NAV_MODULE[key]) !== 'none'
 
@@ -121,7 +122,6 @@ export default function AppLayout() {
   ].filter((n) => visible(n.key))
 
   const NAV = [
-    { key: '/management-dashboard', icon: <DashboardOutlined />, label: lang === 'en' ? 'Management Dashboard' : '管理看板' },
     ...topNav,
     ...salesNav,
     ...systemNav,
@@ -139,6 +139,7 @@ export default function AppLayout() {
           },
         ]
       : []),
+    { key: '/management-dashboard', icon: <DashboardOutlined />, label: phase5Label(lang === 'en' ? 'Management Dashboard' : '管理看板') },
   ]
 
   const TITLES: Record<string, string> = {
