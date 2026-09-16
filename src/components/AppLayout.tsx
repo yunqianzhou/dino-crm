@@ -32,6 +32,7 @@ const { Text } = Typography
 const NAV_MODULE: Record<string, ModuleKey> = {
   '/channels': 'channels',
   '/landing': 'landing',
+  '/management-dashboard': 'salesV3',
   '/users': 'users',
   '/sales': 'sales',
   '/sales-v3': 'salesV3',
@@ -85,7 +86,7 @@ export default function AppLayout() {
   ].filter((n) => visible(n.key))
 
   const ordersV3Nav = [
-    { key: '/orders-v3', icon: <ProfileOutlined />, label: phase3Label('订单中心') },
+    { key: '/orders-v3', icon: <ProfileOutlined />, label: phase3Label(t('app.nav.orders')) },
   ].filter((n) => visible(n.key))
 
   // 旧营销中心：仅作为备份留存
@@ -139,7 +140,7 @@ export default function AppLayout() {
           },
         ]
       : []),
-    { key: '/management-dashboard', icon: <DashboardOutlined />, label: phase5Label(lang === 'en' ? 'Management Dashboard' : '管理看板') },
+    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: phase5Label(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
   ]
 
   const TITLES: Record<string, string> = {
@@ -156,7 +157,7 @@ export default function AppLayout() {
     '/marketing-backup': lang === 'en' ? 'Marketing Center Backup' : '营销中心备份',
     '/users-v2': t('app.nav.usersV2'),
     '/orders': t('app.nav.orders'),
-    '/orders-v3': '订单中心',
+    '/orders-v3': t('app.nav.orders'),
     '/packages': t('app.nav.packages'),
     '/coupons': t('app.nav.coupons'),
     '/system': t('app.nav.system'),

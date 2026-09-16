@@ -29,7 +29,8 @@ import { genCallId, setState, uid, updateSalesSettings, useStore } from '../stor
 import type { Account, CallRecord, CallResult, SalesFollowLog, SalesLifecycleNode, SalesSettings, Student, UserType, UserStatus } from '../types'
 import { CALL_RESULTS } from '../types'
 import { useI18n } from '../i18n'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
 import { usePerm } from '../perm'
 import { isClaimedLead, isPoolLead, isSalesLead } from '../funnel'
 import { resolveUserType } from '../userType'
@@ -79,8 +80,12 @@ const PROGRESS_COLOR: Record<string, string> = {
 function isPaidStudent(student: Student) { return student.status === '付费' || student.paymentStatusStr === '已付费' }
 
 export default function SalesCenter({ importAction, detailPath, phase3 = false }: { importAction?: ReactNode; detailPath?: string; phase3?: boolean }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const text = (zh: string, en: string) => lang === 'zh' ? zh : en
   const navigate = useNavigate()
+  const [dashboardQuery] = useSearchParams()
+  const targetStudentId = phase3 ? dashboardQuery.get('studentId') || '' : ''
+  const dashboardContext = useDashboardContext()
   const students = useStore((s) => s.students)
   const channels = useStore((s) => s.channels)
   const lessons = useStore((s) => s.lessons ?? [])
@@ -101,13 +106,16 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const isLeader = canManageSettings
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
 
+  useEffect(() => { if (targetStudentId) setLineSel([]) }, [targetStudentId])
+
   // 可被分配的销售：启用状态、非系统管理员、且角色具备销售模块「操作」权限
   const salesAccounts = useMemo(
     () => accounts.filter((a) => a.status === '启用' && a.roleId !== 'role_admin' && roles.find((r) => r.id === a.roleId)?.perms.sales === 'operate' && a.businessLines.some(matchLine)),
     [accounts, roles, matchLine, lineSel],
   )
 
-  const [tab, setTab] = useState('follow')
+  const [tab, setTab] = useState(dashboardQuery.get('tab') === 'pool' ? 'pool' : 'follow')
+  useEffect(() => { if (targetStudentId) setTab(dashboardQuery.get('tab') === 'pool' ? 'pool' : 'follow') }, [targetStudentId, dashboardQuery])
   const [keyword, setKeyword] = useState('')
   const [purchaseIntentionFilter, setPurchaseIntentionFilter] = useState<string[]>([])
   const [ownerFilter, setOwnerFilter] = useState<string | undefined>()
@@ -227,6 +235,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   }, [sourceLpOptions, sourceAppOptions, ageGroupOptions, courseLevelOptions, sourceLpFilter, sourceAppFilter])
 
   const matchesLeadFilters = (s: Student) => {
+    if (targetStudentId && s.studentId !== targetStudentId) return false
     const kw = keyword.trim().toLowerCase()
     const owner = s.salesOwner || '__unassigned__'
     const sourceLpMatches = !sourceLpFilter || lpChannelSourceText(channels, s) === sourceLpFilter
@@ -259,20 +268,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   const poolData = useMemo(
     () => poolAll.filter(matchesLeadFilters),
-    [poolAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter, channels],
+    [poolAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter, channels],
   )
 
   const followData = useMemo(
     () => followAll.filter(matchesLeadFilters).filter((s) => consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))),
-    [followAll, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
+    [followAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
   const callScoped = useMemo(() => {
-    let list = callRecords.filter((c) => matchLine(c.businessLine))
+    let list = callRecords.filter((c) => matchLine(c.businessLine) && (!targetStudentId || c.studentId === targetStudentId))
     if (!seeAllOwners) list = list.filter((c) => c.agent === actor)
     return list
-  }, [callRecords, lineSel, matchLine, seeAllOwners, actor])
+  }, [callRecords, targetStudentId, lineSel, matchLine, seeAllOwners, actor])
 
   const matchesCallDate = (call: CallRecord) => {
     return matchesLocalDateRange(call.time, callDateRange, call.businessLine)
@@ -684,7 +693,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       width: 190,
       fixed: 'left',
       render: (id: string) =>
-        detailPath ? <Button type="link" style={{ padding: 0 }} onClick={() => navigate(detailPath + '/' + id)}>{id}</Button> : id,
+        detailPath ? <Button type="link" style={{ padding: 0 }} onClick={() => navigate(detailPath + '/' + id, { state: dashboardContext.state })}>{id}</Button> : id,
     },
     { title: t('user.col.name'), dataIndex: 'localName', width: 140, render: (_, r) => r.localName || r.name },
     {
@@ -746,10 +755,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     },
     { title: t('user.col.country'), dataIndex: 'country', width: 110, render: (_, r) => <Tag>{lineLabel(r)}</Tag> },
     {
-      title: '预约外呼', key: 'landingCallback', width: 240,
+      title: text('预约外呼', 'Callback'), key: 'landingCallback', width: 240,
       render: (_: unknown, r: Student) => validCallback(r.landingCallbackAt)
-        ? <Space direction="vertical" size={2}><Tag color="blue">已填写</Tag><LocalTime time={r.landingCallbackAt} country={r.country || r.businessLine} /></Space>
-        : <Text type="secondary">未填写</Text>,
+        ? <Space direction="vertical" size={2}><Tag color="blue">{text('已填写', 'Provided')}</Tag><LocalTime time={r.landingCallbackAt} country={r.country || r.businessLine} /></Space>
+        : <Text type="secondary">{text('未填写', 'Not provided')}</Text>,
     },
     {
       title: t('user.col.regTime'),
@@ -769,7 +778,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       },
     },
     ...(isLeader ? [{
-      title: '外呼情况',
+      title: text('外呼情况', 'Call activity'),
       key: 'callCount',
       width: 120,
       render: (_: unknown, row: Student) => {
@@ -826,26 +835,26 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
               <Space size={8}>
                 {canDial && (
                   <Button type="link" icon={<PhoneOutlined />} disabled={!r.phone} onClick={() => setDialing(r)}>
-                    外呼
+                    {t('sales.dial')}
                   </Button>
                 )}
                 <Dropdown
                   trigger={['click']}
                   menu={{
                     items: [
-                      ...(canEdit ? [{ key: 'follow', icon: <EditOutlined />, label: '更新跟进', onClick: () => openFollow(r) }] : []),
-                      ...(canReassign ? [{ key: 'reassign', icon: <SwapOutlined />, label: '重新分配线索', onClick: () => openReassign(r) }] : []),
+                      ...(canEdit ? [{ key: 'follow', icon: <EditOutlined />, label: t('sales.update'), onClick: () => openFollow(r) }] : []),
+                      ...(canReassign ? [{ key: 'reassign', icon: <SwapOutlined />, label: t('sales.reassign.title'), onClick: () => openReassign(r) }] : []),
                       ...(canViewReport && latestTrialReport(lessons, r.studentId)
-                        ? [{ key: 'trialReport', label: '试听报告', onClick: () => window.open(TRIAL_REPORT_URL, '_blank', 'noopener,noreferrer') }]
+                        ? [{ key: 'trialReport', label: t('lesson.col.report'), onClick: () => window.open(TRIAL_REPORT_URL, '_blank', 'noopener,noreferrer') }]
                         : []),
                       ...(canEdit ? [
-                        { key: 'drop', danger: true, icon: <RollbackOutlined />, label: '退回公海', onClick: () => openDrop(r) },
-                        { key: 'trialLevel', label: '修改试听课等级', onClick: () => openTrialLevel(r) },
+                        { key: 'drop', danger: true, icon: <RollbackOutlined />, label: t('sales.dropToPool'), onClick: () => openDrop(r) },
+                        { key: 'trialLevel', label: text('修改试听课等级', 'Change trial level'), onClick: () => openTrialLevel(r) },
                       ] : []),
                     ],
                   }}
                 >
-                  <Button>更多 <DownOutlined /></Button>
+                  <Button>{text('更多', 'More')} <DownOutlined /></Button>
                 </Dropdown>
               </Space>
             ) : (
@@ -988,7 +997,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         className="sales-filter-search"
         allowClear
         prefix={<SearchOutlined />}
-        placeholder={tab === 'calls' ? (phase3 ? '搜索用户ID / 姓名 / 登录账号' : t('sales.searchCalls')) : t('sales.searchFollow')}
+        placeholder={tab === 'calls' ? (phase3 ? text('搜索用户ID / 姓名 / 登录账号', 'User ID / Name / Login account') : t('sales.searchCalls')) : t('sales.searchFollow')}
         value={keyword}
         onChange={(e) => setKeyword(e.target.value)}
       />}
@@ -1004,20 +1013,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       ) : <>
         {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />}
         {tab === 'follow' && showVietnamStageFilter && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
-        <Select className="sales-filter-control" allowClear placeholder="预约外呼" value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: '已填写预约外呼', value: 'filled' }, { label: '待外呼（已到时间）', value: 'due' }, { label: '即将外呼（24小时内）', value: 'upcoming' }]} />
-        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="购买意向" value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value) => ({ label: value, value }))} />
-        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="课程等级" value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
-        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="用户类型" value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: value, value }))} />
-        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder="年龄段" value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
+        <Select className="sales-filter-control" allowClear placeholder={text('预约外呼', 'Callback')} value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: text('已填写预约外呼', 'Callback provided'), value: 'filled' }, { label: text('待外呼（已到时间）', 'Callback due'), value: 'due' }, { label: text('即将外呼（24小时内）', 'Callback within 24 hours'), value: 'upcoming' }]} />
+        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={text('购买意向', 'Purchase intent')} value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value, i) => ({ label: t(['sales.purchaseIntention.yes', 'sales.purchaseIntention.no', 'sales.purchaseIntention.none'][i]), value }))} />
+        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.courseLevel')} value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
+        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.userType')} value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: t(`enum.userType.${value}`), value }))} />
+        <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.ageGroup')} value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
         <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.channelSourceLp')} value={sourceLpFilter} onChange={setSourceLpFilter} options={sourceLpOptions.map((value) => ({ label: value, value }))} />
         <Cascader className="sales-filter-control" allowClear changeOnSelect placeholder={t('user.col.channelSourceApp')} value={sourceAppFilter} onChange={(value) => setSourceAppFilter(value as string[] | undefined)} options={sourceAppOptions} />
-        <DatePicker.RangePicker className="sales-filter-date" value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={['注册开始日期', '注册结束日期']} />
-        <DatePicker.RangePicker className="sales-filter-date" value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={['最后跟进开始日期', '最后跟进结束日期']} />
+        <DatePicker.RangePicker className="sales-filter-date" value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={[text('注册开始日期', 'Registered from'), text('注册结束日期', 'Registered to')]} />
+        <DatePicker.RangePicker className="sales-filter-date" value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={[text('最后跟进开始日期', 'Follow-up from'), text('最后跟进结束日期', 'Follow-up to')]} />
       </>}
       <div className="sales-filter-actions">
-        {tab !== 'calls' && tab !== 'summary' && <Button type="link" onClick={resetLeadFilters}>重置筛选</Button>}
-        {(tab === 'calls' || tab === 'summary') && <Button type="link" onClick={() => { setKeyword(''); setCallResultFilter(undefined); setCallAgentFilter(undefined); setCallDateRange(null); setLineSel(allowedLines() || []) }}>重置筛选</Button>}
-        <Button icon={<DownloadOutlined />} onClick={downloadData}>下载数据</Button>
+        {tab !== 'calls' && tab !== 'summary' && <Button type="link" onClick={resetLeadFilters}>{text('重置筛选', 'Reset filters')}</Button>}
+        {(tab === 'calls' || tab === 'summary') && <Button type="link" onClick={() => { setKeyword(''); setCallResultFilter(undefined); setCallAgentFilter(undefined); setCallDateRange(null); setLineSel(allowedLines() || []) }}>{text('重置筛选', 'Reset filters')}</Button>}
+        <Button icon={<DownloadOutlined />} onClick={downloadData}>{text('下载数据', 'Export')}</Button>
         {tab !== 'calls' && tab !== 'summary' && importAction}
       </div>
     </div>
@@ -1036,6 +1045,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         )
       }
     >
+      {phase3 && <DashboardLinkContext filter />}
       <Alert
         type="info"
         showIcon

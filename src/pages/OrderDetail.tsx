@@ -1,3 +1,6 @@
+import { useI18n } from '../i18n'
+import { useDashboardText } from '../dashboardText'
+import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
 import { useMemo } from 'react'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
@@ -17,13 +20,6 @@ const STATUS_COLOR: Record<OrderStatus, string> = {
   已退款: 'red',
   已取消: 'default',
 }
-const STATUS_LABEL: Record<OrderStatus, string> = {
-  已退款: '已退费',
-  已取消: '已取消',
-  已支付: '已支付',
-  待支付: '待支付',
-}
-
 const USER_STATUS_COLOR: Record<UserStatus, string> = {
   '未付费-未体验': 'default',
   '未付费-体验中': 'gold',
@@ -43,6 +39,9 @@ function money(amount: number, currency: string) {
 
 export default function OrderDetail({ backPath = '/orders' }: { backPath?: string }) {
   const navigate = useNavigate()
+  const { t } = useI18n()
+  const d = useDashboardText()
+  const dashboardContext = useDashboardContext()
   const { orderId = '' } = useParams()
   const orders = useStore((s) => s.orders)
   const students = useStore((s) => s.students)
@@ -51,12 +50,12 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const order = useMemo(() => orders.find((item) => item.orderId === orderId), [orders, orderId])
   const student = useMemo(() => students.find((item) => item.studentId === order?.studentId), [students, order?.studentId])
   const inScope = order && (!scope || (student && scope.includes(student.businessLine)))
-  const back = <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(backPath)}>返回订单中心</Button>
+  const back = <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.ordersReturn || backPath, { state: dashboardContext.state })}>{d('backOrders')}</Button>
 
   if (!order || !inScope) {
     return (
-      <Card className="page-card" bordered={false} title={<span className="section-title">订单详情</span>} extra={back}>
-        <Text type="secondary">未找到该订单，或你没有访问权限。</Text>
+      <Card className="page-card" bordered={false} title={<span className="section-title">{d('orderDetail')}</span>} extra={back}>
+        <Text type="secondary">{d('noOrder')}</Text>
       </Card>
     )
   }
@@ -66,34 +65,35 @@ export default function OrderDetail({ backPath = '/orders' }: { backPath?: strin
   const userType = student ? resolveUserType(student) : undefined
   const transactions = [...(order.transactions ?? [])].sort((a, b) => b.time.localeCompare(a.time))
   const columns: ColumnsType<OrderTransaction> = [
-    { title: '子订单号', dataIndex: 'id', width: 190, render: (id) => <Text code>{id}</Text> },
-    { title: '发生时间', dataIndex: 'time', width: 190, render: (time) => <LocalTime time={time} country={country} /> },
-    { title: '订单状态', dataIndex: 'status', width: 120, render: (status: OrderStatus) => <Tag color={STATUS_COLOR[status]}>{STATUS_LABEL[status]}</Tag> },
-    { title: '金额', dataIndex: 'amount', width: 150, align: 'right', render: (amount) => <Text type={amount < 0 ? 'danger' : undefined}>{money(amount, order.currency)}</Text> },
-    { title: '支付方式', dataIndex: 'paymentMethod', width: 130, render: (method) => method || <Text type="secondary">—</Text> },
+    { title: d('subOrder'), dataIndex: 'id', width: 190, render: (id) => <Text code>{id}</Text> },
+    { title: d('recordTime'), dataIndex: 'time', width: 190, render: (time) => <LocalTime time={time} country={country} /> },
+    { title: t('order.col.orderStatus'), dataIndex: 'status', width: 120, render: (status: OrderStatus) => <Tag color={STATUS_COLOR[status]}>{t(`enum.order.${status}`)}</Tag> },
+    { title: d('amount'), dataIndex: 'amount', width: 150, align: 'right', render: (amount) => <Text type={amount < 0 ? 'danger' : undefined}>{money(amount, order.currency)}</Text> },
+    { title: t('order.col.payMethod'), dataIndex: 'paymentMethod', width: 130, render: (method) => method || <Text type="secondary">—</Text> },
   ]
 
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
-      <Card className="page-card" bordered={false} title={<span className="section-title">订单详情</span>} extra={back}>
+      <DashboardLinkContext />
+      <Card className="page-card" bordered={false} title={<span className="section-title">{d('orderDetail')}</span>} extra={back}>
         <Descriptions column={2} bordered size="small">
-          <Descriptions.Item label="订单 ID"><Text code>{order.orderId}</Text></Descriptions.Item>
-          <Descriptions.Item label="商品名称">{order.productName}</Descriptions.Item>
-          <Descriptions.Item label="用户 ID"><Text code>{order.studentId}</Text></Descriptions.Item>
-          <Descriptions.Item label="优惠码">{couponCode ? <Tag color="blue">{couponCode}</Tag> : '—'}</Descriptions.Item>
-          <Descriptions.Item label="用户类型">{userType ? <Tag color={USER_TYPE_COLOR[userType]}>{userType}</Tag> : '—'}</Descriptions.Item>
-          <Descriptions.Item label="国家">{country ? <Tag>{country}</Tag> : '—'}</Descriptions.Item>
-          <Descriptions.Item label="用户状态"><Tag color={USER_STATUS_COLOR[order.userStatus]}>{order.userStatus}</Tag></Descriptions.Item>
-          <Descriptions.Item label="订单状态"><Tag color={STATUS_COLOR[order.orderStatus]}>{STATUS_LABEL[order.orderStatus]}</Tag></Descriptions.Item>
-          <Descriptions.Item label="原价">{money(order.originalPrice, order.currency)}</Descriptions.Item>
-          <Descriptions.Item label="实际付款金额">{money(order.paidAmount, order.currency)}</Descriptions.Item>
-          <Descriptions.Item label="支付方式">{order.payMethod}</Descriptions.Item>
-          <Descriptions.Item label="成功支付时间"><LocalTime time={order.paidTime} country={country} /></Descriptions.Item>
-          <Descriptions.Item label="有效期到期时间"><LocalTime time={order.validUntil} country={country} /></Descriptions.Item>
+          <Descriptions.Item label={t('order.col.id')}><Text code>{order.orderId}</Text></Descriptions.Item>
+          <Descriptions.Item label={t('order.col.product')}>{order.productName}</Descriptions.Item>
+          <Descriptions.Item label={t('user.col.id')}><Text code>{order.studentId}</Text></Descriptions.Item>
+          <Descriptions.Item label={t('user.col.couponCode')}>{couponCode ? <Tag color="blue">{couponCode}</Tag> : '—'}</Descriptions.Item>
+          <Descriptions.Item label={t('user.col.userType')}>{userType ? <Tag color={USER_TYPE_COLOR[userType]}>{t(`enum.userType.${userType}`)}</Tag> : '—'}</Descriptions.Item>
+          <Descriptions.Item label={t('user.col.country')}>{country ? <Tag>{country}</Tag> : '—'}</Descriptions.Item>
+          <Descriptions.Item label={t('user.col.status')}><Tag color={USER_STATUS_COLOR[order.userStatus]}>{t(`enum.status.${order.userStatus}`)}</Tag></Descriptions.Item>
+          <Descriptions.Item label={t('order.col.orderStatus')}><Tag color={STATUS_COLOR[order.orderStatus]}>{t(`enum.order.${order.orderStatus}`)}</Tag></Descriptions.Item>
+          <Descriptions.Item label={t('order.col.original')}>{money(order.originalPrice, order.currency)}</Descriptions.Item>
+          <Descriptions.Item label={t('order.col.paid')}>{money(order.paidAmount, order.currency)}</Descriptions.Item>
+          <Descriptions.Item label={t('order.col.payMethod')}>{order.payMethod}</Descriptions.Item>
+          <Descriptions.Item label={t('order.col.paidTime')}><LocalTime time={order.paidTime} country={country} /></Descriptions.Item>
+          <Descriptions.Item label={t('order.col.validUntil')}><LocalTime time={order.validUntil} country={country} /></Descriptions.Item>
         </Descriptions>
       </Card>
 
-      <Card className="page-card" bordered={false} title={<span className="section-title">订单流水</span>}>
+      <Card className="page-card" bordered={false} title={<span className="section-title">{d('orderTransactions')}</span>}>
         <Table rowKey="id" columns={columns} dataSource={transactions} scroll={{ x: 900 }} pagination={false} />
       </Card>
     </Space>

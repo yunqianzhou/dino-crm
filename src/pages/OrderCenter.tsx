@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button, Card, Input, Select, Space, Table, Tag, Typography, message } from 'antd'
 import { DownloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -10,7 +10,9 @@ import { resolveUserType } from '../userType'
 import { useLineScope } from '../useLineScope'
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
+import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
+import { useDashboardText } from '../dashboardText'
 import { usePerm } from '../perm'
 import { downloadCsv } from '../export'
 
@@ -54,6 +56,11 @@ function fmtMoney(amount: number, currency: string) {
 export default function OrderCenter({ detailsPath, exportPermission = 'orders_export' }: { detailsPath?: string; exportPermission?: 'orders_export' | 'ordersV3_export' }) {
   const { t } = useI18n()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [query] = useSearchParams()
+  const targetStudentId = query.get('studentId') || ''
+  const dashboardContext = useDashboardContext()
+  const d = useDashboardText()
   const { can } = usePerm()
   const canExport = can(exportPermission) === 'operate'
   const orders = useStore((s) => s.orders)
@@ -65,6 +72,8 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const [countryFilter, setCountryFilter] = useState<string | undefined>()
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
+
+  useEffect(() => { if (targetStudentId) setLineSel([]) }, [targetStudentId])
 
   const lineOptions = useMemo(
     () => Array.from(new Set([...channels.map((c) => c.name), ...students.map((s) => s.businessLine)].filter(Boolean))),
@@ -99,6 +108,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const data = useMemo(
     () =>
       orders.filter((o) => {
+        if (targetStudentId && o.studentId !== targetStudentId) return false
         if (!matchLine(lineOf(o.studentId))) return false
         const kw = keyword.trim().toLowerCase()
         const matchKw =
@@ -115,7 +125,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           (!typeFilter || typeOf(o.studentId) === typeFilter)
         )
       }).sort((a, b) => ORDER_STATUS_PRIORITY[a.orderStatus] - ORDER_STATUS_PRIORITY[b.orderStatus]),
-    [orders, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
+    [orders, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
   )
 
   const exportOrders = () => {
@@ -137,7 +147,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       dataIndex: 'orderId',
       width: 180,
       fixed: 'left',
-      render: (id: string) => detailsPath ? <a onClick={() => navigate(`${detailsPath}/${id}`)}>{id}</a> : <Text code>{id}</Text>,
+      render: (id: string) => detailsPath ? <a onClick={() => navigate(`${detailsPath}/${id}`, { state: { ...dashboardContext.state, ordersReturn: location.pathname + location.search } })}>{id}</a> : <Text code>{id}</Text>,
     },
     { title: t('order.col.product'), dataIndex: 'productName', width: 180 },
     { title: t('order.col.studentId'), dataIndex: 'studentId', width: 190 },
@@ -216,6 +226,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
 
   return (
     <Card className="page-card" bordered={false} title={<span className="section-title">{t('order.title')}</span>}>
+      <DashboardLinkContext filter />
       <Space wrap style={{ marginBottom: 16 }}>
         <Input
           allowClear
@@ -258,13 +269,14 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           onChange={setPayMethod}
           options={['App Store', 'Google Play', 'Airwallex - Card', 'Airwallex - Kakaopay'].map((l) => ({ label: l, value: l }))}
         />
-        {canExport && <Button icon={<DownloadOutlined />} onClick={exportOrders}>导出列表</Button>}
+        {canExport && <Button icon={<DownloadOutlined />} onClick={exportOrders}>{d('export')}</Button>}
       </Space>
 
       <Table
         rowKey="orderId"
         columns={columns}
         dataSource={data}
+        locale={targetStudentId ? { emptyText: d('noOrders') } : undefined}
         scroll={{ x: 1880 }}
         pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
       />

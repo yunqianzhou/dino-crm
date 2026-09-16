@@ -29,6 +29,8 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Check dashboard metrics
+        run: pnpm run test:dashboard
       - name: Build site
         run: pnpm run build
       - name: Configure Pages

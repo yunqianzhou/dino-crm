@@ -1,3 +1,4 @@
+import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
 import { useMemo } from 'react'
 import dayjs from 'dayjs'
 import { Button, Card, Descriptions, Space, Table, Tag, Typography } from 'antd'
@@ -26,7 +27,9 @@ const STATUS_COLOR: Record<UserStatus, string> = {
 const USER_TYPE_COLOR: Record<UserType, string> = { 正式用户: 'green', 测试用户: 'gold' }
 
 export default function UserDetail({ backPath = '/users-v2', backText, variant = 'user' }: { backPath?: string; backText?: string; variant?: 'user' | 'sales' }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const text = (zh: string, en: string) => lang === 'zh' ? zh : en
+  const dashboardContext = useDashboardContext()
   const navigate = useNavigate()
   const { studentId = '' } = useParams()
   const students = useStore((s) => s.students)
@@ -63,8 +66,8 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
   )
 
   const back = (
-    <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(backPath)}>
-      {backText ?? t('user.back')}
+    <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(dashboardContext.dashboardReturn || backPath)}>
+      {dashboardContext.dashboardReturn ? text('返回管理看板', 'Back to dashboard') : variant === 'sales' ? text('返回销售中心', 'Back to Sales Center') : backText ?? t('user.back')}
     </Button>
   )
 
@@ -77,17 +80,17 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
   }
 
   const courseColumns: ColumnsType<LessonRecord> = [
-    { title: '课标', dataIndex: 'courseLabel', width: 190, render: (v) => <Text code>{v}</Text> },
+    { title: text('课标', 'Course label'), dataIndex: 'courseLabel', width: 190, render: (v) => <Text code>{v}</Text> },
     {
-      title: '课程状态',
+      title: text('课程状态', 'Lesson status'),
       dataIndex: 'status',
       width: 110,
-      render: (v: LessonRecord['status']) => <Tag color={v === '已完课' ? 'green' : 'processing'}>{v === '已完课' ? '已完成' : '进行中'}</Tag>,
+      render: (v: LessonRecord['status']) => <Tag color={v === '已完课' ? 'green' : 'processing'}>{v === '已完课' ? text('已完成', 'Completed') : text('进行中', 'In progress')}</Tag>,
     },
-    { title: '课程名称', dataIndex: 'courseName', width: 180, render: (v: string | undefined, r) => v || `Dino English${r.lessonType}` },
+    { title: text('课程名称', 'Course name'), dataIndex: 'courseName', width: 180, render: (v: string | undefined, r) => v || `Dino English${r.lessonType}` },
     { title: t('lesson.col.teacher'), dataIndex: 'teacher', width: 130, render: (v) => v || <Text type="secondary">—</Text> },
     {
-      title: '上课时间',
+      title: text('上课时间', 'Lesson time'),
       key: 'startedAt',
       width: 200,
       render: (_: unknown, r: LessonRecord) => <LocalTime time={r.startedAt ?? r.completedAt} country={student.country || student.businessLine} />,
@@ -132,6 +135,7 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
 
   return (
     <Space direction="vertical" size={16} style={{ display: 'flex' }}>
+      <DashboardLinkContext />
       <Card
         className="page-card"
         bordered={false}
@@ -139,9 +143,9 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
         extra={back}
       >
         <Descriptions column={2} bordered size="small">
-          <Descriptions.Item label="用户ID">{student.studentId}</Descriptions.Item>
-          <Descriptions.Item label="学生姓名">{student.localName || student.name}</Descriptions.Item>
-          {variant === 'sales' && <Descriptions.Item label="购买意向">{student.purchaseIntention || <Text type="secondary">—</Text>}</Descriptions.Item>}
+          <Descriptions.Item label={text('用户ID', 'User ID')}>{student.studentId}</Descriptions.Item>
+          <Descriptions.Item label={text('学生姓名', 'Student name')}>{student.localName || student.name}</Descriptions.Item>
+          {variant === 'sales' && <Descriptions.Item label={text('购买意向', 'Purchase intent')}>{student.purchaseIntention || <Text type="secondary">—</Text>}</Descriptions.Item>}
           {vietnamFollowStage && <Descriptions.Item label={t('sales.consultation.currentStage')}><Tag color={CONSULTATION_STAGE_COLOR[vietnamFollowStage]}>{t(`sales.consultation.stage.${vietnamFollowStage}`)}</Tag></Descriptions.Item>}
           <Descriptions.Item label={t('user.col.status')}>
             {(() => {
@@ -151,7 +155,7 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
           </Descriptions.Item>
           <Descriptions.Item label={t('user.col.userType')}><Tag color={USER_TYPE_COLOR[resolveUserType(student)]}>{t(`enum.userType.${resolveUserType(student)}`)}</Tag></Descriptions.Item>
           <Descriptions.Item label={t('user.col.ageGroup')}>{student.ageGroup ? <Tag color="geekblue">{student.ageGroup}</Tag> : <Text type="secondary">—</Text>}</Descriptions.Item>
-          <Descriptions.Item label="课程等级">{student.courseLevel || <Text type="secondary">—</Text>}</Descriptions.Item>
+          <Descriptions.Item label={text('课程等级', 'Course level')}>{student.courseLevel || <Text type="secondary">—</Text>}</Descriptions.Item>
           {variant === 'user' && <Descriptions.Item label={t('user.col.method')}>{t(`enum.method.${student.loginMethod as LoginMethod}`)}</Descriptions.Item>}
           <Descriptions.Item label={t('user.col.account')}>{student.account || <Text type="secondary">—</Text>}</Descriptions.Item>
           <Descriptions.Item label={t('user.col.channelSourceLp')}>{lpChannelSourceText(channels, student) === '—' ? <Text type="secondary">—</Text> : lpChannelSourceText(channels, student)}</Descriptions.Item>
@@ -161,18 +165,18 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
           <Descriptions.Item label={t('user.col.regTime')}><LocalTime time={student.registerTime} country={student.country || student.businessLine} /></Descriptions.Item>
           {variant === 'user' ? <>
             <Descriptions.Item label={t('user.col.expireTime')}><LocalTime time={student.expireTime} country={student.country || student.businessLine} /></Descriptions.Item>
-            <Descriptions.Item label="优惠码">{student.couponCode ? <Tag color="blue">{student.couponCode}</Tag> : <Text type="secondary">—</Text>}</Descriptions.Item>
+            <Descriptions.Item label={text('优惠码', 'Coupon code')}>{student.couponCode ? <Tag color="blue">{student.couponCode}</Tag> : <Text type="secondary">—</Text>}</Descriptions.Item>
           </> : <>
-            <Descriptions.Item label="最新备注">{student.salesLatestNote || <Text type="secondary">—</Text>}</Descriptions.Item>
-            <Descriptions.Item label="最后更新"><LocalTime time={student.salesUpdatedAt} country={student.country || student.businessLine} /></Descriptions.Item>
-            <Descriptions.Item label="领取人">{student.salesOwner || <Text type="secondary">—</Text>}</Descriptions.Item>
+            <Descriptions.Item label={text('最新备注', 'Latest note')}>{student.salesLatestNote || <Text type="secondary">—</Text>}</Descriptions.Item>
+            <Descriptions.Item label={text('最后更新', 'Last updated')}><LocalTime time={student.salesUpdatedAt} country={student.country || student.businessLine} /></Descriptions.Item>
+            <Descriptions.Item label={text('领取人', 'Owner')}>{student.salesOwner || <Text type="secondary">—</Text>}</Descriptions.Item>
           </>}
           <Descriptions.Item label="CC">{student.ccName || <Text type="secondary">—</Text>}</Descriptions.Item>
-          <Descriptions.Item label="是否预约外呼">{student.landingCallbackAt && dayjs.utc(student.landingCallbackAt).isValid() ? <Tag color="blue">已填写</Tag> : <Text type="secondary">未填写</Text>}</Descriptions.Item>
-          <Descriptions.Item label="预约外呼时间"><LocalTime time={student.landingCallbackAt} country={student.country || student.businessLine} /></Descriptions.Item>
-          <Descriptions.Item label="英语学习程度">{student.landingEnglishLevel || <Text type="secondary">—</Text>}</Descriptions.Item>
-          <Descriptions.Item label="学习目的">{student.landingLearningGoal || <Text type="secondary">—</Text>}</Descriptions.Item>
-          {student.businessLine === '马来' && <Descriptions.Item label="孩子当前学习方式">{student.landingCurrentLearningMethod || <Text type="secondary">—</Text>}</Descriptions.Item>}
+          <Descriptions.Item label={text('是否预约外呼', 'Callback requested')}>{student.landingCallbackAt && dayjs.utc(student.landingCallbackAt).isValid() ? <Tag color="blue">{text('已填写', 'Provided')}</Tag> : <Text type="secondary">{text('未填写', 'Not provided')}</Text>}</Descriptions.Item>
+          <Descriptions.Item label={text('预约外呼时间', 'Callback time')}><LocalTime time={student.landingCallbackAt} country={student.country || student.businessLine} /></Descriptions.Item>
+          <Descriptions.Item label={text('英语学习程度', 'English level')}>{student.landingEnglishLevel || <Text type="secondary">—</Text>}</Descriptions.Item>
+          <Descriptions.Item label={text('学习目的', 'Learning goal')}>{student.landingLearningGoal || <Text type="secondary">—</Text>}</Descriptions.Item>
+          {student.businessLine === '马来' && <Descriptions.Item label={text('孩子当前学习方式', 'Current learning method')}>{student.landingCurrentLearningMethod || <Text type="secondary">—</Text>}</Descriptions.Item>}
         </Descriptions>
       </Card>
 

@@ -3,6 +3,7 @@ import { useSession } from './auth'
 import { usePerm } from './perm'
 import type { ModuleKey } from './types'
 import Login from './pages/Login'
+import ManagementDashboard from './pages/ManagementDashboard'
 import AppLayout from './components/AppLayout'
 import ChannelManagement from './pages/ChannelManagement'
 import UserCenter from './pages/UserCenter'
@@ -77,7 +78,7 @@ export default function App() {
           }
         >
           <Route index element={<HomeRedirect />} />
-          <Route path="management-dashboard" element={null} />
+          <Route path="management-dashboard" element={<Guard module="salesV3"><ManagementDashboard /></Guard>} />
           <Route path="channels" element={<Guard module="channels"><ChannelManagement /></Guard>} />
           <Route path="landing" element={<Guard module="landing"><LandingPageManagement /></Guard>} />
           <Route path="users" element={<Guard module="users"><UserCenterP1 /></Guard>} />
