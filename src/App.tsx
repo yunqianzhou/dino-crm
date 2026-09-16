@@ -77,6 +77,7 @@ export default function App() {
           }
         >
           <Route index element={<HomeRedirect />} />
+          <Route path="management-dashboard" element={null} />
           <Route path="channels" element={<Guard module="channels"><ChannelManagement /></Guard>} />
           <Route path="landing" element={<Guard module="landing"><LandingPageManagement /></Guard>} />
           <Route path="users" element={<Guard module="users"><UserCenterP1 /></Guard>} />

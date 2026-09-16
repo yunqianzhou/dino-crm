@@ -16,6 +16,7 @@ import {
   ShopOutlined,
   SolutionOutlined,
   HistoryOutlined,
+  DashboardOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { logout, useSession } from '../auth'
@@ -120,6 +121,7 @@ export default function AppLayout() {
   ].filter((n) => visible(n.key))
 
   const NAV = [
+    { key: '/management-dashboard', icon: <DashboardOutlined />, label: lang === 'en' ? 'Management Dashboard' : '管理看板' },
     ...topNav,
     ...salesNav,
     ...systemNav,
@@ -140,6 +142,7 @@ export default function AppLayout() {
   ]
 
   const TITLES: Record<string, string> = {
+    '/management-dashboard': lang === 'en' ? 'Management Dashboard' : '管理看板',
     '/channels': t('app.nav.channels'),
     '/landing': t('app.nav.landing'),
     '/users': t('app.nav.users'),
