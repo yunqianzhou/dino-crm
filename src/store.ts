@@ -20,6 +20,7 @@ import type {
   SalesSettings,
 } from './types'
 import { LINE_CURRENCY } from './types'
+import { withManagementDemo } from './managementDemo'
 
 // 原型权限和导航发生结构性更新时，升级版本以避免浏览器继续使用旧的演示权限数据。
 const KEY = 'dinoai_crm_state_v70'
@@ -36,6 +37,7 @@ export type AppState = {
   logs: AuditLog[]
   callRecords: CallRecord[]
   lessons: LessonRecord[]
+  demoDatasets?: string[]
   salesSettings?: Record<string, SalesSettings>
 }
 
@@ -216,12 +218,14 @@ function load(): AppState {
       const withCallbackDemo = normalized.students.some((student) => student.studentId === callbackDemo.studentId)
         ? normalized
         : { ...normalized, students: [callbackDemo, ...normalized.students] }
-      return autoAllocate(withCallbackDemo)
+      const migrated = autoAllocate(withManagementDemo(withCallbackDemo))
+      localStorage.setItem(KEY, JSON.stringify(migrated))
+      return migrated
     }
   } catch {
     /* ignore */
   }
-  const finalSeeded = autoAllocate(normalizePaymentMethods(seeded))
+  const finalSeeded = autoAllocate(withManagementDemo(normalizePaymentMethods(seeded)))
   localStorage.setItem(KEY, JSON.stringify(finalSeeded))
   return finalSeeded
 }
@@ -251,7 +255,7 @@ function save(s: AppState) {
 }
 
 export function resetState() {
-  state = seed()
+  state = withManagementDemo(seed())
   emit()
 }
 

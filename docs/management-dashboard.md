@@ -23,3 +23,9 @@ Route: `#/management-dashboard`. Uses the existing prototype store. No productio
 ## Verification
 
 `npm run test:dashboard` checks UTC+7 boundaries, distinct users, scope/owner permissions, paid/test exclusions, current-stage totals and explicit activity dates. `npm run build` checks types and builds the site. Both run before GitHub Pages deployment.
+
+## Demo dataset
+
+Existing browser sessions receive a one-time additive dataset on reload: 204 Vietnam users, six CCs, 180 current sales leads (156 assigned / 24 unassigned), 24 paid users, 54 orders covering all four order statuses, and related calls, bookings, lifecycle records and lessons. The nine current stages all have examples.
+
+The dataset uses reserved `.invalid` accounts and deliberately invalid phone numbers. These fictional AppID users are marked as formal users to exercise the default dashboard filter. They are prototype fixtures, not real customers. Registration and event times span the three weeks before first load; their dates and user edits are then retained. Existing data is preserved; a migration marker prevents duplicates and stops deleted fixtures from being re-added.
