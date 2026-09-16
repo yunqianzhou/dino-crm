@@ -7,7 +7,7 @@ import { useStore } from '../store'
 import { usePerm } from '../perm'
 import { useI18n } from '../i18n'
 import { useDashboardText, type DashboardWord } from '../dashboardText'
-import { dashboardMetrics, dashboardPopulation, PERIOD_METRICS, type DashboardFilters } from '../dashboardData'
+import { dashboardMetrics, dashboardPopulation, dashboardDateRows, PERIOD_METRICS, type DashboardFilters } from '../dashboardData'
 import { consultationStage, CONSULTATION_STAGES, CONSULTATION_STAGE_COLOR } from '../salesLifecycle'
 import { isSalesLead } from '../funnel'
 import type { Student } from '../types'
@@ -27,7 +27,7 @@ export default function ManagementDashboard() {
  const navigate = useNavigate()
  const date = (key: string) => { const v = query.get(key) || ''; return /^\d{4}-\d{2}-\d{2}$/.test(v) && dayjs(v).isValid() ? v : '' }
  const filters: DashboardFilters = { mode: query.get('mode') === 'period' ? 'period' : 'current', start: date('start'), end: date('end'), owner: query.get('cc') || '', userType: query.has('type') ? query.get('type') || '' : '正式用户' }
- const change = (values: Record<string, string>) => { const next = new URLSearchParams(query); Object.entries(values).forEach(([k, v]) => next.set(k, v)); next.delete('detail'); next.delete('detailCC'); setQuery(next) }
+ const change = (values: Record<string, string>) => { const next = new URLSearchParams(query); Object.entries(values).forEach(([k, v]) => next.set(k, v)); next.delete('detail'); next.delete('detailCC'); next.delete('detailDate'); setQuery(next) }
  const scope = allowedLines()
  const population = dashboardPopulation(students, scope, scope === null || can('salesV3_reassign') === 'operate', actor)
  const metrics = dashboardMetrics(population, calls, lessons, filters)
@@ -36,14 +36,19 @@ export default function ManagementDashboard() {
  const title = (metric: string) => (CONSULTATION_STAGES as readonly string[]).includes(metric) ? t(`sales.consultation.stage.${metric}`) : d(metric as DashboardWord)
  const keys = filters.mode === 'current' ? ['total', ...CONSULTATION_STAGES] : [...PERIOD_METRICS]
  const ccRows = ownerIds.filter(id => !filters.owner || filters.owner === id).map(id => ({ id, name: ownerName(id), metrics: Object.fromEntries(Object.entries(metrics).map(([key, rows]) => [key, rows.filter(s => (s.salesOwner || '__unassigned__') === id)])) })).filter(row => Object.values(row.metrics).some(rows => rows.length))
- const open = (metric: string, cc?: string) => { const next = new URLSearchParams(query); next.set('detail', metric); if (cc) next.set('detailCC', cc); else next.delete('detailCC'); setQuery(next) }
+ const grouping = query.get('group') === 'date' ? 'date' : 'cc'
+ const dateRows = dashboardDateRows(population, calls, lessons, filters)
+ const breakdownRows = grouping === 'date' ? dateRows : ccRows
+ const open = (metric: string, cc?: string, day?: string) => { const next = new URLSearchParams(query); next.set('detail', metric); if (cc) next.set('detailCC', cc); else next.delete('detailCC'); if (day) next.set('detailDate', day); else next.delete('detailDate'); setQuery(next) }
  const rawDetail = query.get('detail') || ''
  const detail = [...keys, 'assigned', 'unassigned'].includes(rawDetail) ? rawDetail : ''
  const detailCC = query.get('detailCC') || ''
- const detailRows = (metrics[detail] || []).filter(s => !detailCC || (s.salesOwner || '__unassigned__') === detailCC)
- const close = () => { const next = new URLSearchParams(query); next.delete('detail'); next.delete('detailCC'); setQuery(next) }
+ const detailDate = date('detailDate')
+ const detailMetrics = detailDate ? dateRows.find(row => row.id === detailDate)?.metrics || {} : metrics
+ const detailRows = (detailMetrics[detail] || []).filter(s => !detailCC || (s.salesOwner || '__unassigned__') === detailCC)
+ const close = () => { const next = new URLSearchParams(query); next.delete('detail'); next.delete('detailCC'); next.delete('detailDate'); setQuery(next) }
  const go = (path: string) => navigate(path, { state: { dashboardReturn: location.pathname + location.search } })
- const count = (key: string, cc?: string, n = (metrics[key] || []).length) => <button className="dashboard-count" onClick={() => open(key, cc)} aria-label={`${title(key)} · ${cc ? ownerName(cc) + ' · ' : ''}${n}`}>{n.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}</button>
+ const count = (key: string, cc?: string, n = (metrics[key] || []).length, day?: string) => <button className="dashboard-count" onClick={() => open(key, cc, day)} aria-label={`${title(key)} · ${cc ? ownerName(cc) + ' · ' : ''}${day ? day + ' · ' : ''}${n}`}>{n.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}</button>
  const columns: ColumnsType<Student> = [
    { title: t('user.col.id'), dataIndex: 'studentId', width: 200, render: (id, s) => can('usersV2') !== 'none' ? <Button type="link" style={{ padding: 0 }} onClick={() => go(`/users-v2/${encodeURIComponent(s.studentId)}`)}>{id}</Button> : id },
    { title: t('user.col.name'), dataIndex: 'name', width: 130 },
@@ -70,13 +75,20 @@ export default function ManagementDashboard() {
    </div>
    {filters.mode === 'current' && <Card title={d('stageTitle')}><p className="dashboard-help">{d('stageHelp')}</p><div className="dashboard-stages">{CONSULTATION_STAGES.map(stage => <div key={stage}><span>{title(stage)}</span>{count(stage)}</div>)}</div></Card>}
    {filters.mode === 'period' && <Alert type="info" message={d('periodNote')} />}
-   <Card title={d('ccTitle')}><p className="dashboard-help">{d('ccHelp')}</p><Table rowKey="id" size="middle" dataSource={ccRows} scroll={{ x: filters.mode === 'current' ? 1500 : 1050 }} pagination={false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
-    { title: d('currentCC'), dataIndex: 'name', key: 'cc', fixed: 'left', width: 170 },
-    ...keys.map(key => ({ title: title(key), key, width: 135, render: (_: unknown, row: typeof ccRows[number]) => count(key, row.id, (row.metrics[key] || []).length) })),
-   ]} /></Card>
+   <Card title={d('breakdown')}>
+    <Segmented style={{ marginBottom: 16 }} value={grouping} onChange={v => change({ group: String(v) })} options={[{ value: 'cc', label: d('ccTitle') }, { value: 'date', label: d('dateTitle') }]} />
+    <p className="dashboard-help">{d(grouping === 'cc' ? 'ccHelp' : filters.mode === 'current' ? 'dateCurrentHelp' : 'datePeriodHelp')}</p>
+    <Table rowKey="id" size="middle" dataSource={breakdownRows} scroll={{ x: filters.mode === 'current' ? 1500 : 1050 }} pagination={grouping === 'date' ? { pageSize: 10, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
+     { title: d(grouping === 'cc' ? 'currentCC' : filters.mode === 'current' ? 'registerDates' : 'recordDates'), dataIndex: 'name', key: 'group', fixed: 'left', width: 170 },
+     ...keys.map(key => ({ title: title(key), key, width: 135, render: (_: unknown, row: typeof breakdownRows[number]) => count(key, grouping === 'cc' ? row.id : undefined, (row.metrics[key] || []).length, grouping === 'date' ? row.id : undefined) })),
+    ]} summary={() => breakdownRows.length ? <Table.Summary.Row>
+      <Table.Summary.Cell index={0}><strong>{d(filters.mode === 'current' ? 'currentTotal' : 'periodTotal')}</strong></Table.Summary.Cell>
+      {keys.map((key, i) => <Table.Summary.Cell index={i + 1} key={key}>{count(key)}</Table.Summary.Cell>)}
+    </Table.Summary.Row> : null} />
+   </Card>
    <p className="dashboard-footnote">{d('unavailable')}</p>
-   <Modal open={!!detail && (keys.includes(detail) || ['assigned', 'unassigned'].includes(detail))} onCancel={close} footer={<Button onClick={close}>{t('common.close')}</Button>} width={1180} title={`${d('users')} · ${detail ? title(detail) : ''}${detailCC ? ' · ' + ownerName(detailCC) : ''}`}>
-    <p className="dashboard-help">{detailRows.length} {d('count')} · {d('currentCC')} · UTC+7</p>
+   <Modal open={!!detail && (keys.includes(detail) || ['assigned', 'unassigned'].includes(detail))} onCancel={close} footer={<Button onClick={close}>{t('common.close')}</Button>} width={1180} title={`${d('users')} · ${detail ? title(detail) : ''}${detailCC ? ' · ' + ownerName(detailCC) : ''}${detailDate ? ' · ' + detailDate : ''}`}>
+    <p className="dashboard-help">{detailRows.length} {d('count')} · {detailDate ? `${d(filters.mode === 'current' ? 'registerDates' : 'recordDates')}: ${detailDate}` : d('currentCC')} · UTC+7</p>
     <Table rowKey="studentId" columns={columns} dataSource={detailRows} scroll={{ x: 1100 }} pagination={{ pageSize: 10, showSizeChanger: false, showTotal: n => t('common.total', { n }) }} locale={{ emptyText: d('noRows') }} />
    </Modal>
  </div>

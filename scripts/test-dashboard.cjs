@@ -7,7 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/managementDemo.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
-  const { dashboardMetrics, dashboardPopulation, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
+  const { dashboardMetrics, dashboardPopulation, dashboardDateRows, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
   const user = (id, extra = {}) => ({ studentId: id, name: id, phone: '+840000000', account: id, businessLine: '越南', status: '未付费-未体验', userType: '正式用户', registerTime: '2026-09-01 00:00:00', ...extra })
   const a = user('a', { salesOwner: 'a@example.com' })
   const b = user('b', { salesOwner: 'b@example.com', salesProgress: '暂不跟进' })
@@ -71,5 +71,24 @@ try {
   assert.equal(withManagementDemo(migrated, '2026-10-16T08:00:00Z'), migrated, 'reload must not replace dates or edits')
   const afterDelete = { ...migrated, students: migrated.students.slice(1) }
   assert.equal(withManagementDemo(afterDelete), afterDelete, 'reload must not restore deliberate deletions')
+  const dateUsers = [user('daily', { registerTime: '2026-08-31 17:00:00', salesOwner: 'cc-a' }), user('excluded', { salesOwner: 'cc-b' })]
+  const dailyCalls = [
+    { studentId: 'daily', result: '已接通', time: '2026-09-01 16:59:59' },
+    { studentId: 'daily', result: '已接通', time: '2026-09-01 16:50:00' },
+    { studentId: 'daily', result: '已接通', time: '2026-09-01 17:00:00' },
+    { studentId: 'excluded', result: '已接通', time: '2026-09-01 17:00:00' },
+  ]
+  const dateFilters = { ...filters, mode: 'period', start: '2026-09-01', end: '2026-09-02', owner: 'cc-a' }
+  const daily = dashboardDateRows(dateUsers, dailyCalls, [], dateFilters)
+  assert.deepEqual(daily.map(row => row.id), ['2026-09-02', '2026-09-01'])
+  assert.deepEqual(daily.map(row => row.metrics.connected.map(s => s.studentId)), [['daily'], ['daily']])
+  assert.equal(daily.reduce((sum, row) => sum + row.metrics.connected.length, 0), 2)
+  assert.equal(dashboardMetrics(dateUsers, dailyCalls, [], dateFilters).connected.length, 1, 'period total must deduplicate across days')
+  const currentDaily = dashboardDateRows(dateUsers, dailyCalls, [], { ...dateFilters, mode: 'current' })
+  assert.deepEqual(currentDaily.map(row => row.id), ['2026-09-01'], 'current stage groups by registration date')
+  assert.equal(currentDaily[0].metrics['已接通待预约'].length, 1)
+  assert.equal(dashboardDateRows(dateUsers, dailyCalls, [], { ...dateFilters, start: '2026-09-03' }).length, 0)
+  const demoDays = dashboardDateRows(demo.students, demo.callRecords, demo.lessons, filters)
+  assert.equal(demoDays.reduce((sum, row) => sum + row.metrics.total.length, 0), 180)
   console.log('Dashboard checks passed: UTC+7 boundaries, deduplication, permissions, shared stages, filters and recorded activity.')
 } finally { rmSync(tmp, { recursive: true, force: true }) }

@@ -29,3 +29,7 @@ Route: `#/management-dashboard`. Uses the existing prototype store. No productio
 Existing browser sessions receive a one-time additive dataset on reload: 204 Vietnam users, six CCs, 180 current sales leads (156 assigned / 24 unassigned), 24 paid users, 54 orders covering all four order statuses, and related calls, bookings, lifecycle records and lessons. The nine current stages all have examples.
 
 The dataset uses reserved `.invalid` accounts and deliberately invalid phone numbers. These fictional AppID users are marked as formal users to exercise the default dashboard filter. They are prototype fixtures, not real customers. Registration and event times span the three weeks before first load; their dates and user edits are then retained. Existing data is preserved; a migration marker prevents duplicates and stops deleted fixtures from being re-added.
+
+## Date breakdown
+
+The two modes are labeled 当前阶段分布 / Current stage distribution and 销售活动统计 / Sales activity. Each supports By CC and By date. Current-stage date rows group by registration date and show the current stage, not a historical snapshot. Activity rows group by the time used for each metric, in UTC+7, and deduplicate within each day. Only dates with data appear. The summary shows distinct users across the full selected period, not the sum of daily rows. Selecting a daily count opens those exact users and preserves that date when returning from a Phase 3 page.

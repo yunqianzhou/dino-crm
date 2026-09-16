@@ -40,3 +40,22 @@ export function dashboardMetrics(population: Student[], calls: CallRecord[], les
   }
   return metrics
 }
+
+/** Daily rows use the same metric definitions and filters as the headline counts. */
+export function dashboardDateRows(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters) {
+  const rows = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+    (!filters.userType || resolveUserType(s) === filters.userType))
+  const ids = new Set(rows.map(s => s.studentId))
+  const times = rows.map(s => s.registerTime)
+  if (filters.mode === 'period') {
+    calls.filter(c => ids.has(c.studentId)).forEach(c => times.push(c.time))
+    rows.forEach(s => {
+      s.salesAppointments?.forEach(a => times.push(a.createdAt))
+      s.salesLifecycleEvents?.forEach(e => times.push(e.reportedAt))
+    })
+  }
+  const dates = [...new Set(times.filter(time => inVietnamRange(time, filters.start, filters.end))
+    .map(time => dayjs.utc(time).utcOffset(7 * 60).format('YYYY-MM-DD')))].sort().reverse()
+  return dates.map(date => ({ id: date, name: date, metrics: dashboardMetrics(rows, calls, lessons, { ...filters, start: date, end: date }) }))
+    .filter(row => Object.values(row.metrics).some(users => users.length > 0))
+}
