@@ -23,6 +23,7 @@ export default function ManagementDashboard() {
  const students = useStore(s => s.students)
  const calls = useStore(s => s.callRecords ?? [])
  const lessons = useStore(s => s.lessons ?? [])
+ const orders = useStore(s => s.orders)
  const accounts = useStore(s => s.accounts)
  const [query, setQuery] = useSearchParams()
  const location = useLocation()
@@ -33,16 +34,16 @@ export default function ManagementDashboard() {
  const change = (values: Record<string, string>) => { const next = new URLSearchParams(query); Object.entries(values).forEach(([k, v]) => next.set(k, v)); clearDetail(next); setQuery(next) }
  const scope = allowedLines()
  const population = dashboardPopulation(students, scope, scope === null || can('salesV3_reassign') === 'operate', actor)
- const metrics = dashboardMetrics(population, calls, lessons, filters)
+ const metrics = dashboardMetrics(population, calls, lessons, filters, orders)
  const ownerName = (id: string) => id === '__unassigned__' ? d('unassigned') : accounts.find(a => a.email === id)?.name || id
  const ownerIds = [...new Set(population.map(s => s.salesOwner || '__unassigned__'))].sort()
  const title = (metric: string) => (CONSULTATION_STAGES as readonly string[]).includes(metric) ? t(`sales.consultation.stage.${metric}`) : d(metric as DashboardWord)
- const keys = filters.mode === 'current' ? ['total', ...CONSULTATION_STAGES] : [...PERIOD_METRICS]
+ const keys = filters.mode === 'current' ? ['total', ...CONSULTATION_STAGES, 'paid'] : [...PERIOD_METRICS]
  const groupValues: DashboardGrouping[] = ['cc', 'date', 'intent', 'age', 'registrationAge']
  const grouping = (groupValues.includes(query.get('group') as DashboardGrouping) ? query.get('group') : 'cc') as DashboardGrouping
  const groupLabels = { cc: d('ccTitle'), date: d('dateTitle'), intent: d('groupIntent'), age: d('groupAge'), registrationAge: d('groupRegistrationAge') }
  const groupName = (group: DashboardGrouping, id: string): string => group === 'cc' ? ownerName(id) : id === '__unknown__' ? d('unknown') : group === 'intent' ? t(`sales.purchaseIntention.${id === '有意向' ? 'yes' : id === '无意向' ? 'no' : 'none'}`) : group === 'registrationAge' ? `${id} ${d('days')}` : id
- const dateRows = dashboardDateRows(population, calls, lessons, filters)
+ const dateRows = dashboardDateRows(population, calls, lessons, filters, orders)
  const breakdownRows = (grouping === 'date' ? dateRows : dashboardGroupRows(metrics, grouping)).map(row => ({ ...row, name: groupName(grouping, row.id) }))
  const reasonKind = (REASON_KINDS.includes(query.get('reasonKind') as ReasonKind) ? query.get('reasonKind') : 'noShow') as ReasonKind
  const reasonRows = dashboardReasonRows(population, calls, lessons, filters, reasonKind)
@@ -87,13 +88,13 @@ export default function ManagementDashboard() {
      {(filters.owner || filters.start || filters.end) && <Button type="text" onClick={reset}>{d('resetFilters')}</Button>}
    </Space><p className="dashboard-help">{d(filters.mode === 'current' ? 'currentHelp' : 'periodHelp')}</p></Card>
    <div className={`dashboard-kpis ${filters.mode === 'period' ? 'dashboard-period' : ''}`}>
-     {(filters.mode === 'current' ? ['total', 'assigned', 'unassigned'] : [...PERIOD_METRICS]).map(key => <Card key={key}><div className="dashboard-kpi-label">{title(key)}</div>{count(key)}<ArrowRightOutlined /></Card>)}
+     {(filters.mode === 'current' ? ['total', 'assigned', 'unassigned', 'paid'] : [...PERIOD_METRICS]).map(key => <Card key={key} className={key === 'paid' ? 'dashboard-paid' : undefined}><div className="dashboard-kpi-label">{title(key)}</div>{count(key)}{key === 'paid' && <p className="dashboard-paid-hint">{d(filters.mode === 'current' ? 'paidCurrent' : 'paidPeriod')}</p>}<ArrowRightOutlined /></Card>)}
    </div>
    {filters.mode === 'current' && <Card title={d('stageTitle')}><p className="dashboard-help">{d('stageHelp')}</p><div className="dashboard-stages">{CONSULTATION_STAGES.map(stage => <div key={stage}><div className="dashboard-stage-line"><span>{title(stage)}</span>{count(stage)}</div><Progress percent={metrics.total?.length ? Math.round((metrics[stage]?.length || 0) / metrics.total.length * 1000) / 10 : 0} size="small" strokeColor="#5086ee" format={p => `${p}%`} /><span className="dashboard-stage-share">{d('stageShare')}</span></div>)}</div></Card>}
    <Card title={d('breakdown')}>
     <Segmented style={{ marginBottom: 16 }} value={grouping} onChange={v => change({ group: String(v) })} className="dashboard-grouping" options={groupValues.map(value => ({ value, label: groupLabels[value] }))} />
     <p className="dashboard-help">{d(grouping === 'cc' ? 'ccHelp' : grouping === 'date' ? filters.mode === 'current' ? 'dateCurrentHelp' : 'datePeriodHelp' : grouping === 'registrationAge' ? 'registrationAgeHelp' : 'groupHelp')}</p>
-    <Table rowKey="id" size="middle" dataSource={breakdownRows} scroll={{ x: filters.mode === 'current' ? 1500 : 1050 }} pagination={grouping === 'date' ? { pageSize: 10, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
+    <Table rowKey="id" size="middle" dataSource={breakdownRows} scroll={{ x: filters.mode === 'current' ? 1650 : 1200 }} pagination={grouping === 'date' ? { pageSize: 10, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
      { title: grouping === 'cc' ? d('currentCC') : grouping === 'date' ? d(filters.mode === 'current' ? 'registerDates' : 'recordDates') : d(grouping), dataIndex: 'name', key: 'group', fixed: 'left', width: 170 },
      ...keys.map(key => ({ title: title(key), key, width: 135, render: (_: unknown, row: typeof breakdownRows[number]) => count(key, (row.metrics[key] || []).length, grouping, row.id) })),
     ]} summary={() => breakdownRows.length ? <Table.Summary.Row>
@@ -112,7 +113,7 @@ export default function ManagementDashboard() {
    </Card>
    <p className="dashboard-footnote">{d('demo')} <Button type="link" size="small" onClick={() => setRulesOpen(true)}>{d('rules')}</Button></p>
    <Modal open={rulesOpen} onCancel={() => setRulesOpen(false)} footer={<Button onClick={() => setRulesOpen(false)}>{t('common.close')}</Button>} title={d('rules')}>
-     {[d('formalOnly'), d('currentHelp'), d('periodHelp'), d('periodNote'), d('registrationAgeHelp'), d('intentNote'), d('limits')].map(text => <p key={text}>{text}</p>)}
+     {[d('formalOnly'), d('paidRule'), d('currentHelp'), d('periodHelp'), d('periodNote'), d('registrationAgeHelp'), d('intentNote'), d('limits')].map(text => <p key={text}>{text}</p>)}
    </Modal>
    <Modal open={!!detail || !!detailReason} onCancel={close} footer={<Button onClick={close}>{t('common.close')}</Button>} width={1280} title={`${d('users')} · ${detailLabel}`}>
     <p className="dashboard-help">{detailRows.length} {d('count')} · {d('currentCC')} · UTC+7</p>

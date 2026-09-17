@@ -1,13 +1,18 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
-import type { CallRecord, LessonRecord, Student } from './types'
+import type { CallRecord, LessonRecord, Order, Student } from './types'
 import { isSalesLead } from './funnel'
 import { consultationStage } from './salesLifecycle'
 import { resolveUserType } from './userType'
 dayjs.extend(utc)
 
 export type DashboardFilters = { mode: 'current' | 'period'; start: string; end: string; owner: string; userType: string }
-export const PERIOD_METRICS = ['registered', 'called', 'connected', 'booked', 'attended', 'completed'] as const
+export const PERIOD_METRICS = ['registered', 'called', 'connected', 'booked', 'attended', 'completed', 'paid'] as const
+/** A paid profile flag is not payment evidence; count only valid, positive paid orders. */
+export function isDashboardPaidOrder(order: Order) {
+  return order.orderStatus === '已支付' && Number.isFinite(order.paidAmount) && order.paidAmount > 0 &&
+    !!order.paidTime && dayjs.utc(order.paidTime).isValid()
+}
 export function inVietnamRange(time: string | undefined, start: string, end: string) {
   if (!time || !dayjs.utc(time).isValid()) return false
   const date = dayjs.utc(time).utcOffset(7 * 60).format('YYYY-MM-DD')
@@ -17,7 +22,7 @@ export function dashboardPopulation(students: Student[], scope: string[] | null,
   return [...new Map(students.filter(s => s.businessLine === '越南' && (!scope || scope.includes(s.businessLine)) &&
     (seeAll || !s.salesOwner || s.salesOwner === actor)).map(s => [s.studentId, s])).values()]
 }
-export function dashboardMetrics(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters) {
+export function dashboardMetrics(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters, orders: Order[] = []) {
   const range = (time?: string) => inVietnamRange(time, filters.start, filters.end)
   const rows = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType))
@@ -38,17 +43,21 @@ export function dashboardMetrics(population: Student[], calls: CallRecord[], les
       ((e.node === 'attendance' && e.result === '已出勤') || (e.node === 'consultation' && ['咨询完成', '咨询未完成'].includes(e.result)))))
     metrics.completed = rows.filter(s => (s.salesLifecycleEvents ?? []).some(e => e.node === 'consultation' && e.result === '咨询完成' && range(e.reportedAt)))
   }
+  const paidIds = new Set(orders.filter(o => isDashboardPaidOrder(o) &&
+    (filters.mode === 'current' || range(o.paidTime))).map(o => o.studentId))
+  metrics.paid = rows.filter(s => paidIds.has(s.studentId) && (filters.mode === 'period' || range(s.registerTime)))
   return metrics
 }
 
 /** Daily rows use the same metric definitions and filters as the headline counts. */
-export function dashboardDateRows(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters) {
+export function dashboardDateRows(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters, orders: Order[] = []) {
   const rows = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType))
   const ids = new Set(rows.map(s => s.studentId))
   const times = rows.map(s => s.registerTime)
   if (filters.mode === 'period') {
     calls.filter(c => ids.has(c.studentId)).forEach(c => times.push(c.time))
+    orders.filter(o => ids.has(o.studentId) && isDashboardPaidOrder(o)).forEach(o => times.push(o.paidTime!))
     rows.forEach(s => {
       s.salesAppointments?.forEach(a => times.push(a.createdAt))
       s.salesLifecycleEvents?.forEach(e => times.push(e.reportedAt))
@@ -56,7 +65,7 @@ export function dashboardDateRows(population: Student[], calls: CallRecord[], le
   }
   const dates = [...new Set(times.filter(time => inVietnamRange(time, filters.start, filters.end))
     .map(time => dayjs.utc(time).utcOffset(7 * 60).format('YYYY-MM-DD')))].sort().reverse()
-  return dates.map(date => ({ id: date, name: date, metrics: dashboardMetrics(rows, calls, lessons, { ...filters, start: date, end: date }) }))
+  return dates.map(date => ({ id: date, name: date, metrics: dashboardMetrics(rows, calls, lessons, { ...filters, start: date, end: date }, orders) }))
     .filter(row => Object.values(row.metrics).some(users => users.length > 0))
 }
 

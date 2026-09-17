@@ -134,5 +134,29 @@ try {
   assert.equal(enriched.students.length, oldDemo.students.length)
   assert(enriched.students.flatMap(s => s.salesLifecycleEvents || []).some(e => e.reason))
   assert.equal(withManagementDemo(enriched), enriched)
+  // Payment evidence comes from orders, independent of the profile flag and funnel history.
+  const paidUsers = [user('payer', { salesOwner: 'cc-a' }), user('flag-only', { status: '付费' }), user('test-payer', { userType: '测试用户' })]
+  const paidOrder = (id, studentId, overrides = {}) => ({ orderId: id, studentId, orderStatus: '已支付', paidAmount: 100, paidTime: '2026-09-01T17:00:00Z', ...overrides })
+  const paymentOrders = [paidOrder('one', 'payer'), paidOrder('repeat', 'payer'), paidOrder('test', 'test-payer'),
+    ...['待支付', '已退款', '已取消'].map((orderStatus, i) => paidOrder('excluded-' + i, 'flag-only', { orderStatus })),
+    paidOrder('free', 'flag-only', { paidAmount: 0 }), paidOrder('missing-date', 'flag-only', { paidTime: undefined }),
+    paidOrder('invalid-date', 'flag-only', { paidTime: 'invalid' }), paidOrder('unknown-user', 'absent'),
+  ]
+  const paymentFilter = { ...filters, mode: 'period', start: '2026-09-02', end: '2026-09-02' }
+  assert.deepEqual(dashboardMetrics(paidUsers, [], [], paymentFilter, paymentOrders).paid.map(s => s.studentId), ['payer'])
+  assert.equal(dashboardMetrics(paidUsers, [], [], { ...paymentFilter, start: '2026-09-01', end: '2026-09-01' }, paymentOrders).paid.length, 0, 'payment uses UTC+7 date')
+  assert.equal(dashboardMetrics(paidUsers, [], [], { ...paymentFilter, owner: 'cc-b' }, paymentOrders).paid.length, 0)
+  assert.equal(dashboardMetrics(paidUsers, [], [], { ...paymentFilter, mode: 'current' }, paymentOrders).paid.length, 0, 'current view uses registration date')
+  assert.equal(dashboardMetrics(paidUsers, [], [], { ...filters, start: '2026-09-01', end: '2026-09-01' }, paymentOrders).paid.length, 1)
+  const paymentDays = dashboardDateRows(paidUsers, [], [], paymentFilter, paymentOrders)
+  assert.deepEqual(paymentDays.map(r => [r.id, r.metrics.paid.length]), [['2026-09-02', 1]], 'include payment-only days')
+  const repeatDays = [...paymentOrders, paidOrder('next-day', 'payer', { paidTime: '2026-09-02T17:00:00Z' })]
+  assert.equal(dashboardDateRows(paidUsers, [], [], { ...paymentFilter, end: '2026-09-03' }, repeatDays).reduce((sum, r) => sum + r.metrics.paid.length, 0), 2)
+  assert.equal(dashboardMetrics(paidUsers, [], [], { ...paymentFilter, end: '2026-09-03' }, repeatDays).paid.length, 1)
+  const demoPayments = dashboardMetrics(demo.students, demo.callRecords, demo.lessons, filters, demo.orders)
+  assert.equal(demoPayments.paid.length, 24)
+  assert.equal(demoPayments.total.length, 180, 'paid card does not change current lead denominator')
+  assert.equal(dashboardDateRows(demo.students, demo.callRecords, demo.lessons, filters, demo.orders).reduce((sum, r) => sum + r.metrics.paid.length, 0), 24)
+  for (const group of ['cc', 'age', 'intent', 'registrationAge']) assert.equal(dashboardGroupRows(demoPayments, group).reduce((sum, r) => sum + r.metrics.paid.length, 0), 24)
   console.log('Dashboard checks passed: UTC+7 boundaries, deduplication, permissions, shared stages, dimensional totals, reason history, demo migration and recorded activity.')
 } finally { rmSync(tmp, { recursive: true, force: true }) }

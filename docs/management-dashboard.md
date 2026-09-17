@@ -9,7 +9,7 @@ Route: `#/management-dashboard`. Uses the existing prototype store. No productio
 - Current follow-up: current sales leads, split into assigned/unassigned and the exact shared `consultationStage` stages. The CC table breaks down these same counts by current owner.
 - Period activity: distinct user IDs per metric. Registration uses registration time, calls use call time, bookings use appointment creation time. Attendance/completion use explicit lifecycle record timestamps (`reportedAt`); current status and appointment update timestamps are not treated as historical evidence.
 - All date boundaries use Vietnam UTC+7. Period columns are independent and must not be divided to produce conversion rates.
-- Historical conversion, paid conversion and CC payment ranking remain excluded.
+- Historical conversion rates and paid conversion rates remain excluded. Paid-user counts are supported from successful orders.
 
 ## Navigation
 
@@ -48,8 +48,16 @@ The business Base was read via the existing authorized Lark API (table field met
 | Detailed Lark rejection reasons | Not mapped automatically | Lark has more detailed categories than CRM; unknown free text groups as Other |
 | Appointment confirmation, city, deposits and remaining balance | Deferred | No verified complete equivalent in the audited sales tables |
 | Sources and campaigns | Not shown in this version | User deprioritized source analysis; source mapping is incomplete |
-| Conversion / paid rankings / revenue | Deferred | History completeness and payment reconciliation remain unresolved |
+| Paid users | Supported in the prototype from paid orders | Positive amount and valid payment time; deduplicate by user; live payment reconciliation remains pending |
+| Conversion rates / revenue | Deferred | History completeness and payment reconciliation remain unresolved |
 
 Current-stage reasons use the latest matching explicit record for users still in that stage. Missing reasons remain a separate category. Activity reasons use recorded dates and distinct users within each reason; users can occur in multiple reason rows, so these rows have no additive grand total or share. Every count opens matching users using the same shared data and permissions; Phase 3 return links preserve the selected dimension and details.
 
 The view always excludes test users, even when an old URL contains a type filter. The unnecessary user-type dropdown has been removed. Header shows scope and Demo data; detailed counting notes are available through Counting rules. Reason fixtures are added once only to existing original synthetic events without replacing existing reasons or changing dates, IDs or user edits.
+
+
+## Paid users (2026-09-17)
+
+Paid users are an independent order-based metric in both views and all five breakdowns. Orders must currently be 已支付, have a positive finite paidAmount and a valid paidTime. Pending, cancelled, refunded and zero-value orders are excluded. Multiple qualifying orders for one user count once in the selection. Refunds therefore restate the earlier counts. No profile payment flag, membership expiry or coupon is used as order evidence.
+
+The current view filters these users by registration date, alongside (but outside) the current unpaid sales-lead total and its nine-stage denominator. The activity view filters orders by payment date in Vietnam UTC+7. Daily rows include days with only a payment, and the whole-period summary deduplicates repeat payments across dates. CC attribution remains current ownership. Clicking a count uses the existing user and Order Center Phase 3 detail links. The shared synthetic dataset contains 24 qualifying paid users; this does not imply a production payment integration has been completed.
