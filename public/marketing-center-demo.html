@@ -49,6 +49,7 @@
     .set-promo-box code{color:#174ea6;font-size:14px;font-weight:600}
     #set-modal .set-rule-scroll{max-height:350px}#set-modal .set-rule-scroll th{position:sticky;top:0;z-index:1}
     @media(max-width:600px){.selected-skus{grid-template-columns:1fr}}
+    .channel-picker{position:relative}.channel-picker input{padding-left:31px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 16 16' fill='none'%3E%3Ccircle cx='7' cy='7' r='4.25' stroke='%234e5969' stroke-width='1.5'/%3E%3Cpath d='m10.2 10.2 3 3' stroke='%234e5969' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:10px center;background-size:14px 14px}.channel-options{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:12;max-height:220px;overflow:auto;background:#fff;border:1px solid #d9dfe8;border-radius:6px;box-shadow:0 6px 16px rgba(0,0,0,.12)}.channel-option{display:flex;flex-direction:column;gap:2px;width:100%;padding:9px 11px;border:0;border-bottom:1px solid #f0f0f0;background:#fff;text-align:left}.channel-option:last-child{border-bottom:0}.channel-option:hover,.channel-option.active{background:#f0f7ff}.channel-option small{color:#86909c}.channel-empty{padding:12px;color:#86909c;font-size:13px}
   </style>
 </head>
 <body>
@@ -122,7 +123,7 @@
       <div class="form-section" style="margin-top:22px"><div class="grid">
         <div class="field"><label>1. 业务线 <em>*</em></label><select id="form-line"></select></div>
         <div class="field"><label>2. 渠道类型 <em>*</em></label><select id="form-owner-type"></select></div>
-        <div class="field span2"><label>3. 渠道 <em>*</em></label><input id="form-owner-search" placeholder="搜索渠道名称或渠道码"><select id="form-owner"></select></div>
+        <div class="field span2"><label>3. 渠道 <em>*</em></label><div class="channel-picker"><input id="form-owner-search" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="form-owner-options" placeholder="搜索并选择渠道名称或渠道码"><div class="channel-options" id="form-owner-options" role="listbox" hidden></div><select id="form-owner" hidden></select></div><div class="help">输入关键词后，从匹配结果中选择一个渠道。</div></div>
         <div class="field"><label>4. 页面类型 <em>*</em></label><select id="form-lp-type"><option value="10">线索搜集页</option><option value="104">支付落地页</option></select></div>
         <div class="field"><label>5. 页面样式 <em>*</em></label><select id="form-template-id"></select></div>
         <div class="field span2" id="payment-config-tip" style="display:none"><div class="notice"><b>支付落地页配置：</b>从当前渠道的 SKU 关联中选择一个 SKU；如该 SKU 有折扣或立减，可选择将优惠带入页面。</div></div>
@@ -422,12 +423,19 @@
     function isOfferAvailable(offer){const now=today();return !!offer&&offer.status==='生效中'&&offer.from<=now&&offer.to>=now}
     function syncLinkSelection(){const subject=distributors.find(x=>x.name===$('form-owner').value),isAds=subject?.type==='广告投放',isKol=subject?.type==='KOL';$('form-lp-id-wrap').style.display=isAds?'':'none';$('form-lp-id').value=isAds?(subject.lpId||'—'):'—';$('form-content-wrap').style.display=isKol?'':'none';$('form-template-wrap').style.display=subject?.line==='韩国'?'':'none';if(subject){syncTemplateOptions(subject.line);refreshSetOptions(undefined,subject.line,subject)}else{$('form-set').innerHTML='<option value="">请先选择渠道</option>';}const offer=offers[$('form-set').value];$('form-offer-rules').innerHTML=offer?'<div class="template-box"><b>已选优惠明细</b><div class="help">优惠码：'+esc(offer.code)+'</div><div style="margin-top:8px">'+offer.rules.map(rule=>'<span class="tag blue">'+esc(rule)+'</span>').join(' ')+'</div></div>':'';resetLinkPreview()}
     function isPlanAvailable(plan){return !!distributors.find(x=>x.id===plan.channelId)}
+    function renderChannelPickerOptions(owners,selectedId){
+      const search=$('form-owner-search'),panel=$('form-owner-options'),typing=document.activeElement===search&&!search.dataset.selected;
+      panel.innerHTML=owners.length?owners.map(owner=>'<button type="button" role="option" class="channel-option '+(owner.id===selectedId?'active':'')+'" data-channel-option="'+esc(owner.id)+'"><b>'+esc(owner.name)+'</b><small>'+esc(owner.channelCode)+' · '+esc(owner.type)+' · '+esc(owner.line)+'</small></button>').join(''):'<div class="channel-empty">暂无匹配渠道</div>';
+      panel.hidden=!typing;search.setAttribute('aria-expanded',String(typing));
+      panel.querySelectorAll('[data-channel-option]').forEach(button=>button.onclick=()=>{const owner=owners.find(item=>item.id===button.dataset.channelOption);if(!owner)return;$('form-owner').value=owner.id;search.value=owner.name+'（'+owner.channelCode+'）';search.dataset.selected='1';panel.hidden=true;search.setAttribute('aria-expanded','false');pendingLandingLpId='';refreshLinkPlanOptions();syncLandingPageForm()});
+    }
     function refreshLinkPlanOptions(selected){
       const line=$('form-line').value,type=$('form-owner-type').value,previousOwner=$('form-owner').value,keyword=$('form-owner-search').value.trim().toLowerCase();
       const owners=distributors.filter(x=>x.enabled&&(!line||x.line===line)&&(!type||x.type===type)&&(!keyword||[x.name,x.channelCode].filter(Boolean).join(' ').toLowerCase().includes(keyword)));
       $('form-owner').innerHTML='<option value="">请选择渠道</option>'+owners.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
       const ownerId=owners.some(x=>x.id===previousOwner)?previousOwner:'';
       $('form-owner').value=ownerId;
+      renderChannelPickerOptions(owners,ownerId);
       const items=ownerId?channelSkuPlans.filter(plan=>plan.channelId===ownerId):[];
       $('form-plan').innerHTML='<option value="">暂无可用关联</option>'+items.map(plan=>'<option value="'+plan.id+'">'+esc(plan.id)+'</option>').join('');
       $('form-plan').value=items.some(x=>x.id===selected)?selected:(items[0]?.id||'');
@@ -510,7 +518,7 @@
       $('form-line').innerHTML='<option value="">请选择业务线</option>'+businessLines.map(line=>'<option>'+line+'</option>').join('');
       $('form-line').value=channel.line;refreshLandingFilters();
       $('form-owner-type').value=channel.type;refreshLinkPlanOptions();
-      $('form-owner').value=channel.id;refreshLinkPlanOptions(x.set);
+      $('form-owner').value=channel.id;$('form-owner-search').value=channel.name+'（'+channel.channelCode+'）';$('form-owner-search').dataset.selected='1';refreshLinkPlanOptions(x.set);
       if(isPaymentPage()){
         if([...$('form-sku').options].some(option=>option.value===x.skuId))$('form-sku').value=x.skuId;
         syncPaymentSkuSelection();
@@ -583,9 +591,11 @@
       const finalPrice=usePromo?planFinalPrice(sku,rule.mode,rule.value):price.value;
       $('form-plan-summary').innerHTML='<div class="template-box"><b>最终展示 · '+esc(sku.name)+'</b><div class="help">'+esc(sku.id)+' · '+(usePromo?esc(planRuleLabel(rule,sku)):'未使用优惠，按原价')+'</div><div style="margin-top:6px">应付 <b>'+esc(formatMoney(finalPrice,price.currency))+'</b></div></div>';
     }
-    $('form-line').onchange=()=>{pendingLandingLpId='';refreshLandingFilters();syncLandingPageForm()};
-    $('form-owner-type').onchange=()=>{pendingLandingLpId='';refreshLinkPlanOptions();syncLandingPageForm()};
-    $('form-owner-search').oninput=()=>{pendingLandingLpId='';refreshLinkPlanOptions();syncLandingPageForm()};
+    $('form-line').onchange=()=>{pendingLandingLpId='';$('form-owner-search').value='';$('form-owner-search').dataset.selected='';refreshLandingFilters();syncLandingPageForm()};
+    $('form-owner-type').onchange=()=>{pendingLandingLpId='';$('form-owner-search').value='';$('form-owner-search').dataset.selected='';refreshLinkPlanOptions();syncLandingPageForm()};
+    $('form-owner-search').onfocus=()=>{if($('form-owner-search').dataset.selected){$('form-owner-search').value='';$('form-owner-search').dataset.selected='';$('form-owner').value=''}refreshLinkPlanOptions()};
+    $('form-owner-search').oninput=()=>{pendingLandingLpId='';$('form-owner-search').dataset.selected='';$('form-owner').value='';refreshLinkPlanOptions();syncLandingPageForm()};
+    $('form-owner-search').onblur=()=>setTimeout(()=>{$('form-owner-options').hidden=true;$('form-owner-search').setAttribute('aria-expanded','false')},150);
     $('form-owner').onchange=()=>{pendingLandingLpId='';refreshLinkPlanOptions();syncLandingPageForm()};
     $('form-lp-type').onchange=syncLandingPageForm;
     $('form-sku').onchange=syncPaymentSkuSelection;
