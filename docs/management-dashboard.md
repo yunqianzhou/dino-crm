@@ -9,7 +9,9 @@ Route: `#/management-dashboard`. Uses the existing prototype store. No productio
 - Current follow-up: current sales leads, split into assigned/unassigned and the exact shared `consultationStage` stages. The CC table breaks down these same counts by current owner.
 - Period activity: distinct user IDs per metric. Registration uses registration time, calls use call time, bookings use appointment creation time. Attendance/completion use explicit lifecycle record timestamps (`reportedAt`); current status and appointment update timestamps are not treated as historical evidence.
 - All date boundaries use Vietnam UTC+7. Period columns are independent and must not be divided to produce conversion rates.
-- Historical conversion rates and paid conversion rates remain excluded. Paid-user counts are supported from successful orders.
+- Conversion funnel analysis uses a registration cohort: Leads are filtered by registration date, then Connected, Booked, Attended and Paid show whether those same users later reached each outcome. Each rate uses Leads as its denominator. It can be broken down by current CC, a unified channel-source field, or registration date × current CC.
+- Unified channel source keeps Landing Page and App acquisition distinct while using the available attribution fields: `Landing page · source` when a channel code exists, otherwise `App · paid source / sub-source` when available.
+- Revenue and AOV use successful, positive paid orders and payment date (not the registration-cohort funnel). AOV is Revenue divided by unique paid users; the management demo uses VND.
 
 ## Navigation
 

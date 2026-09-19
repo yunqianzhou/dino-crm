@@ -8,6 +8,7 @@ dayjs.extend(utc)
 
 export type DashboardFilters = { mode: 'current' | 'period'; start: string; end: string; owner: string; userType: string }
 export const PERIOD_METRICS = ['registered', 'called', 'connected', 'booked', 'attended', 'completed', 'paid'] as const
+export const CONVERSION_METRICS = ['leads', 'connected', 'booked', 'attended', 'paid'] as const
 /** A paid profile flag is not payment evidence; count only valid, positive paid orders. */
 export function isDashboardPaidOrder(order: Order) {
   return order.orderStatus === '已支付' && Number.isFinite(order.paidAmount) && order.paidAmount > 0 &&
@@ -49,6 +50,34 @@ export function dashboardMetrics(population: Student[], calls: CallRecord[], les
   return metrics
 }
 
+/**
+ * Registration-cohort funnel used for management conversion analysis.
+ * The denominator is always a lead's registration date. Later actions are
+ * intentionally not date-restricted: this answers "what did this cohort
+ * eventually convert to?", rather than mixing unrelated daily activities.
+ */
+export function dashboardConversionMetrics(population: Student[], calls: CallRecord[], filters: DashboardFilters, orders: Order[] = []) {
+  const eligible = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+    (!filters.userType || resolveUserType(s) === filters.userType) && !!s.phone?.trim() && inVietnamRange(s.registerTime, filters.start, filters.end))
+  const callIds = new Set(calls.filter(c => c.result === '已接通').map(c => c.studentId))
+  const paidIds = new Set(orders.filter(isDashboardPaidOrder).map(o => o.studentId))
+  const hasEvent = (s: Student, node: string, outcomes: string[]) => (s.salesLifecycleEvents || []).some(e => e.node === node && outcomes.includes(e.result))
+  return {
+    leads: eligible,
+    connected: eligible.filter(s => callIds.has(s.studentId)),
+    booked: eligible.filter(s => (s.salesAppointments || []).some(a => a.appointmentStatus !== '已取消') || hasEvent(s, 'appointment', ['已预约', '已改期'])),
+    attended: eligible.filter(s => (s.salesAppointments || []).some(a => a.attendanceStatus === '已出勤') || hasEvent(s, 'attendance', ['已出勤'])),
+    paid: eligible.filter(s => paidIds.has(s.studentId)),
+  } as Record<typeof CONVERSION_METRICS[number], Student[]>
+}
+
+/** Revenue is recognised from paid orders and stays separate from the cohort funnel. */
+export function dashboardRevenue(orders: Order[], students: Student[], filters: DashboardFilters) {
+  const allowed = new Set(students.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+    (!filters.userType || resolveUserType(s) === filters.userType)).map(s => s.studentId))
+  return orders.filter(o => allowed.has(o.studentId) && isDashboardPaidOrder(o) && inVietnamRange(o.paidTime, filters.start, filters.end))
+}
+
 /** Daily rows use the same metric definitions and filters as the headline counts. */
 export function dashboardDateRows(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters, orders: Order[] = []) {
   const rows = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
@@ -69,11 +98,16 @@ export function dashboardDateRows(population: Student[], calls: CallRecord[], le
     .filter(row => Object.values(row.metrics).some(users => users.length > 0))
 }
 
-export type DashboardGrouping = 'cc' | 'date' | 'intent' | 'age' | 'registrationAge'
+export type DashboardGrouping = 'cc' | 'date' | 'intent' | 'age' | 'registrationAge' | 'source'
 export function dashboardGroupKey(s: Student, group: Exclude<DashboardGrouping, 'date'>, now = dayjs.utc().toISOString()) {
   if (group === 'cc') return s.salesOwner || '__unassigned__'
   if (group === 'intent') return s.purchaseIntention || '未填写'
   if (group === 'age') return s.ageGroup || '__unknown__'
+  if (group === 'source') {
+    if (s.channelCode) return `Landing page · ${s.adChannel || s.channelSource || s.registerChannel || s.channelCode}`
+    const appSource = [s.adChannel, s.subChannel].filter(Boolean).join(' / ')
+    return appSource ? `App · ${appSource}` : (s.channelSource || s.registerChannel || '__unknown__')
+  }
   if (!s.registerTime || !dayjs.utc(s.registerTime).isValid()) return '__unknown__'
   const today = dayjs.utc(now).utcOffset(420).startOf('day')
   const registered = dayjs.utc(s.registerTime).utcOffset(420).startOf('day')
