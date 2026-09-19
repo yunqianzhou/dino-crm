@@ -8,12 +8,15 @@ import { useStore } from '../store'
 import { usePerm } from '../perm'
 import { useI18n } from '../i18n'
 import { useDashboardText, type DashboardWord } from '../dashboardText'
-import { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupRows, dashboardReasonRows, dashboardConversionMetrics, dashboardRevenue, REASON_KINDS, PERIOD_METRICS, CONVERSION_METRICS, type DashboardFilters, type DashboardGrouping, type ReasonKind } from '../dashboardData'
+import { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupRows, dashboardGroupKey, dashboardReasonRows, dashboardConversionMetrics, dashboardRevenue, REASON_KINDS, PERIOD_METRICS, CONVERSION_METRICS, type DashboardFilters, type DashboardGrouping, type ReasonKind } from '../dashboardData'
 import { consultationStage, CONSULTATION_STAGES, CONSULTATION_STAGE_COLOR } from '../salesLifecycle'
 import { isSalesLead } from '../funnel'
 import type { Student } from '../types'
 import LocalTime from '../components/LocalTime'
 import './ManagementDashboard.css'
+
+type ConversionDimension = 'date' | 'cc' | 'source'
+type ConversionRow = { id: string; name: string; metrics: Record<typeof CONVERSION_METRICS[number], Student[]>; children?: ConversionRow[] }
 
 export default function ManagementDashboard() {
  const d = useDashboardText()
@@ -48,14 +51,29 @@ export default function ManagementDashboard() {
  const reasonKind = (REASON_KINDS.includes(query.get('reasonKind') as ReasonKind) ? query.get('reasonKind') : 'noShow') as ReasonKind
  const reasonRows = dashboardReasonRows(population, calls, lessons, filters, reasonKind)
  const conversion = dashboardConversionMetrics(population, calls, filters, orders)
- const conversionGroup = (['cc', 'source', 'dateCC'].includes(query.get('conversionGroup') || '') ? query.get('conversionGroup') : 'cc') as 'cc' | 'source' | 'dateCC'
- const dateCCKey = (s: Student) => `${dayjs.utc(s.registerTime).utcOffset(420).format('YYYY-MM-DD')}|${s.salesOwner || '__unassigned__'}`
- const conversionRows = conversionGroup === 'dateCC'
-   ? [...new Set(conversion.leads.map(dateCCKey))].sort().reverse().map(id => {
-       const [date, cc] = id.split('|')
-       return { id, date, cc, metrics: Object.fromEntries(CONVERSION_METRICS.map(key => [key, conversion[key].filter(s => dateCCKey(s) === id)])) }
+ const conversionDimensions: ConversionDimension[] = ['date', 'cc', 'source']
+ const conversionPrimary = (conversionDimensions.includes(query.get('conversionPrimary') as ConversionDimension) ? query.get('conversionPrimary') : 'date') as ConversionDimension
+ const conversionSecondaryOptions = conversionDimensions.filter(value => value !== conversionPrimary)
+ const conversionSecondary = (conversionSecondaryOptions.includes(query.get('conversionSecondary') as ConversionDimension) ? query.get('conversionSecondary') : 'cc') as ConversionDimension | ''
+ const conversionDimensionLabel = (dimension: ConversionDimension) => dimension === 'date' ? d('registerDates') : dimension === 'cc' ? d('currentCC') : d('source')
+ const conversionKey = (s: Student, dimension: ConversionDimension) => dimension === 'date'
+   ? dayjs.utc(s.registerTime).utcOffset(420).format('YYYY-MM-DD')
+   : dashboardGroupKey(s, dimension)
+ const conversionName = (dimension: ConversionDimension, id: string) => dimension === 'cc' ? ownerName(id) : groupName(dimension, id)
+ const conversionRows = (() => {
+   const groupRows = (dimension: ConversionDimension, matches: (s: Student) => boolean, parentId = ''): ConversionRow[] => {
+     const ids = [...new Set(conversion.leads.filter(matches).map(s => conversionKey(s, dimension)))]
+     ids.sort((a, b) => dimension === 'date' ? b.localeCompare(a) : b.localeCompare(a))
+     return ids.map(id => {
+       const inGroup = (s: Student) => matches(s) && conversionKey(s, dimension) === id
+       const children = conversionSecondary && dimension === conversionPrimary
+         ? groupRows(conversionSecondary as ConversionDimension, inGroup, id)
+         : undefined
+       return { id: `${parentId}${dimension}:${id}`, name: conversionName(dimension, id), metrics: Object.fromEntries(CONVERSION_METRICS.map(key => [key, conversion[key].filter(inGroup)])) as ConversionRow['metrics'], children }
      })
-   : dashboardGroupRows(conversion, conversionGroup).map(row => ({ ...row, name: groupName(conversionGroup, row.id) }))
+   }
+   return groupRows(conversionPrimary, () => true)
+ })()
  const paidRevenueOrders = dashboardRevenue(orders, population, filters)
  const revenueGroup = (query.get('revenueGroup') === 'date' ? 'date' : 'cc') as 'cc' | 'date'
  const revenueRows = (() => {
@@ -114,9 +132,10 @@ export default function ManagementDashboard() {
      {(filters.mode === 'current' ? ['total', 'assigned', 'unassigned', 'paid'] : [...PERIOD_METRICS]).map(key => <Card key={key} className={key === 'paid' ? 'dashboard-paid' : undefined}><div className="dashboard-kpi-label">{title(key)}</div>{count(key)}{key === 'paid' && <p className="dashboard-paid-hint">{d(filters.mode === 'current' ? 'paidCurrent' : 'paidPeriod')}</p>}<ArrowRightOutlined /></Card>)}
    </div>
    <Card title={d('conversionTitle')} className="dashboard-conversion">
-     <div className="dashboard-analysis-head"><div><p className="dashboard-help">{d('conversionHelp')}</p><Tag color="gold">{d('cohortTag')}</Tag></div><Segmented value={conversionGroup} onChange={v => change({ conversionGroup: String(v) })} options={[{ value: 'cc', label: d('ccTitle') }, { value: 'source', label: d('groupSource') }, { value: 'dateCC', label: d('dateCC') }]} /></div>
-     <Table rowKey="id" size="middle" dataSource={conversionRows} scroll={{ x: 1350 }} pagination={conversionGroup === 'dateCC' ? { pageSize: 10, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
-       ...(conversionGroup === 'dateCC' ? [{ title: d('registerDates'), dataIndex: 'date', fixed: 'left' as const, width: 130 }, { title: d('currentCC'), dataIndex: 'cc', width: 150, render: ownerName }] : [{ title: conversionGroup === 'cc' ? d('currentCC') : d('source'), dataIndex: 'name', fixed: 'left' as const, width: 250 }]),
+     <div className="dashboard-analysis-head"><div><p className="dashboard-help">{d('conversionHelp')}</p><Tag color="gold">{d('cohortTag')}</Tag></div><div className="dashboard-dimension-picker"><span>{d('groupBy')}</span><Select aria-label={d('primaryDimension')} value={conversionPrimary} onChange={v => change({ conversionPrimary: v, conversionSecondary: v === conversionSecondary ? conversionSecondaryOptions.find(option => option !== v) || 'cc' : conversionSecondary })} options={conversionDimensions.map(value => ({ value, label: conversionDimensionLabel(value) }))} /><ArrowRightOutlined /><Select aria-label={d('secondaryDimension')} value={conversionSecondary} onChange={v => change({ conversionSecondary: v })} options={conversionSecondaryOptions.map(value => ({ value, label: conversionDimensionLabel(value) }))} /></div></div>
+     <p className="dashboard-hierarchy-note">{d('hierarchyHelp')}</p>
+     <Table rowKey="id" size="middle" dataSource={conversionRows} scroll={{ x: 1220 }} pagination={false} expandable={{ indentSize: 20, defaultExpandAllRows: false, expandRowByClick: true, columnTitle: d('expand') }} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
+       { title: conversionDimensionLabel(conversionPrimary), dataIndex: 'name', fixed: 'left', width: 250, render: (name: string, row: ConversionRow) => <span className={row.children?.length ? 'conversion-parent-label' : undefined}>{name}</span> },
        { title: d('leads'), width: 110, render: (_: unknown, row: typeof conversionRows[number]) => row.metrics.leads.length },
        ...CONVERSION_METRICS.slice(1).map(key => ({ title: title(key), width: 140, render: (_: unknown, row: typeof conversionRows[number]) => <div className="conversion-cell"><span>{row.metrics[key].length}</span><small>{row.metrics.leads.length ? `${Math.round(row.metrics[key].length / row.metrics.leads.length * 100)}%` : '—'}</small></div> })),
      ]} />

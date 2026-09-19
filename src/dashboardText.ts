@@ -5,6 +5,7 @@ const words = {
  resetFilters: ['重置筛选', 'Reset filters'], today: ['今天', 'Today'], last7: ['近 7 天', 'Last 7 days'], thisMonth: ['本月', 'This month'],
  groupIntent: ['按购买意向', 'By purchase intent'], groupAge: ['按年龄段', 'By age group'], groupRegistrationAge: ['按注册时长', 'By time since registration'],
  groupSource: ['按渠道来源', 'By channel source'], source: ['渠道来源', 'Channel source'], dateCC: ['按日期 × CC', 'By date × CC'],
+ groupBy: ['聚合维度', 'Group by'], primaryDimension: ['一级维度', 'Primary dimension'], secondaryDimension: ['二级维度', 'Secondary dimension'], expand: ['展开', 'Expand'], hierarchyHelp: ['先看一级维度汇总，展开后查看二级维度明细；切换顺序即可获得另一种对比视角。', 'Review the primary-dimension total first, then expand for the secondary breakdown. Switch the order for the alternate comparison.'],
  conversionTitle: ['转化漏斗分析', 'Conversion funnel analysis'], cohortTag: ['注册 Cohort', 'Registration cohort'],
  conversionHelp: ['以注册日期为分母，查看线索后续是否接通、预约、出席及付费。可按 CC、统一渠道来源，或日期 × CC 对比效率；各百分比均相对于 Leads。', 'Use registration date as the denominator to see whether leads later connected, booked, attended and paid. Compare efficiency by CC, unified channel source, or date × CC; every rate is relative to Leads.'],
  leads: ['线索数', 'Leads'],
