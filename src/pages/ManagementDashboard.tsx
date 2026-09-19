@@ -151,7 +151,7 @@ export default function ManagementDashboard() {
      ]} />
    </Card>
    {filters.mode === 'current' && <Card title={d('stageTitle')}><p className="dashboard-help">{d('stageHelp')}</p><div className="dashboard-stages">{CONSULTATION_STAGES.map(stage => <div key={stage}><div className="dashboard-stage-line"><span>{title(stage)}</span>{count(stage)}</div><Progress percent={metrics.total?.length ? Math.round((metrics[stage]?.length || 0) / metrics.total.length * 1000) / 10 : 0} size="small" strokeColor="#5086ee" format={p => `${p}%`} /><span className="dashboard-stage-share">{d('stageShare')}</span></div>)}</div></Card>}
-   <Card title={d('breakdown')}>
+   <Card title={d(filters.mode === 'period' ? 'breakdown' : 'currentBreakdown')}>
     <Segmented style={{ marginBottom: 16 }} value={grouping} onChange={v => change({ group: String(v) })} className="dashboard-grouping" options={groupValues.map(value => ({ value, label: groupLabels[value] }))} />
     <p className="dashboard-help">{d(grouping === 'cc' ? 'ccHelp' : grouping === 'date' ? filters.mode === 'current' ? 'dateCurrentHelp' : 'datePeriodHelp' : grouping === 'registrationAge' ? 'registrationAgeHelp' : 'groupHelp')}</p>
     <Table rowKey="id" size="middle" dataSource={breakdownRows} scroll={{ x: filters.mode === 'current' ? 1650 : 1200 }} pagination={grouping === 'date' ? { pageSize: 10, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[

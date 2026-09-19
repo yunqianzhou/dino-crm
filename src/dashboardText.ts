@@ -37,7 +37,7 @@ const words = {
  allDates: ['全部日期', 'All dates'],
  registerDates: ['注册日期', 'Registration dates'], recordDates: ['统计日期', 'Activity dates'],
  stageTitle: ['当前跟进阶段', 'Current follow-up stage'], stageHelp: ['与销售中心三期使用相同的跟进阶段。点击人数查看用户。', 'Uses the same stages as Sales Center Phase 3. Select a count to view users.'],
- breakdown: ['明细统计', 'Breakdown'], dateTitle: ['按日期查看', 'By date'],
+ breakdown: ['销售活动明细（期间去重人数）', 'Sales activity detail (distinct users in period)'], currentBreakdown: ['当前线索明细', 'Current lead breakdown'], dateTitle: ['按日期查看', 'By date'],
  dateCurrentHelp: ['按用户注册日期分组，查看这些用户现在的阶段，不是当天的历史阶段。仅列出有数据的日期。', 'Group users by registration date and show their stages now, not their stages on that past date. Only dates with data are shown.'],
  datePeriodHelp: ['按各项活动的统计日期分组，每天按用户 ID 去重；同一用户可在多天出现，因此各天人数相加可能大于期间总人数。仅列出有数据的日期。', 'Group each activity by its counting date, deduplicating users within each day. A user may appear on several days, so daily counts can exceed the distinct users for the whole period. Only dates with data are shown.'],
  periodTotal: ['期间去重人数', 'Distinct users in period'], currentTotal: ['合计', 'Total'],
