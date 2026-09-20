@@ -429,9 +429,9 @@
       panel.hidden=!typing;search.setAttribute('aria-expanded',String(typing));
       panel.querySelectorAll('[data-channel-option]').forEach(button=>button.onclick=()=>{const owner=owners.find(item=>item.id===button.dataset.channelOption);if(!owner)return;$('form-owner').value=owner.id;search.value=owner.name+'（'+owner.channelCode+'）';search.dataset.selected='1';panel.hidden=true;search.setAttribute('aria-expanded','false');pendingLandingLpId='';refreshLinkPlanOptions();syncLandingPageForm()});
     }
-    function refreshLinkPlanOptions(selected){
-      const line=$('form-line').value,type=$('form-owner-type').value,previousOwner=$('form-owner').value,keyword=$('form-owner-search').value.trim().toLowerCase();
-      const owners=distributors.filter(x=>x.enabled&&(!line||x.line===line)&&(!type||x.type===type)&&(!keyword||[x.name,x.channelCode].filter(Boolean).join(' ').toLowerCase().includes(keyword)));
+    function refreshLinkPlanOptions(selected,selectedOwnerId){
+      const line=$('form-line').value,type=$('form-owner-type').value,previousOwner=selectedOwnerId??$('form-owner').value,keyword=$('form-owner-search').value.trim().toLowerCase(),normalizedKeyword=keyword.replace(/[\s（）()_-]/g,'');
+      const owners=distributors.filter(x=>x.enabled&&(!line||x.line===line)&&(!type||x.type===type)&&(!normalizedKeyword||[x.name,x.channelCode].filter(Boolean).join(' ').toLowerCase().replace(/[\s（）()_-]/g,'').includes(normalizedKeyword)));
       $('form-owner').innerHTML='<option value="">请选择渠道</option>'+owners.map(x=>'<option value="'+x.id+'">'+esc(x.name)+'</option>').join('');
       const ownerId=owners.some(x=>x.id===previousOwner)?previousOwner:'';
       $('form-owner').value=ownerId;
@@ -441,7 +441,7 @@
       $('form-plan').value=items.some(x=>x.id===selected)?selected:(items[0]?.id||'');
       syncLinkPlanSelection();
     }
-    function refreshLandingFilters(resetPlan=true){const line=$('form-line').value,type=$('form-owner-type').value;const types=[...new Set(distributors.filter(x=>!line||x.line===line).map(x=>x.type))];$('form-owner-type').innerHTML='<option value="">请选择渠道类型</option>'+types.map(x=>'<option>'+x+'</option>').join('');if(types.includes(type))$('form-owner-type').value=type;else $('form-owner-type').value='';refreshLinkPlanOptions(resetPlan?'':$('form-plan').value)}
+    function refreshLandingFilters(resetPlan=true,selectedOwnerId){const line=$('form-line').value,type=$('form-owner-type').value;const types=[...new Set(distributors.filter(x=>!line||x.line===line).map(x=>x.type))];$('form-owner-type').innerHTML='<option value="">请选择渠道类型</option>'+types.map(x=>'<option>'+x+'</option>').join('');if(types.includes(type))$('form-owner-type').value=type;else $('form-owner-type').value='';refreshLinkPlanOptions(resetPlan?'':$('form-plan').value,selectedOwnerId)}
     function syncLinkPlanSelection(){syncLandingPageForm()}
     function syncOwnerChannelCode(){const existing=editingOwnerId&&distributors.find(x=>x.id===editingOwnerId),channelCode=existing?.channelCode||'';$('owner-channel-code').value=channelCode;$('owner-channel-code').placeholder=channelCode?'':'保存渠道后自动生成';$('owner-channel-code-help').textContent=channelCode?'渠道码已生成且可复制；保存后保持不变，用于渠道关联、筛选和归因。':'保存渠道后由 CRM 自动生成渠道码；生成后不可修改，可用于渠道关联、筛选和归因。';$('copy-owner-channel-code').disabled=!channelCode;$('copy-owner-channel-code').onclick=()=>{if(channelCode){navigator.clipboard?.writeText(channelCode);toast('渠道码已复制')}else toast('请先保存渠道')}}
     function syncOwnerModal(){const type=$('owner-form-type').value,isAds=type==='广告投放',isSales=type==='销售',isKol=type==='KOL';$('owner-modal-title').textContent=editingOwnerId?'编辑渠道':(isAds?'新增广告投放渠道':isSales?'新增销售渠道':'新增 KOL 渠道');$('owner-name-label').innerHTML=isAds?'渠道名称（投放渠道名称） <em>*</em>':isSales?'渠道名称（销售姓名） <em>*</em>':'渠道名称（KOL 名称 / 昵称） <em>*</em>';$('owner-name-help').textContent=isAds?'请填写用于投放归因的渠道名称；保存后将作为渠道列表中的渠道名称展示。':isSales?'请填写销售姓名；保存后将作为渠道列表中的渠道名称展示。':'请填写 KOL 名称或昵称；保存后将作为渠道列表中的渠道名称展示。';$('owner-form-name').placeholder=isAds?'例如：韩国 Meta 开学季投放':isSales?'例如：Amy Zhang':'例如：Jisu Mom';$('owner-platform-field').style.display=isAds?'':'none';$('owner-account-field').style.display=isAds?'':'none';$('owner-account-label').innerHTML='广告账户（选填）';$('owner-form-account').placeholder='例如：Meta 广告账户 ID（可不填）';if(isKol){$('owner-form-platform').value='Meta';$('owner-form-account').value=''}$('owner-form-tip').innerHTML=isAds?'<b>填写渠道名称（投放渠道名称）并保存后，CRM 将生成渠道码。</b>LP ID 将在创建落地页时生成。':isSales?'<b>填写渠道名称（销售姓名）并保存后，CRM 将生成渠道码。</b>建立渠道后不会自动生成链接，需要时再创建落地页。':'<b>填写渠道名称（KOL 名称 / 昵称）并保存后，CRM 将生成渠道码。</b>每次 KOL 发布内容时，在创建落地页填写帖子标识或帖子链接。';syncOwnerChannelCode()}
@@ -516,9 +516,12 @@
       $('form-lp-type').value=String(x.lpType||'10');
       $('form-sku').innerHTML='';$('form-promo-code').innerHTML='';
       $('form-line').innerHTML='<option value="">请选择业务线</option>'+businessLines.map(line=>'<option>'+line+'</option>').join('');
-      $('form-line').value=channel.line;refreshLandingFilters();
-      $('form-owner-type').value=channel.type;refreshLinkPlanOptions();
-      $('form-owner').value=channel.id;$('form-owner-search').value=channel.name+'（'+channel.channelCode+'）';$('form-owner-search').dataset.selected='1';refreshLinkPlanOptions(x.set);
+      $('form-line').value=channel.line;
+      $('form-owner-type').value=channel.type;
+      $('form-owner-search').value=channel.name+'（'+channel.channelCode+'）';
+      $('form-owner-search').dataset.selected='1';
+      refreshLandingFilters(false,channel.id);
+      refreshLinkPlanOptions(x.set,channel.id);
       if(isPaymentPage()){
         if([...$('form-sku').options].some(option=>option.value===x.skuId))$('form-sku').value=x.skuId;
         syncPaymentSkuSelection();
@@ -565,10 +568,11 @@
     }
     function syncPaymentSkuSelection(){
       if(!isPaymentPage())return;
-      const plan=channelSkuPlans.find(x=>x.id===$('form-plan').value),subject=landingSubject();
+      const subject=landingSubject(),plan=channelSkuPlans.find(x=>x.id===$('form-plan').value)||channelSkuPlans.find(x=>x.channelId===subject?.id);
       const rules=planRules(plan).filter(rule=>skus.some(x=>x.id===rule.skuId));
       if(!plan||plan.channelId!==subject?.id||!rules.length){
-        $('form-sku').innerHTML='<option value="">'+(subject?'当前渠道暂无可用 SKU':'请先选择渠道')+'</option>';$('form-sku-list').innerHTML='<div class="empty">'+(subject?'当前渠道暂无可用 SKU':'请先选择渠道')+'</div>';
+        const message=subject?'当前渠道暂无可用 SKU':'请从下拉结果选择渠道';
+        $('form-sku').innerHTML='<option value="">'+message+'</option>';$('form-sku-list').innerHTML='<div class="empty">'+message+'</div>';
         $('form-promo-code').innerHTML='<option value="">无可用优惠</option>';$('form-promo-code').disabled=true;
         $('form-plan-summary').innerHTML='';$('form-promo-help').textContent='选择渠道后，将展示该渠道全部可售 SKU。';resetLinkPreview();return;
       }
@@ -578,7 +582,8 @@
       $('form-promo-code').disabled=!hasDiscount;
       $('form-promo-code').innerHTML=hasDiscount?'<option value="'+esc(plan.promoCode)+'">使用优惠 · '+esc(plan.promoCode)+'</option><option value="">不使用优惠（全部按原价）</option>':'<option value="">当前方案无优惠，全部按原价售卖</option>';
       if(hasDiscount)$('form-promo-code').value=plan.promoCode;
-      $('form-promo-help').textContent=hasDiscount?'切换后会统一更新本页全部 SKU 的展示价格。':'当前方案没有可用优惠，全部 SKU 按原价展示。';
+      $('form-promo-help').textContent=hasDiscount?'默认使用优惠；切换后会统一更新本页全部 SKU 的展示价格。':'当前方案没有可用优惠，全部 SKU 按原价展示。';
+      $('form-plan').value=plan.id;
       $('form-set').innerHTML='<option value="'+plan.id+'">'+esc(plan.id)+'</option>';
       renderPaymentSummary();resetLinkPreview();
     }
