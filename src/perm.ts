@@ -59,6 +59,7 @@ export function usePerm() {
     if (!role) return 'operate'
     const saved = role.perms[m]
     if (saved) return saved
+    if (m === 'salesV5_batch_assign') return role.id === 'role_admin' ? 'operate' : 'none'
     if (m === 'appABTest') return role.perms.marketing ?? 'none'
     if (m === 'marketingV2_channel_types') return role.id === 'role_admin' ? 'operate' : 'none'
     // 兼容四期上线前保存在 localStorage 的旧角色数据。

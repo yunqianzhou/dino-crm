@@ -26,7 +26,8 @@ import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
 import { hasPhoneLogin, resolveUserType } from '../userType'
 import { resolveUserStatus } from '../lessons'
-import { inUserCenter } from '../funnel'
+import LeadAssignmentModal from '../components/LeadAssignmentModal'
+import { isSalesLead, inUserCenter } from '../funnel'
 import { useLineScope } from '../useLineScope'
 import { appChannelSourceText, businessLineOf, lineLabel, lpChannelSourceText, registerChannelText } from '../channel'
 import LineFilter from '../components/LineFilter'
@@ -59,12 +60,16 @@ const USER_TYPE_COLOR: Record<UserType, string> = {
   测试用户: 'gold',
 }
 
-export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
+export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?: boolean; phase5?: boolean }) {
   const { t } = useI18n()
   const students = useStore((s) => s.students)
   const channels = useStore((s) => s.channels)
   const lessons = useStore((s) => s.lessons ?? [])
-  const { can, actor, allowedLines } = usePerm()
+  const { can, actor, account, allowedLines } = usePerm()
+  const accounts = useStore(s => s.accounts)
+  const [reassigning, setReassigning] = useState<Student | null>(null)
+  const canReassign = phase5 && account?.status !== '停用' && can('usersV2') !== 'none' && can('salesV3_config') === 'operate'
+  const ccLabel = (student: Student) => accounts.find(a => a.email === student.salesOwner)?.name || student.salesOwner || student.ccName || '—'
   const dashboardContext = useDashboardContext()
   const dashboardScope = phase3 ? dashboardContext.dashboardScope : undefined
   const permittedDashboardIds = dashboardScope ? new Set(dashboardPopulation(students, allowedLines(), allowedLines() === null || can('salesV3_reassign') === 'operate', actor).map(s => s.studentId)) : undefined
@@ -104,7 +109,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
     () =>
       students.filter((s) => {
         // 分流规则：未付费-未体验且有手机号的用户进入「销售中心」，其余展示在此
-        if (dashboardScope ? !matchesDashboardScope(dashboardScope, s.studentId) || !permittedDashboardIds?.has(s.studentId) : !inUserCenter(s, lessons)) return false
+        if (dashboardScope ? !matchesDashboardScope(dashboardScope, s.studentId) || !permittedDashboardIds?.has(s.studentId) : !phase5 && !inUserCenter(s, lessons)) return false
         const kw = keyword.trim().toLowerCase()
         const matchKw =
           !kw ||
@@ -118,7 +123,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
         const bl = businessLineOf(channels, s)
         return matchKw && matchLine(bl) && matchStatus && matchType && matchCountry
       }),
-    [students, channels, lessons, keyword, lineSel, statusFilter, typeFilter, countryFilter, matchLine, dashboardScope, permittedDashboardIds],
+    [phase5, students, channels, lessons, keyword, lineSel, statusFilter, typeFilter, countryFilter, matchLine, dashboardScope, permittedDashboardIds],
   )
 
   const phoneLocked = editing ? hasPhoneLogin(editing) : false
@@ -130,7 +135,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
       data.map((s) => [
         s.studentId, s.localName || s.name, resolveUserStatus(s, lessons), resolveUserType(s), s.ageGroup, s.loginMethod,
         s.account, maskPhone(s.phone), lineLabel(s), registerChannelText(channels, s), s.channelCode, s.campaign, s.campaignId,
-        s.couponCode, s.ccName, s.registerTime, s.expireTime, s.lastModifier,
+        s.couponCode, phase5 ? ccLabel(s) : s.ccName, s.registerTime, s.expireTime, s.lastModifier,
       ]),
     )
     message.success(`已导出 ${data.length} 条用户数据（手机号已加密）`)
@@ -240,7 +245,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
       dataIndex: 'studentId',
       width: 190,
       fixed: 'left',
-      render: (v: string) => <Link to={`/users-v2/${v}`} state={dashboardContext.state}>{v}</Link>,
+      render: (v: string) => <Link to={`${phase5 ? "/users-v5" : "/users-v2"}/${v}`} state={dashboardContext.state}>{v}</Link>,
     },
     {
       title: t('user.col.name'),
@@ -396,7 +401,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
   const phase3Columns: ColumnsType<Student> = [
     {
       title: t('user.col.id'), dataIndex: 'studentId', width: 190, fixed: 'left',
-      render: (v: string) => <Link to={`/users-v2/${v}`} state={dashboardContext.state}>{v}</Link>,
+      render: (v: string) => <Link to={`${phase5 ? "/users-v5" : "/users-v2"}/${v}`} state={dashboardContext.state}>{v}</Link>,
     },
     { title: t('user.col.name'), dataIndex: 'localName', width: 140, render: (_: unknown, r) => r.localName || r.name },
     {
@@ -436,7 +441,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
     { title: t('user.col.regTime'), dataIndex: 'registerTime', width: 200, render: (v, r) => <LocalTime time={v} country={r.country || r.businessLine} /> },
     { title: t('user.col.expireTime'), dataIndex: 'expireTime', width: 200, render: (v, r) => <LocalTime time={v} country={r.country || r.businessLine} /> },
     { title: t('user.col.couponCode'), dataIndex: 'couponCode', width: 140, render: (v) => v ? <Tag color="blue">{v}</Tag> : <Text type="secondary">—</Text> },
-    { title: t('user.col.cc'), dataIndex: 'ccName', width: 150, render: (v) => v || <Text type="secondary">—</Text> },
+    { title: t('user.col.cc'), dataIndex: 'ccName', width: 150, render: (v, r) => phase5 ? ccLabel(r) : v || <Text type="secondary">—</Text> },
     {
       title: '最新修改人',
       dataIndex: 'lastModifier',
@@ -450,14 +455,17 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
     },
     {
       title: t('common.action'), key: 'action', width: 120, fixed: 'right',
-      render: (_: unknown, r) => canEdit ? (
+      render: (_: unknown, r) => canEdit || canReassign ? (
         <Dropdown
           trigger={['click']}
           menu={{
             items: [
-              { key: 'edit', icon: <EditOutlined />, label: t('user.editInfo'), onClick: () => openEdit(r) },
-              { key: 'membership', icon: <PlusCircleOutlined />, label: t('user.addMembership'), onClick: () => openAddMembership(r) },
-              { key: 'trialLevel', label: '修改试听课等级', onClick: () => openTrialLevel(r) },
+              ...(canReassign ? [{ key: 'reassign', label: '重新分配线索', disabled: !isSalesLead(r, lessons), onClick: () => setReassigning(r) }] : []),
+              ...(canEdit ? [
+                { key: 'edit', icon: <EditOutlined />, label: t('user.editInfo'), onClick: () => openEdit(r) },
+                { key: 'membership', icon: <PlusCircleOutlined />, label: t('user.addMembership'), onClick: () => openAddMembership(r) },
+                { key: 'trialLevel', label: '修改试听课等级', onClick: () => openTrialLevel(r) },
+              ] : []),
             ],
           }}
         >
@@ -468,9 +476,9 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
   ]
 
   return (
-    <Card className="page-card" bordered={false} title={<span className="section-title">{t('user.titleV2')}</span>}>
+    <Card className="page-card" bordered={false} title={<span className="section-title">{phase5 ? '用户列表' : t('user.titleV2')}</span>}>
       {phase3 && <DashboardLinkContext />}
-      {!dashboardScope && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('user.funnelTip')} />}
+      {!dashboardScope && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={phase5 ? '统一查看注册用户。符合销售线索条件的未付费用户，可在操作菜单中重新分配 CC。' : t('user.funnelTip')} />}
       <Space wrap style={{ marginBottom: 16 }}>
         <Input
           allowClear
@@ -515,6 +523,8 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
           scroll={{ x: phase3 ? 3050 : 3250 }}
           pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
       />
+
+      {reassigning && <LeadAssignmentModal records={[reassigning]} onClose={() => setReassigning(null)} />}
 
       <Modal
         open={!!editing}

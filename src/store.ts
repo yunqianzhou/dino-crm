@@ -20,6 +20,7 @@ import type {
   SalesSettings,
 } from './types'
 import { LINE_CURRENCY } from './types'
+import { withPhase5Members } from './phase5'
 import { withManagementDemo } from './managementDemo'
 
 // 原型权限和导航发生结构性更新时，升级版本以避免浏览器继续使用旧的演示权限数据。
@@ -218,14 +219,14 @@ function load(): AppState {
       const withCallbackDemo = normalized.students.some((student) => student.studentId === callbackDemo.studentId)
         ? normalized
         : { ...normalized, students: [callbackDemo, ...normalized.students] }
-      const migrated = autoAllocate(withManagementDemo(withCallbackDemo))
+      const migrated = autoAllocate(withPhase5Members(withManagementDemo(withCallbackDemo)))
       localStorage.setItem(KEY, JSON.stringify(migrated))
       return migrated
     }
   } catch {
     /* ignore */
   }
-  const finalSeeded = autoAllocate(withManagementDemo(normalizePaymentMethods(seeded)))
+  const finalSeeded = autoAllocate(withPhase5Members(withManagementDemo(normalizePaymentMethods(seeded))))
   localStorage.setItem(KEY, JSON.stringify(finalSeeded))
   return finalSeeded
 }
@@ -255,7 +256,7 @@ function save(s: AppState) {
 }
 
 export function resetState() {
-  state = withManagementDemo(seed())
+  state = withPhase5Members(withManagementDemo(seed()))
   emit()
 }
 
@@ -758,6 +759,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'operate',
         marketing: 'operate',
@@ -825,6 +827,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'operate',
         marketing: 'operate',
@@ -892,6 +895,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'none',
         marketing: 'none',
@@ -959,6 +963,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'all',
       perms: {
+        salesV5_batch_assign: 'operate',
         marketingV2_channel_types: 'operate',
         appABTest: 'operate',
         marketing: 'operate',
@@ -1026,6 +1031,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'none',
         marketing: 'none',

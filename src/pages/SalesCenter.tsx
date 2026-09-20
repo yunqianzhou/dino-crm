@@ -1,3 +1,6 @@
+import CCSelect from '../components/CCSelect'
+import LeadAssignmentModal from '../components/LeadAssignmentModal'
+import { isSalesMember } from '../phase5'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -80,7 +83,7 @@ const PROGRESS_COLOR: Record<string, string> = {
 
 function isPaidStudent(student: Student) { return student.status === '付费' || student.paymentStatusStr === '已付费' }
 
-export default function SalesCenter({ importAction, detailPath, phase3 = false }: { importAction?: ReactNode; detailPath?: string; phase3?: boolean }) {
+export default function SalesCenter({ importAction, detailPath, phase3 = false, phase5 = false }: { importAction?: ReactNode; detailPath?: string; phase3?: boolean; phase5?: boolean }) {
   const { t, lang } = useI18n()
   const text = (zh: string, en: string) => lang === 'zh' ? zh : en
   const navigate = useNavigate()
@@ -96,6 +99,9 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const accounts = useStore((s) => s.accounts)
   const roles = useStore((s) => s.roles)
   const { can, allowedLines, actor, account } = usePerm()
+  const [selectedIds, setSelectedIds] = useState<React.Key[]>([])
+  const [batchRecords, setBatchRecords] = useState<Student[] | null>(null)
+  const canBatchAssign = phase5 && account?.status !== '停用' && can('salesV3') === 'operate' && can('salesV5_batch_assign') === 'operate'
   const canEdit = can(phase3 ? 'salesV3_update' : 'sales_update') === 'operate'
   const canClaim = can(phase3 ? 'salesV3_claim' : 'sales_claim') === 'operate'
   const canDial = can(phase3 ? 'salesV3_dial' : 'sales_dial') === 'operate'
@@ -142,14 +148,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   useEffect(() => { setPages((prev) => ({ ...prev, follow: { current: 1, pageSize: prev.follow?.pageSize || 10 } })) }, [consultationStageFilter])
   useEffect(() => { setPages((prev) => ({ ...prev, calls: { current: 1, pageSize: prev.calls?.pageSize || 10 } })) }, [keyword, lineSel, callResultFilter, callAgentFilter, callDateRange])
   useEffect(() => {
+    if (phase5) return
     if (ownerFilter && ownerFilter !== '__unassigned__' && !salesAccounts.some((a) => a.email === ownerFilter)) setOwnerFilter(undefined)
     if (callAgentFilter && !salesAccounts.some((a) => a.email === callAgentFilter)) setCallAgentFilter(undefined)
-  }, [salesAccounts, ownerFilter, callAgentFilter])
+  }, [phase5, salesAccounts, ownerFilter, callAgentFilter])
   const paginationFor = (key: string) => ({ current: pages[key]?.current || 1, pageSize: pages[key]?.pageSize || 10, showTotal: (n: number) => t('common.total', { n }), showSizeChanger: true })
   const tableChanged = (key: string, pagination: any, sorter: any) => {
     setPages((prev) => ({ ...prev, [key]: { current: pagination.current || 1, pageSize: pagination.pageSize || 10 } }))
     setSorts((prev) => ({ ...prev, [key]: { field: sorter.field, order: sorter.order } }))
   }
+
+  const selectionScope = JSON.stringify([account?.id, actor, tab, lineSel, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, canBatchAssign])
+  useEffect(() => { setSelectedIds([]); setBatchRecords(null) }, [selectionScope])
+  const batchSelection = canBatchAssign ? { selectedRowKeys: selectedIds, preserveSelectedRowKeys: true, onChange: (keys: React.Key[]) => setSelectedIds(keys), columnWidth: 48 } : undefined
+  const ccAccounts = accounts.filter(item => item.businessLines.some(matchLine) || (item.businessLines.length === 0 && isSalesMember(item) && roles.find(role => role.id === item.roleId)?.dataScope === 'all'))
 
   const [editing, setEditing] = useState<Student | null>(null)
   const [dialing, setDialing] = useState<Student | null>(null)
@@ -566,6 +578,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           ? {
               ...x,
               salesOwner: reassignTo,
+              ...(phase5 ? { ccName: name } : {}),
               salesLatestNote: note,
               salesUpdatedAt: now,
               salesHistory: [
@@ -1013,11 +1026,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       {(tab === 'calls' || tab === 'summary') ? (
         <>
           {tab === 'calls' && <Select className="sales-filter-control" allowClear placeholder={t('sales.call.result')} value={callResultFilter} onChange={setCallResultFilter} options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))} />}
-          {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('sales.call.agent')} value={callAgentFilter} onChange={setCallAgentFilter} options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))} />}
+          {seeAllOwners && (phase5 ? <CCSelect className="sales-filter-control" accounts={ccAccounts} owners={callRecords.filter(record => matchLine(record.businessLine)).map(record => record.agent)} value={callAgentFilter} onChange={setCallAgentFilter} unassigned={false} placeholder="坐席 · 搜索销售姓名 / 邮箱" /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('sales.call.agent')} value={callAgentFilter} onChange={setCallAgentFilter} options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))} />)}
           <DatePicker.RangePicker className="sales-filter-date" value={callDateRange} onChange={setCallDateRange} allowClear placeholder={[t('pkg.startTime'), t('pkg.endTime')]} />
         </>
       ) : <>
-        {seeAllOwners && <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />}
+        {seeAllOwners && (phase5 ? <CCSelect className="sales-filter-control" accounts={ccAccounts} owners={salesLeads.map(student => student.salesOwner || '')} value={ownerFilter} onChange={setOwnerFilter} /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />)}
         {tab === 'follow' && showVietnamStageFilter && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
         <Select className="sales-filter-control" allowClear placeholder={text('预约外呼', 'Callback')} value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: text('已填写预约外呼', 'Callback provided'), value: 'filled' }, { label: text('待外呼（已到时间）', 'Callback due'), value: 'due' }, { label: text('即将外呼（24小时内）', 'Callback within 24 hours'), value: 'upcoming' }]} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={text('购买意向', 'Purchase intent')} value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value, i) => ({ label: t(['sales.purchaseIntention.yes', 'sales.purchaseIntention.no', 'sales.purchaseIntention.none'][i]), value }))} />
@@ -1038,11 +1051,16 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     </div>
   )
 
+  const batchBar = phase5 && canBatchAssign && <div className="phase5-batch-bar">
+    <Space><strong>已选择 {selectedIds.length} 条线索</strong><Text type="secondary">支持跨页勾选；切换筛选或页签后清空</Text></Space>
+    <Space><Button type="text" disabled={!selectedIds.length} onClick={() => setSelectedIds([])}>清空选择</Button><Button type="primary" icon={<SwapOutlined />} disabled={!selectedIds.length} onClick={() => setBatchRecords((tab === 'pool' ? poolData : followData).filter(student => selectedIds.includes(student.studentId)))}>批量分配</Button></Space>
+  </div>
+
   return (
     <Card
       className="page-card"
       bordered={false}
-      title={<span className="section-title">{t('sales.title')}</span>}
+      title={<span className="section-title">{phase5 ? '销售线索' : t('sales.title')}</span>}
       extra={
         canManageSettings && (
           <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
@@ -1051,6 +1069,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
         )
       }
     >
+      {batchRecords && <LeadAssignmentModal batch records={batchRecords} seeAllOwners={seeAllOwners} onClose={() => setBatchRecords(null)} onDone={() => setSelectedIds([])} />}
       {phase3 && <DashboardLinkContext filter />}
       {!dashboardScope && <Alert
         type="info"
@@ -1077,8 +1096,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             children: (
               <>
                 {filterBar}
+                {batchBar}
                 <Table
                   rowKey="studentId"
+                  rowSelection={batchSelection}
                   columns={poolColumns}
                   dataSource={poolData}
                   scroll={{ x: 2180 + 90 }}
@@ -1095,11 +1116,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
             children: (
               <>
                 {filterBar}
-                {isLeader && (
+                {batchBar}
+                {isLeader && (!phase5 || seeAllOwners) && (
                   <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('sales.leaderTip')} />
                 )}
                 <Table
                   rowKey="studentId"
+                  rowSelection={batchSelection}
                   columns={followColumns}
                   dataSource={followData}
                   scroll={{ x: canReassign ? 2180 + 200 + 130 + 100 : 2180 + 200 + 130 }}

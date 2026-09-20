@@ -353,6 +353,7 @@ export type DataScope = 'all' | 'line'
 
 // 受权限管控的功能模块
 export type ModuleKey =
+  | 'salesV5_batch_assign'
   | 'appABTest'
   | 'marketingV2_channel_types'
   // 主模块
@@ -383,6 +384,7 @@ export type ModuleKey =
   | 'system_role_add' | 'system_role_edit' | 'system_role_delete' | 'system_acc_add' | 'system_acc_edit'
 
 export const PERMISSION_MODULES: ModuleKey[] = [
+  'salesV5_batch_assign',
   'appABTest',
   'marketing',
   'channels', 'channels_create', 'channels_edit', 'channels_delete', 'channels_gen_code', 'channels_params',
@@ -410,6 +412,7 @@ export type Role = {
 export type AccountStatus = '启用' | '停用'
 
 export type Account = {
+  isSalesMember?: boolean // 明确标记真实销售；与页面权限、坐席绑定分别维护
   id: string
   email: string
   name: string

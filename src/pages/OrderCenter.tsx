@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Input, Select, Space, Table, Tag, Typography, message } from 'antd'
-import { DownloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, Card, DatePicker, Input, InputNumber, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useStore } from '../store'
 import type { Order, OrderStatus, UserStatus, UserType } from '../types'
@@ -17,6 +17,12 @@ import { dashboardPopulation } from '../dashboardData'
 import { useDashboardText } from '../dashboardText'
 import { usePerm } from '../perm'
 import { downloadCsv } from '../export'
+
+import dayjs from 'dayjs'
+import CCSelect from '../components/CCSelect'
+import { businessLineOf } from '../channel'
+import { emptyOrderFilters5, matchesOrderFilters5, orderCreatedTime, orderTime5 } from '../phase5Orders'
+import type { OrderFilters5 } from '../phase5Orders'
 
 const { Text } = Typography
 
@@ -55,7 +61,7 @@ function fmtMoney(amount: number, currency: string) {
   return `${currency} ${amount.toLocaleString()}`
 }
 
-export default function OrderCenter({ detailsPath, exportPermission = 'orders_export' }: { detailsPath?: string; exportPermission?: 'orders_export' | 'ordersV3_export' }) {
+export default function OrderCenter({ detailsPath, exportPermission = 'orders_export', phase5 = false }: { detailsPath?: string; exportPermission?: 'orders_export' | 'ordersV3_export'; phase5?: boolean }) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
@@ -65,6 +71,11 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const d = useDashboardText()
   const { can, actor, allowedLines } = usePerm()
   const canExport = can(exportPermission) === 'operate'
+  const accounts = useStore(state => state.accounts)
+  const [moreFilters, setMoreFilters] = useState(false)
+  const [filters5, setFilters5] = useState<OrderFilters5>(emptyOrderFilters5)
+  const [page5, setPage5] = useState(1)
+  const update5 = (patch: Partial<OrderFilters5>) => setFilters5(current => ({ ...current, ...patch }))
   const orders = useStore((s) => s.orders)
   const students = useStore((s) => s.students)
   const dashboardScope = detailsPath === '/orders-v3' ? dashboardContext.dashboardScope : undefined
@@ -85,9 +96,9 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   )
 
   const lineOf = useMemo(() => {
-    const map = new Map(students.map((s) => [s.studentId, s.businessLine]))
+    const map = new Map(students.map((s) => [s.studentId, phase5 ? businessLineOf(channels, s) : s.businessLine]))
     return (studentId: string) => map.get(studentId) ?? '—'
-  }, [students])
+  }, [students, channels, phase5])
 
   const typeOf = useMemo(() => {
     const map = new Map(students.map((s) => [s.studentId, resolveUserType(s)]))
@@ -109,15 +120,30 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
     return Array.from(new Set(students.map((s) => s.country || s.businessLine).filter(Boolean))) as string[]
   }, [students])
 
+  const userMap = useMemo(() => new Map(students.map(student => [student.studentId, student])), [students])
+  const ownerOf = (order: Order) => userMap.get(order.studentId)?.salesOwner || userMap.get(order.studentId)?.ccName
+  const ccNameOf = (order: Order) => accounts.find(account => account.email === ownerOf(order))?.name || ownerOf(order) || userMap.get(order.studentId)?.ccName || '未分配'
+  const scopedOrders = orders.filter(order => matchLine(lineOf(order.studentId)))
+  const productOptions = [...new Set(scopedOrders.map(order => order.productName))]
+  const currencyOptions = [...new Set(scopedOrders.map(order => order.currency))]
+  const payOptions = [...new Set(scopedOrders.map(order => order.payMethod))]
+  const resetFilters5 = () => {
+    setKeyword(''); setOrderStatus(undefined); setPayMethod(undefined); setCountryFilter(undefined); setTypeFilter(undefined); setLineSel([]); setFilters5(emptyOrderFilters5)
+  }
+  const filterKey5 = JSON.stringify([keyword, orderStatus, payMethod, countryFilter, typeFilter, lineSel, filters5])
+  useEffect(() => { setPage5(1) }, [filterKey5])
+
   const data = useMemo(
     () =>
       orders.filter((o) => {
         if (dashboardScope && (!matchesDashboardScope(dashboardScope, o.studentId, o.orderId) || !permittedDashboardIds?.has(o.studentId))) return false
         if (targetStudentId && o.studentId !== targetStudentId) return false
         if (!matchLine(lineOf(o.studentId))) return false
+        if (phase5 && !matchesOrderFilters5(o, filters5, ownerOf(o))) return false
         const kw = keyword.trim().toLowerCase()
         const matchKw =
           !kw ||
+          (phase5 && `${userMap.get(o.studentId)?.name || ''} ${userMap.get(o.studentId)?.localName || ''} ${userMap.get(o.studentId)?.account || ''}`.toLowerCase().includes(kw)) ||
           o.orderId.toLowerCase().includes(kw) ||
           o.studentId.toLowerCase().includes(kw) ||
           o.productName.toLowerCase().includes(kw) ||
@@ -130,17 +156,19 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           (!typeFilter || typeOf(o.studentId) === typeFilter)
         )
       }).sort((a, b) => ORDER_STATUS_PRIORITY[a.orderStatus] - ORDER_STATUS_PRIORITY[b.orderStatus]),
-    [orders, dashboardScope, permittedDashboardIds, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
+    [phase5, filters5, userMap, orders, dashboardScope, permittedDashboardIds, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
   )
 
   const exportOrders = () => {
+    if (!canExport) return
+    if (!data.length) { message.info('暂无可导出数据'); return }
     downloadCsv(
       `订单中心_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.csv`,
-      ['订单ID', '商品名称', '用户ID', '用户类型', '国家', '用户状态', '订单状态', '优惠码', '原价', '实际付款金额', '币种', '支付方式', '成功支付时间', '有效期到期时间'],
+      ['订单ID', '商品名称', '用户ID', '用户类型', '国家', '用户状态', '订单状态', '优惠码', '原价', '实际付款金额', '币种', '支付方式', phase5 ? '成功支付时间（UTC+08:00）' : '成功支付时间', phase5 ? '有效期到期时间（UTC+08:00）' : '有效期到期时间', ...(phase5 ? ['当前 CC', '创建时间（UTC+08:00）'] : [])],
       data.map((order) => [
         order.orderId, order.productName, order.studentId, typeOf(order.studentId), countryOf(order.studentId),
         order.userStatus, ORDER_STATUS_CODE[order.orderStatus], couponCodeOf(order.studentId, order.payMethod), order.originalPrice, order.paidAmount, order.currency,
-        order.payMethod, order.paidTime, order.validUntil,
+        order.payMethod, phase5 ? orderTime5(order.paidTime) : order.paidTime, phase5 ? orderTime5(order.validUntil) : order.validUntil, ...(phase5 ? [ccNameOf(order), orderTime5(orderCreatedTime(order))] : []),
       ]),
     )
     message.success(`已导出 ${data.length} 条订单数据`)
@@ -193,7 +221,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       title: t('order.col.orderStatus'),
       dataIndex: 'orderStatus',
       width: 100,
-      render: (v: OrderStatus) => <Tag color={ORDER_STATUS_COLOR[v]}>{ORDER_STATUS_CODE[v]}</Tag>,
+      render: (v: OrderStatus) => <Tag color={ORDER_STATUS_COLOR[v]}>{phase5 ? v : ORDER_STATUS_CODE[v]}</Tag>,
     },
     {
       title: t('order.col.original'),
@@ -219,20 +247,57 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
       title: t('order.col.paidTime'),
       dataIndex: 'paidTime',
       width: 200,
-      render: (v: string | undefined, r: Order) => <LocalTime time={v} country={countryOf(r.studentId)} />,
+      render: (v: string | undefined, r: Order) => phase5 ? orderTime5(v) : <LocalTime time={v} country={countryOf(r.studentId)} />,
     },
     {
       title: t('order.col.validUntil'),
       dataIndex: 'validUntil',
       width: 200,
-      render: (v: string | undefined, r: Order) => <LocalTime time={v} country={countryOf(r.studentId)} />,
+      render: (v: string | undefined, r: Order) => phase5 ? orderTime5(v) : <LocalTime time={v} country={countryOf(r.studentId)} />,
     },
   ]
 
+  const activeTags: { label: string; clear: () => void }[] = [
+    ...(keyword ? [{ label: `搜索：${keyword}`, clear: () => setKeyword('') }] : []),
+    ...(orderStatus ? [{ label: `订单状态：${orderStatus}`, clear: () => setOrderStatus(undefined) }] : []),
+    ...(payMethod ? [{ label: `支付方式：${payMethod}`, clear: () => setPayMethod(undefined) }] : []),
+    ...(countryFilter ? [{ label: `国家：${countryFilter}`, clear: () => setCountryFilter(undefined) }] : []),
+    ...(lineSel.length ? [{ label: `业务线：${lineSel.join('、')}`, clear: () => setLineSel([]) }] : []),
+    ...(typeFilter ? [{ label: `用户类型：${typeFilter}`, clear: () => setTypeFilter(undefined) }] : []),
+    ...(filters5.product ? [{ label: `商品：${filters5.product}`, clear: () => update5({ product: undefined }) }] : []),
+    ...(filters5.cc ? [{ label: `CC：${accounts.find(a => a.email === filters5.cc)?.name || (filters5.cc === '__unassigned__' ? '未分配' : filters5.cc)}`, clear: () => update5({ cc: undefined }) }] : []),
+    ...(filters5.currency ? [{ label: `币种：${filters5.currency}`, clear: () => update5({ currency: undefined, min: undefined, max: undefined }) }] : []),
+    ...(filters5.min != null || filters5.max != null ? [{ label: `实付：${filters5.min ?? '不限'} — ${filters5.max ?? '不限'}`, clear: () => update5({ min: undefined, max: undefined }) }] : []),
+    ...(filters5.from || filters5.to ? [{ label: `${{ paidTime: '支付', createdTime: '创建', validUntil: '到期' }[filters5.dateField]}日期：${filters5.from || '不限'} — ${filters5.to || '不限'}`, clear: () => update5({ from: undefined, to: undefined }) }] : []),
+  ]
+  const extraCount = Number(!!filters5.cc) + Number(!!filters5.currency) + Number(filters5.min != null || filters5.max != null) + Number(!!typeFilter)
+  const paidAmounts = new Map<string, number>()
+  data.filter(order => order.orderStatus === '已支付').forEach(order => paidAmounts.set(order.currency, (paidAmounts.get(order.currency) || 0) + order.paidAmount))
+  const phase5Filters = <div className="phase5-orders-filters">
+    <div className="phase5-filter-grid">
+      <div className="phase5-filter-field wide"><label>搜索订单 / 用户</label><Input allowClear prefix={<SearchOutlined />} value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="订单号 / 用户 ID / 姓名 / 登录账号 / 优惠码" /></div>
+      <div className="phase5-filter-field"><label>业务线</label><LineFilter value={lineSel} onChange={setLineSel} options={filterOptions(lineOptions)} disabled={lineDisabled} width={0} /></div>
+      <div className="phase5-filter-field"><label>国家</label><Select aria-label="国家" allowClear showSearch placeholder="全部国家" value={countryFilter} onChange={setCountryFilter} options={countries.map(value => ({ label: value, value }))} /></div>
+      <div className="phase5-filter-field"><label>订单状态</label><Select aria-label="订单状态" allowClear placeholder="全部状态" value={orderStatus} onChange={setOrderStatus} options={['待支付', '已支付', '已退款', '已取消'].map(value => ({ label: value, value }))} /></div>
+      <div className="phase5-filter-field"><label>商品</label><Select aria-label="商品" allowClear showSearch placeholder="搜索商品名称" value={filters5.product} onChange={product => update5({ product })} options={productOptions.map(value => ({ label: value, value }))} /></div>
+      <div className="phase5-filter-field"><label>支付方式</label><Select aria-label="支付方式" allowClear placeholder="全部支付方式" value={payMethod} onChange={setPayMethod} options={payOptions.map(value => ({ label: value, value }))} /></div>
+      <div className="phase5-filter-field"><label>时间类型 · UTC+08:00</label><Select aria-label="时间类型" value={filters5.dateField} onChange={dateField => update5({ dateField })} options={[{ label: '成功支付时间', value: 'paidTime' }, { label: '订单创建时间', value: 'createdTime' }, { label: '有效期到期时间', value: 'validUntil' }]} /></div>
+      <div className="phase5-filter-field wide"><label>日期范围 · 含开始与结束日期</label><DatePicker.RangePicker aria-label="订单日期范围" value={filters5.from && filters5.to ? [dayjs(filters5.from), dayjs(filters5.to)] : null} onChange={value => update5({ from: value?.[0]?.format('YYYY-MM-DD'), to: value?.[1]?.format('YYYY-MM-DD') })} presets={[{ label: '今天', value: [dayjs.utc().utcOffset(480), dayjs.utc().utcOffset(480)] }, { label: '近 7 天', value: [dayjs.utc().utcOffset(480).subtract(6, 'day'), dayjs.utc().utcOffset(480)] }, { label: '近 30 天', value: [dayjs.utc().utcOffset(480).subtract(29, 'day'), dayjs.utc().utcOffset(480)] }]} /></div>
+    </div>
+    {moreFilters && <div className="phase5-filter-grid" style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed #dce2ed' }}>
+      <div className="phase5-filter-field"><label>当前 CC</label><CCSelect accounts={accounts.filter(a => a.businessLines.some(matchLine))} owners={scopedOrders.map(order => ownerOf(order) || '')} value={filters5.cc} onChange={cc => update5({ cc })} /></div>
+      <div className="phase5-filter-field"><label>币种</label><Select aria-label="币种" allowClear placeholder="全部币种" value={filters5.currency} onChange={currency => update5({ currency, min: undefined, max: undefined })} options={currencyOptions.map(value => ({ label: value, value }))} /></div>
+      <div className="phase5-filter-field"><label>实际付款金额 {filters5.currency || '· 请先选择币种'}</label><Space.Compact style={{ width: '100%' }}><InputNumber aria-label="最低实付金额" disabled={!filters5.currency} min={0} max={filters5.max ?? undefined} placeholder="最低" value={filters5.min} onChange={min => update5({ min })} /><InputNumber aria-label="最高实付金额" disabled={!filters5.currency} min={filters5.min ?? 0} placeholder="最高" value={filters5.max} onChange={max => update5({ max })} /></Space.Compact></div>
+      <div className="phase5-filter-field"><label>用户类型</label><Select aria-label="用户类型" allowClear placeholder="全部用户类型" value={typeFilter} onChange={setTypeFilter} options={USER_TYPES.map(value => ({ label: value, value }))} /></div>
+    </div>}
+    <div className="phase5-filter-footer"><Space><Button type="link" style={{ paddingLeft: 0 }} icon={moreFilters ? <UpOutlined /> : <DownOutlined />} onClick={() => setMoreFilters(!moreFilters)}>{moreFilters ? '收起更多筛选' : '更多筛选'}{extraCount ? ` (${extraCount})` : ''}</Button><Text type="secondary">选择后自动筛选</Text></Space><Space><Button onClick={resetFilters5}>重置筛选</Button>{canExport && <Button icon={<DownloadOutlined />} onClick={exportOrders}>导出筛选结果</Button>}</Space></div>
+    {!!activeTags.length && <Space wrap style={{ marginTop: 14 }}>{activeTags.map(tag => <Tag key={tag.label} closable onClose={event => { event.preventDefault(); tag.clear() }}>{tag.label}</Tag>)}</Space>}
+  </div>
+
   return (
-    <Card className="page-card" bordered={false} title={<span className="section-title">{t('order.title')}</span>}>
+    <Card className="page-card" bordered={false} title={<span className="section-title">{phase5 ? '订单列表' : t('order.title')}</span>}>
       <DashboardLinkContext filter />
-      <Space wrap style={{ marginBottom: 16 }}>
+      {phase5 ? phase5Filters : <Space wrap style={{ marginBottom: 16 }}>
         <Input
           allowClear
           prefix={<SearchOutlined />}
@@ -275,15 +340,16 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           options={['App Store', 'Google Play', 'Airwallex - Card', 'Airwallex - Kakaopay'].map((l) => ({ label: l, value: l }))}
         />
         {canExport && <Button icon={<DownloadOutlined />} onClick={exportOrders}>{d('export')}</Button>}
-      </Space>
+      </Space>}
+      {phase5 && <div className="phase5-summary"><span>共 <strong>{data.length}</strong> 笔订单</span><Text type="secondary">已支付订单实付：{[...paidAmounts].map(([currency, amount]) => `${currency} ${amount.toLocaleString()}`).join(' / ') || '—'}</Text><Text type="secondary" style={{ fontSize: 12 }}>金额分币种展示 · CC 按当前用户归属 · 时间 UTC+08:00</Text></div>}
 
       <Table
         rowKey="orderId"
-        columns={columns}
+        columns={phase5 ? [...columns.slice(0, 3), { title: '当前 CC', key: 'currentCC', width: 160, render: (_: unknown, order: Order) => ccNameOf(order) }, ...columns.slice(3), { title: '订单创建时间', key: 'createdTime', width: 180, render: (_: unknown, order: Order) => orderTime5(orderCreatedTime(order)) }] : columns}
         dataSource={data}
         locale={targetStudentId ? { emptyText: d('noOrders') } : undefined}
-        scroll={{ x: 1880 }}
-        pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
+        scroll={{ x: phase5 ? 2220 : 1880 }}
+        pagination={{ ...(phase5 ? { current: page5, onChange: (page: number) => setPage5(page) } : {}), showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
       />
     </Card>
   )

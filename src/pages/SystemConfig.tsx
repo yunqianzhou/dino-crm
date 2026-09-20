@@ -49,7 +49,7 @@ const MODULE_HIERARCHY: ModuleNode[] = [
   { key: 'system', children: [{ key: 'system_role_add' }, { key: 'system_role_edit' }, { key: 'system_role_delete' }, { key: 'system_acc_add' }, { key: 'system_acc_edit' }] },
   { key: 'usersV2', children: [{ key: 'usersV2_edit' }, { key: 'usersV2_phone_view' }, { key: 'usersV2_export' }, { key: 'usersV2_view_report' }, { key: 'usersV2_view_replay' }] },
   { key: 'ordersV3', children: [{ key: 'ordersV3_export' }] },
-  { key: 'salesV3', children: [{ key: 'salesV3_claim' }, { key: 'salesV3_dial' }, { key: 'salesV3_update' }, { key: 'salesV3_reassign' }, { key: 'salesV3_config' }, { key: 'salesV3_import_leads' }, { key: 'salesV3_view_report' }, { key: 'salesV3_view_replay' }] },
+  { key: 'salesV3', children: [{ key: 'salesV5_batch_assign' }, { key: 'salesV3_claim' }, { key: 'salesV3_dial' }, { key: 'salesV3_update' }, { key: 'salesV3_reassign' }, { key: 'salesV3_config' }, { key: 'salesV3_import_leads' }, { key: 'salesV3_view_report' }, { key: 'salesV3_view_replay' }] },
   {
     key: 'marketing',
     children: [
@@ -103,6 +103,7 @@ export default function SystemConfig() {
   const lines = BUSINESS_LINES
 
   const moduleLabel = (m: ModuleKey) => {
+    if (m === 'salesV5_batch_assign') return '批量分配线索（五期 · 独立权限）'
     if (m === 'appABTest') return lang === 'en' ? 'APP A/B test (Phase 6)' : 'APP A/B test配置（六期）'
     if (m === 'marketingV2_channel_types') return lang === 'en' ? 'Manage channel types' : '维护渠道类型（独立授权）'
     const marketingV2Labels: Partial<Record<ModuleKey, string>> = lang === 'en' ? {
@@ -298,6 +299,7 @@ export default function SystemConfig() {
         email: a.email,
         name: a.name,
         roleId: a.roleId,
+        isSalesMember: a.isSalesMember === true,
         businessLines: a.businessLines,
         status: a.status === '启用',
       })
@@ -316,6 +318,8 @@ export default function SystemConfig() {
       roleId: v.roleId,
       businessLines: scope === 'all' ? [] : v.businessLines ?? [],
       status: v.status ? '启用' : '停用',
+      isSalesMember: v.isSalesMember === true,
+      salesLead: accEditing?.salesLead,
       lastLogin: accEditing?.lastLogin,
       outboundSeatBound: accEditing?.outboundSeatBound || false,
     }
@@ -397,6 +401,7 @@ export default function SystemConfig() {
   const accColumns: ColumnsType<Account> = [
     { title: t('sys.acc.col.name'), dataIndex: 'name', width: 140 },
     { title: t('sys.acc.col.email'), dataIndex: 'email', width: 220 },
+    { title: '销售成员', key: 'salesMember', width: 110, render: (_: unknown, account: Account) => account.isSalesMember ? <Tag color="blue">销售</Tag> : <Text type="secondary">—</Text> },
     {
       title: t('sys.acc.col.role'),
       dataIndex: 'roleId',
@@ -761,6 +766,7 @@ export default function SystemConfig() {
               options={lines.map((l) => ({ label: l, value: l }))}
             />
           </Form.Item>
+          <Form.Item name="isSalesMember" label="销售成员" valuePropName="checked" extra="开启后纳入五期 CC 筛选的在职销售列表；接收分配还需启用账号、销售操作权限及对应业务线权限。"><Switch checkedChildren="是" unCheckedChildren="否" /></Form.Item>
           <Form.Item name="status" label={t('sys.acc.col.status')} valuePropName="checked">
             <Switch
               checkedChildren={t('sys.status.enabled')}

@@ -80,6 +80,12 @@ export default function App() {
           }
         >
           <Route index element={<HomeRedirect />} />
+          <Route path="users-v5" element={<Guard module="usersV2"><UserCenter phase3 phase5 /></Guard>} />
+          <Route path="users-v5/:studentId" element={<Guard module="usersV2"><UserDetail backPath="/users-v5" /></Guard>} />
+          <Route path="sales-v5" element={<Guard module="salesV3"><SalesCenterP3 phase5 /></Guard>} />
+          <Route path="sales-v5/:studentId" element={<Guard module="salesV3"><UserDetail variant="sales" backPath="/sales-v5" backText="返回销售中心五期" /></Guard>} />
+          <Route path="orders-v5" element={<Guard module="ordersV3"><OrderCenter phase5 detailsPath="/orders-v5" exportPermission="ordersV3_export" /></Guard>} />
+          <Route path="orders-v5/:orderId" element={<Guard module="ordersV3"><OrderDetail backPath="/orders-v5" /></Guard>} />
           <Route path="app-ab-test" element={<Guard module="appABTest"><AppABTest /></Guard>} />
           <Route path="management-dashboard" element={<Guard module="salesV3"><ManagementDashboard /></Guard>} />
           <Route path="channels" element={<Guard module="channels"><ChannelManagement /></Guard>} />

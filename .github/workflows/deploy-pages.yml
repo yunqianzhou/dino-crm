@@ -33,6 +33,8 @@ jobs:
         run: pnpm run test:dashboard
       - name: Check App A/B configuration rules
         run: pnpm run test:ab-config
+      - name: Check phase 5 assignment and order filters
+        run: node scripts/test-phase5.cjs
       - name: Build site
         run: pnpm run build
       - name: Configure Pages

@@ -201,6 +201,6 @@ function LeadImportButton() {
   )
 }
 
-export default function SalesCenterP3() {
-  return <SalesCenter phase3 detailPath="/sales-v3" importAction={<LeadImportButton />} />
+export default function SalesCenterP3({ phase5 = false }: { phase5?: boolean }) {
+  return <SalesCenter phase3 phase5={phase5} detailPath={phase5 ? "/sales-v5" : "/sales-v3"} importAction={<LeadImportButton />} />
 }

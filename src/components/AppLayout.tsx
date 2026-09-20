@@ -31,6 +31,9 @@ const { Header, Sider, Content } = Layout
 const { Text } = Typography
 
 const NAV_MODULE: Record<string, ModuleKey> = {
+  '/users-v5': 'usersV2',
+  '/sales-v5': 'salesV3',
+  '/orders-v5': 'ordersV3',
   '/channels': 'channels',
   '/landing': 'landing',
   '/management-dashboard': 'salesV3',
@@ -126,7 +129,14 @@ export default function AppLayout() {
     { key: '/system', icon: <SafetyOutlined />, label: phase2Label(t('app.nav.system')) },
   ].filter((n) => visible(n.key))
 
+  const phase5Nav = [
+    { key: '/users-v5', icon: <TeamOutlined />, label: appABPhaseLabel(t('app.nav.users')) },
+    { key: '/sales-v5', icon: <SolutionOutlined />, label: appABPhaseLabel(t('app.nav.sales')) },
+    { key: '/orders-v5', icon: <ProfileOutlined />, label: appABPhaseLabel(t('app.nav.orders')) },
+  ].filter(item => visible(item.key))
+
   const NAV = [
+    ...phase5Nav,
     ...topNav,
     ...salesNav,
     ...systemNav,
@@ -149,6 +159,9 @@ export default function AppLayout() {
   ]
 
   const TITLES: Record<string, string> = {
+    '/users-v5': '用户中心 · 五期',
+    '/sales-v5': '销售中心 · 五期',
+    '/orders-v5': '订单中心 · 五期',
     '/app-ab-test': lang === 'en' ? 'APP A/B test configuration' : 'APP A/B test配置',
     '/management-dashboard': lang === 'en' ? 'Management Dashboard' : '管理看板',
     '/channels': t('app.nav.channels'),
