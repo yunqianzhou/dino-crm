@@ -9,7 +9,7 @@ The supplied business dashboard and follow-up conversation establish the priorit
 1. Compare CC conversion at each step: lead, contact, appointment, attendance and payment.
 2. Combine date and CC to examine daily CC activity and the outcomes of a registration group.
 3. Include amount paid and AOV in the corresponding detail table, not just a separate payment page.
-4. Compare all sources and individual existing CRM sources. Business labels such as Multi-cities, 2 Cities and Old Lead are not silently mapped to CRM fields; the business-to-CRM source mapping still needs confirmation.
+4. Source analysis is deferred at the user’s request. Source filters, grouping choices and source comparison matrices are hidden. Existing source data is preserved; legacy source-filter URL parameters do not narrow the dashboard.
 
 ## Reading the page
 
@@ -17,14 +17,14 @@ Four always-visible question buttons keep all content in the same dashboard. Eac
 
 | View | Date meaning | Content |
 | --- | --- | --- |
-| Conversion overview (default) | Registration dates select the same lead group; recorded outcomes and valid orders are followed to date | Five step counts, five reference rates, date-to-CC hierarchy, source filter, amount/AOV column, daily-source and CC-source matrices |
+| Conversion overview (default) | Registration dates select the same lead group; recorded outcomes and valid orders are followed to date | Five step counts, five reference rates, date-to-CC hierarchy and amount/AOV column |
 | Current leads | Registration dates select users whose stages are shown now | Lead/assigned/unassigned/paid cards, all nine current stages, all 11 metrics, amount/AOV, follow-up reasons |
 | Sales activity | Each metric uses its activity date | Seven distinct-user activity metrics, daily rows expandable by CC, amount/AOV by payment date, recorded follow-up reasons |
 | Payments | Payment dates | Amount, payers, AOV, amount per payer, paid orders and exact user/order details; dates expandable by CC |
 
-All six existing current/activity breakdowns remain equally visible: CC, date, source, intent, age and time since registration. All metrics are shown by default. Optional column choices persist; Show all metrics restores them.
+The five current/activity breakdowns remain equally visible: CC, date, intent, age and time since registration. All metrics are shown by default. Optional column choices persist; Show all metrics restores them.
 
-Conversion overview defaults to registration date then current CC. Source can be filtered independently, or chosen as a hierarchy dimension. The source/date and source/CC matrices partition the same selected registered users. Their nonzero cells open exact matching users.
+Conversion overview defaults to registration date then current CC. Both hierarchy levels offer date and CC only. Legacy source hierarchy selections fall back to date/CC.
 
 ## Definitions and limitations
 
@@ -58,7 +58,7 @@ A qualifying order must currently be Paid, have a finite positive paidAmount and
 
 ## Details and navigation
 
-Counts open matching users, including hierarchical date-plus-CC/source scopes. Current/activity child rows and both source matrices preserve exact subsets. User, sales and order actions retain existing permissions and return to the selected question, date range and detail dialog.
+Counts open matching users, including hierarchical date-plus-CC scopes. Current/activity child rows preserve exact subsets. User, sales and order actions retain existing permissions and return to the selected question, date range and detail dialog.
 
 Payment rows open exact paid orders or distinct payers; date-plus-CC payment details preserve both constraints. Users can open their qualifying orders and the existing Phase 3 order detail/transactions. Legacy current/activity and detail URLs remain readable after introduction of the four question views.
 
@@ -72,6 +72,6 @@ Appointment confirmation, city, deposit/balance and more detailed business-speci
 
 ## Demo and verification
 
-The existing additive demo dataset remains unchanged: 204 Vietnam users, six CCs, 180 current leads and 24 paid users, plus orders, appointments and events. Browser sessions can contain additional prototype records or edits. The source labels shown are those actually stored in that session; business screenshot values are not copied in as data.
+The existing additive demo dataset remains unchanged: 204 Vietnam users, six CCs, 180 current leads and 24 paid users, plus orders, appointments and events. Browser sessions can contain additional prototype records or edits. Source data is preserved but hidden from the dashboard; business screenshot values are not copied in as data.
 
-`npm run test:dashboard` verifies UTC+7 boundaries, permissions, deduplication, shared stages, paid-order evidence, currency separation, refunds, registration cohorts, step-rate denominators and missing preceding-step records, AOV versus amount per payer, table payment-date semantics, source matrix totals, independent view dates and legacy URL interpretation. `npm run build` checks types and produces the site. Browser verification covers all four questions, date retention, reference-rate rows, date-to-CC expansion, source matrices, exact user/order details and return navigation.
+`npm run test:dashboard` verifies UTC+7 boundaries, permissions, deduplication, shared stages, paid-order evidence, currency separation, refunds, registration cohorts, step-rate denominators and missing preceding-step records, AOV versus amount per payer, table payment-date semantics, source matrix totals, independent view dates and legacy URL interpretation. `npm run build` checks types and produces the site. Browser verification covers all four questions, date retention, reference-rate rows, date-to-CC expansion, exact user/order details and return navigation.

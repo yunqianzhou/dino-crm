@@ -8,13 +8,12 @@ import { useStore } from '../store'
 import { usePerm } from '../perm'
 import { useI18n } from '../i18n'
 import { useDashboardText, type DashboardWord } from '../dashboardText'
-import { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupRows, dashboardReasonRows, dashboardCohortMetrics, dashboardCohortRows, dashboardCohortRates, dashboardBreakdownPayments, dashboardPaymentOrders, dashboardGroupKey, type CohortMetrics, COHORT_METRICS, type CohortMetric, type CohortDimension, type CohortRow, REASON_KINDS, PERIOD_METRICS, type DashboardFilters, type DashboardGrouping, type ReasonKind } from '../dashboardData'
+import { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupRows, dashboardReasonRows, dashboardCohortMetrics, dashboardCohortRows, dashboardCohortRates, dashboardBreakdownPayments, dashboardPaymentOrders, COHORT_METRICS, type CohortMetric, type CohortDimension, type CohortRow, REASON_KINDS, PERIOD_METRICS, type DashboardFilters, type DashboardGrouping, type ReasonKind } from '../dashboardData'
 import { consultationStage, CONSULTATION_STAGES, CONSULTATION_STAGE_COLOR } from '../salesLifecycle'
 import { isSalesLead } from '../funnel'
 import type { Student } from '../types'
 import LocalTime from '../components/LocalTime'
 import DashboardPayments from '../components/DashboardPayments'
-import DashboardCohortMatrix from '../components/DashboardCohortMatrix'
 import DashboardMoneyCell from '../components/DashboardMoneyCell'
 import { DASHBOARD_VIEWS, dashboardView, dashboardViewRange, dashboardSwitchView, type DashboardView } from '../dashboardView'
 import './ManagementDashboard.css'
@@ -54,7 +53,7 @@ export default function ManagementDashboard() {
  const requestedColumns = (query.get(columnParam) || '').split(',').filter(key => keys.includes(key))
  const visibleKeys = requestedColumns.length ? keys.filter(key => requestedColumns.includes(key)) : defaultColumns
  const rangeLabel = filters.start && filters.end ? `${filters.start} — ${filters.end}` : d('allDates')
- const groupValues: DashboardGrouping[] = ['cc', 'date', 'source', 'intent', 'age', 'registrationAge']
+ const groupValues: DashboardGrouping[] = ['cc', 'date', 'intent', 'age', 'registrationAge']
  const grouping = (groupValues.includes(query.get('group') as DashboardGrouping) ? query.get('group') : view === 'period' ? 'date' : 'cc') as DashboardGrouping
  const groupLabels = { cc: d('ccTitle'), date: d('dateTitle'), source: d('groupSource'), intent: d('groupIntent'), age: d('groupAge'), registrationAge: d('groupRegistrationAge') }
  const groupName = (group: DashboardGrouping, id: string): string => group === 'cc' ? ownerName(id) : id === '__unknown__' ? d('unknown') : group === 'intent' ? t(`sales.purchaseIntention.${id === '有意向' ? 'yes' : id === '无意向' ? 'no' : 'none'}`) : group === 'registrationAge' ? `${id} ${d('days')}` : id
@@ -66,24 +65,18 @@ export default function ManagementDashboard() {
  const reasonRows = dashboardReasonRows(population, calls, lessons, filters, reasonKind)
  const cohortFilters = filters
  const cohortRange = cohortFilters.start && cohortFilters.end ? `${cohortFilters.start} — ${cohortFilters.end}` : d('allDates')
- const fullCohort = dashboardCohortMetrics(population, calls, cohortFilters, orders)
- const sourceOptions = dashboardCohortRows(fullCohort, 'source', '').map(row => row.value)
- const sourceFilter = query.get('cohortSource') || ''
- const cohort = Object.fromEntries(COHORT_METRICS.map(key => [key, fullCohort[key].filter(s => !sourceFilter || dashboardGroupKey(s, 'source') === sourceFilter)])) as CohortMetrics
+ const cohort = dashboardCohortMetrics(population, calls, cohortFilters, orders)
  const rates = dashboardCohortRates(cohort)
  const rateDisplay = (rate: typeof rates[number]) => rate.value === null ? d('rateUnavailable') : `${Math.round(rate.value * 10) / 10}%`
  const rateHint = (rate: typeof rates[number]) => `${d(rate.formula)}: ${rate.numeratorCount} / ${rate.denominatorCount}${rate.reason ? ' - ' + d(rate.reason) : ''}`
  const rateForMetric = (metric: CohortMetric) => ({ connected: 'rateContact', booked: 'rateBooking', attended: 'rateAttendance', paid: 'ratePaid' } as const)[metric as Exclude<CohortMetric, 'leads'>]
  const cohortMoney = (row?: CohortRow) => <DashboardMoneyCell orders={dashboardPaymentOrders(orders, (row?.metrics || cohort).leads, { ...cohortFilters, start: '', end: '' })} />
- const cohortDimensions: CohortDimension[] = ['date', 'cc', 'source']
+ const cohortDimensions: CohortDimension[] = ['date', 'cc']
  const cohortPrimary = (cohortDimensions.includes(query.get('conversionPrimary') as CohortDimension) ? query.get('conversionPrimary') : 'date') as CohortDimension
  const secondaryValue = query.get('conversionSecondary')
- const cohortSecondary: CohortDimension | '' = secondaryValue === '' ? '' : cohortDimensions.includes(secondaryValue as CohortDimension) && secondaryValue !== cohortPrimary ? secondaryValue as CohortDimension : cohortPrimary === 'cc' ? 'source' : 'cc'
+ const cohortSecondary: CohortDimension | '' = secondaryValue === '' ? '' : cohortDimensions.includes(secondaryValue as CohortDimension) && secondaryValue !== cohortPrimary ? secondaryValue as CohortDimension : cohortPrimary === 'cc' ? 'date' : 'cc'
  const cohortRows = dashboardCohortRows(cohort, cohortPrimary, cohortSecondary)
- const cohortDateSources = dashboardCohortRows(cohort, 'date', 'source')
- const cohortCCSources = dashboardCohortRows(cohort, 'cc', 'source')
- const cohortAllRows = [...cohortRows, ...cohortDateSources, ...cohortCCSources]
- const cohortSources = dashboardCohortRows(cohort, 'source', '').map(row => row.value)
+ const cohortAllRows = cohortRows
  const cohortDimensionTitle = (value: CohortDimension) => d(value === 'date' ? 'registerDates' : value === 'cc' ? 'currentCC' : 'source')
  const cohortTitle = (key: CohortMetric) => d(({ leads: 'cohortLeads', connected: 'cohortConnected', booked: 'cohortBooked', attended: 'cohortAttended', paid: 'paid' } as const)[key])
  const cohortName = (row: CohortRow) => groupName(row.dimension, row.value)
@@ -113,7 +106,7 @@ export default function ManagementDashboard() {
  const detailRange = cohortDetail ? cohortPath.find(row => row.dimension === 'date')?.value || cohortRange : detailGroup === 'date' ? detailValue : rangeLabel
  const detailOwner = (cohortDetail ? cohortPath.find(row => row.dimension === 'cc')?.value : detailGroup === 'cc' ? detailValue : query.get('detailCC') || '') || filters.owner
  const close = () => change({})
- const reset = () => change({ start: '', end: '', cc: '', ...(view === 'cohort' ? { cohortSource: '' } : {}) })
+ const reset = () => change({ start: '', end: '', cc: '' })
  const today = dayjs().utcOffset(420)
  const go = (path: string) => navigate(path, { state: { dashboardReturn: location.pathname + location.search } })
  const count = (key: string, n = (metrics[key] || []).length, group?: DashboardGrouping, value?: string, owner?: string) => <button className="dashboard-count" onClick={() => open(key, group, value, owner)} aria-label={`${title(key)} · ${group && value ? groupName(group, value) + ' · ' : ''}${owner ? ownerName(owner) + ' / ' : ''}${n}`}>{n.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}</button>
@@ -136,10 +129,9 @@ export default function ManagementDashboard() {
    <nav className="dashboard-questions" aria-label={d('chooseQuestion')}>{DASHBOARD_VIEWS.map(value => <button key={value} aria-pressed={view === value} onClick={() => switchView(value)}><strong>{d(viewText[value].label)}</strong><span>{d(viewText[value].question)}</span></button>)}</nav>
    <Card className="dashboard-filters"><Space wrap size={16}>
      <Select aria-label={d('currentCC')} value={filters.owner} style={{ minWidth: 180 }} onChange={v => change({ cc: v })} options={[{ value: '', label: d('allCC') }, ...ownerIds.map(id => ({ value: id, label: ownerName(id) }))]} />
-     {view === 'cohort' && <Select aria-label={d('source')} value={sourceFilter} style={{ minWidth: 200 }} onChange={value => change({ cohortSource: value })} options={[{ value: '', label: d('allSources') }, ...sourceOptions.map(value => ({ value, label: groupName('source', value) }))]} />}
      <div className="dashboard-date"><span>{d(activeText.date)}</span><DatePicker.RangePicker aria-label={d(activeText.date)} value={filters.start && filters.end ? [dayjs(filters.start), dayjs(filters.end)] : null} placeholder={[d('allDates'), d('allDates')]} presets={[{ label: d('today'), value: [today, today] }, { label: d('last7'), value: [today.subtract(6, 'day'), today] }, { label: d('thisMonth'), value: [today.startOf('month'), today] }]} onChange={v => change({ start: v?.[0]?.format('YYYY-MM-DD') || '', end: v?.[1]?.format('YYYY-MM-DD') || '' })} /></div>
-     {(filters.owner || filters.start || filters.end || (view === 'cohort' && sourceFilter)) && <Button type="text" onClick={reset}>{d('resetFilters')}</Button>}
-   </Space><p className="dashboard-help">{d(activeText.meaning)} {view === 'cohort' && d('sourceMappingHelp')}</p></Card>
+     {(filters.owner || filters.start || filters.end) && <Button type="text" onClick={reset}>{d('resetFilters')}</Button>}
+   </Space><p className="dashboard-help">{d(activeText.meaning)}</p></Card>
    <section className="dashboard-reading" aria-label={d('readingGuide')}><div><h3>{d(activeText.question)}</h3><p>{d(activeText.read, { ...Object.fromEntries(Object.entries(view === 'cohort' ? cohort : metrics).map(([key, rows]) => [key, rows.length])), totalRate: rateDisplay(rates[4]) })}</p><span>{d(activeText.next)}</span></div><Button type="link" onClick={() => setRulesOpen(true)}>{d('exampleTitle')}</Button></section>
    {isLeadView && <div className={`dashboard-kpis ${filters.mode === 'period' ? 'dashboard-period' : ''}`}>
      {(filters.mode === 'current' ? ['total', 'assigned', 'unassigned', 'paid'] : [...PERIOD_METRICS]).map(key => <Card key={key} className={key === 'paid' ? 'dashboard-paid' : undefined}><div className="dashboard-kpi-label">{title(key)}</div>{count(key)}{key === 'paid' && <p className="dashboard-paid-hint">{d(filters.mode === 'current' ? 'paidCurrent' : 'paidPeriod')}</p>}{key !== 'paid' && <p className="dashboard-kpi-hint">{d(`${key}Hint` as DashboardWord)}</p>}<ArrowRightOutlined /></Card>)}
@@ -180,10 +172,6 @@ export default function ManagementDashboard() {
      ]} summary={() => cohortRows.length ? <Table.Summary.Row><Table.Summary.Cell index={0}><strong>{d('currentTotal')}</strong></Table.Summary.Cell>{COHORT_METRICS.map((key, i) => <Table.Summary.Cell index={i + 1} key={key}>{cohortCount(key)}</Table.Summary.Cell>)}<Table.Summary.Cell index={6}>{rateDisplay(rates[4])}</Table.Summary.Cell><Table.Summary.Cell index={7}>{cohortMoney()}</Table.Summary.Cell></Table.Summary.Row> : null} />
      <p className="dashboard-help dashboard-bottom-note">{d('cohortEvidence')}</p>
    </Card>}
-   {view === 'cohort' && <div className="dashboard-matrix-pair">
-     <DashboardCohortMatrix title={d('sourceDateTitle')} help={d('sourceDateHelp')} rowTitle={d('registerDates')} rows={cohortDateSources} sources={cohortSources} rowName={cohortRowLabel} sourceName={source => groupName('source', source)} onOpen={row => openCohort('leads', row)} />
-     <DashboardCohortMatrix title={d('sourceCCTitle')} help={d('sourceCCHelp')} rowTitle={d('currentCC')} rows={cohortCCSources} sources={cohortSources} rowName={cohortRowLabel} sourceName={source => groupName('source', source)} onOpen={row => openCohort('leads', row)} />
-   </div>}
    {view === 'payments' && <DashboardPayments population={population} orders={orders} filters={paymentFilters} rangeLabel={paymentRange} />}
    {isLeadView && <Card title={d('reasons')}>
      <Segmented className="dashboard-grouping" value={reasonKind} onChange={v => change({ reasonKind: String(v) })} options={REASON_KINDS.map(value => ({ value, label: d(value) }))} />
