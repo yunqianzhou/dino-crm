@@ -80,7 +80,10 @@
 .ab-allocation-bar { display:flex; overflow:hidden; height:12px; border-radius:8px; background:#e8edf5; margin-bottom:18px; }
 .ab-allocation-line { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:13px 0; font-size:12px; }
 .ab-instructions { margin:0; padding-left:20px; color:#687990; line-height:2.3; font-size:13px; }
-.ab-steps { padding:22px 26px; margin-bottom:22px; background:#fff; border:1px solid #e7ebf0; border-radius:10px; }
+.ab-step-nav { margin-bottom:16px; overflow-x:auto; }
+.ab-step-nav .ab-steps { width:640px; max-width:100%; min-width:480px; padding:0; }
+.ab-publish-settings { max-width:760px; margin-top:20px; }
+.ab-publish-settings .ant-form-item { margin-bottom:0; }
 .ab-freeze-note { margin-bottom:18px; }
 .ab-editor-actions { position:sticky; bottom:-20px; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:15px; padding:17px 20px; margin-top:20px; background:#fff; border-top:1px solid #e4e9f0; box-shadow:0 -4px 18px #233a5908; }
 .ab-review-card { margin-bottom:24px; }

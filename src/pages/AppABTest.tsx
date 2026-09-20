@@ -164,7 +164,6 @@ export default function AppABTest() {
       <Card title={experiment ? '实验信息' : '线上配置信息'}>
         <Form layout="vertical" disabled={locked}>
           <Form.Item label={experiment ? '实验名称' : '配置名称'} htmlFor="ab-config-name" required><Input id="ab-config-name" placeholder={experiment ? '例如：沙特 Android 登录后置实验' : '例如：沙特 Android 首次使用方案'} value={editing.value.name} onChange={e => experiment ? changeExperiment({ name: e.target.value }) : changeOnline({ name: e.target.value })} /></Form.Item>
-          {online && <Form.Item label="替换现有线上配置" extra="保存草稿不会影响当前线上版本；发布成功后才替换。未选择则作为独立投放，范围不得与其他生效配置重叠。"><Select aria-label="替换现有线上配置" allowClear value={online.replacesId} placeholder="不替换，新建独立投放" options={liveOnline.filter(x => x.id !== online.id).map(x => ({ value: x.id, label: `${x.name} · V${x.revision}` }))} onChange={replacesId => changeOnline({ replacesId })} /></Form.Item>}
           {experiment && <div className="ab-base-snapshot"><CopyOutlined /><div><strong>基准快照：{experiment.base.name} · V{experiment.base.revision}</strong><p>创建实验时复制；后续线上修改不会改变本实验。各组初始内容与基准一致。</p></div></div>}
           {online?.source && <Alert type="info" showIcon message={`来源：${online.source}。流程、页面与已填写译文已一并复制；请确认下方适用范围。`} />}
         </Form>
@@ -241,7 +240,7 @@ export default function AppABTest() {
     </> : <>
       <div className="ab-edit-meta"><Space wrap><strong>{editing.value.name || (experiment ? '新建实验' : '新建线上配置')}</strong><Tag color={statusColor(activeStatus)}>{activeStatus}</Tag>{editing.value.status !== 'draft' && <Tag>配置只读</Tag>}</Space><Space>{canEdit && experiment && experiment.status !== 'draft' && <><Button icon={<CopyOutlined />} onClick={() => copyExperiment(experiment)}>复制为新实验</Button><Button onClick={() => showPromotion(experiment)}>实验组转线上</Button>{['待开始', '进行中'].includes(activeStatus) && <Button danger onClick={() => close(experiment)}>关闭实验</Button>}</>}{canEdit && online?.status === 'published' && <Button icon={<CopyOutlined />} onClick={() => reviseOnline(online)}>修改新版本</Button>}</Space></div>
       {experiment?.status !== 'draft' && experiment && <Alert className="ab-freeze-note" type="warning" showIcon message="本实验配置已冻结" description="可以预览各组页面与译文；如需修改条件、流量、分组、时间或内容，请复制为新实验。关闭或结束后也不能恢复编辑。" />}
-      <Steps current={step} onChange={setStep} className="ab-steps" items={[{ title: experiment ? '实验设置' : '适用范围' }, { title: experiment ? '分组方案' : '流程与页面' }, { title: experiment ? '检查并开启' : '检查并发布' }]} />
+      <nav className="ab-step-nav" aria-label="配置步骤"><Steps size="small" responsive={false} current={step} onChange={setStep} className="ab-steps" items={[{ title: experiment ? '实验设置' : '适用范围' }, { title: experiment ? '分组方案' : '流程与页面' }, { title: experiment ? '检查并开启' : '检查并发布' }]} /></nav>
       {step === 0 ? settings : step === 1 ? planEditor : <>
         <Card title={locked ? '配置概览' : '发布前检查'} className="ab-review-card">
           <Descriptions column={2} size="small" bordered items={[
@@ -250,6 +249,11 @@ export default function AppABTest() {
             { key: 'target', label: '适用范围', span: 2, children: targetSummary(editing.value.target) },
             ...(experiment ? [{ key: 'traffic', label: '实验流量', children: `${experiment.traffic}%` }, { key: 'variants', label: '分组', children: experiment.variants.map(v => `${v.name} ${v.weight}%${v.control ? '（对照）' : ''}`).join(' / ') }, { key: 'time', label: '时间（UTC+8）', span: 2, children: `${experiment.startMode === 'now' && !experiment.startAt ? '开启后立即开始' : formatDate(experiment.startAt)} 至 ${formatDate(experiment.endAt)}` }] : [{ key: 'replaces', label: '替换配置', span: 2, children: store.online.find(x => x.id === online?.replacesId)?.name ?? '新建独立投放' }]),
           ]} />
+          {online && !locked && <Form layout="vertical" className="ab-publish-settings">
+            <Form.Item label="替换现有线上配置（可选）" extra="发布成功后才会替换，保存草稿不会影响线上。未选择则新增投放，适用范围不能与其他已发布配置重叠。">
+              <Select aria-label="替换现有线上配置" allowClear value={online.replacesId} placeholder="不替换，新增投放" options={liveOnline.filter(x => x.id !== online.id).map(x => ({ value: x.id, label: `${x.name} · V${x.revision} · ${targetSummary(x.target)}` }))} onChange={replacesId => changeOnline({ replacesId })} />
+            </Form.Item>
+          </Form>}
           {!locked && (errors.length ? <Alert type="error" showIcon message={`有 ${errors.length} 项需要处理`} description={<ul>{errors.map((error, index) => <li key={index}>{error}</li>)}</ul>} /> : <Alert type="success" showIcon icon={<CheckCircleOutlined />} message="人群、版本条件、比例和时间等本地校验已通过" description="仍需正式接口校验素材、商品、客户端兼容与实际投放冲突。当前操作只改变原型数据。" />)}
           <Paragraph type="secondary" style={{ margin: '16px 0 0' }}>已填写的基础文案和译文随方案一同保存{experiment ? '、冻结' : ''}。未填写的语言在本原型中回退基础中文；正式多语言发布与服务端校验尚未接入。</Paragraph>
         </Card>
