@@ -61,7 +61,7 @@ export function seedStore(): ABStore {
 }
 
 type Version = [number, number, number]
-const validVersion = (text: string) => /^\d+\.\d+\.\d+$/.test(text) && text.split('.').every(n => Number.isSafeInteger(Number(n)) && Number(n) < Number.MAX_SAFE_INTEGER)
+export const validVersion = (text: string) => /^\d+\.\d+\.\d+$/.test(text) && text.split('.').every(n => Number.isSafeInteger(Number(n)) && Number(n) < Number.MAX_SAFE_INTEGER)
 const parseVersion = (text: string) => text.split('.').map(Number) as Version
 const compare = (a: Version, b: Version) => { for (let i = 0; i < 3; i++) { if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1 } return 0 }
 export function versionMatches(version: string, conditions: VersionCondition[]): boolean {

@@ -1,7 +1,8 @@
+import type { Member } from './appConfigModel'
 import type { PageCopy, Plan, Target } from './abTestConfig'
 export type Asset = { mode: 'inherit' | 'custom' | 'hidden'; src?: string; name?: string; mime?: string; width?: number; height?: number; bytes?: number }
 export type PageItem = { id: string; label: string; body?: string; asset?: Asset; values?: string[] }
-export type PageDetails = { texts: Record<string, string>; assets: Record<string, Asset>; lists: Record<string, PageItem[]>; settings: Record<string, string | number | boolean | string[]> }
+export type PageDetails = { members?: Member[]; texts: Record<string, string>; assets: Record<string, Asset>; lists: Record<string, PageItem[]>; settings: Record<string, string | number | boolean | string[]> }
 export const inheritedAsset = (): Asset => ({ mode: 'inherit' })
 export const animations = [{ value: 'static', label: '静态' }, { value: 'breathe', label: '呼吸动效' }, { value: 'shake', label: '抖动动效' }]
 export const loginMethods = [{ id: 'google', label: 'Google' }, { id: 'apple', label: 'Apple' }, { id: 'phone', label: '手机号' }, { id: 'facebook', label: 'Facebook' }, { id: 'kakao', label: 'Kakao' }]
@@ -30,7 +31,7 @@ export function defaultPageDetails(node: string, copy?: PageCopy): PageDetails {
  return d
 }
 export function pageDetails(plan: Plan, node: string): PageDetails { return plan.pages?.[node] ?? defaultPageDetails(node, plan.copy[node]) }
-export function previewVariables(text: string, nickname: string, level: string): string { return text.split('{昵称}').join(nickname).split('{当前定级}').join(level) }
+export function previewVariables(text: string, nickname: string, level: string): string { return text.split('{nickname}').join(nickname).split('{昵称}').join(nickname).split('{当前定级}').join(level) }
 export function validAssetSource(src: string): boolean { return /^asset:[\w-]+$/.test(src) || /^https:\/\//i.test(src) && (() => { try { const u = new URL(src); return Boolean(u.hostname) && !u.username && !u.password } catch { return false } })() }
 export function demoProducts(target: Target) {
  const countries = target.countries.includes('*') ? ['SA', 'MY', 'US'] : target.countries
