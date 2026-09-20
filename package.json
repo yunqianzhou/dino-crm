@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test:dashboard": "node scripts/test-dashboard.cjs"
+    "test:dashboard": "node scripts/test-dashboard.cjs",
+    "test:ab-config": "node scripts/test-ab-config.cjs"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",

@@ -31,6 +31,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Check dashboard metrics
         run: pnpm run test:dashboard
+      - name: Check App A/B configuration rules
+        run: pnpm run test:ab-config
       - name: Build site
         run: pnpm run build
       - name: Configure Pages
