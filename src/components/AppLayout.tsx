@@ -77,9 +77,9 @@ export default function AppLayout() {
   const phase2Label = (text: string) => phaseLabel(text, t('app.phase2'), 'orange')
   const phase3Label = (text: string) => phaseLabel(text, t('app.phase3'), 'purple')
   const phase4Label = (text: string) => phaseLabel(text, '四期', 'cyan')
-  const phase5Label = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'green')
+  const dashboardPhaseLabel = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 4.3' : '4.3期', 'green')
 
-  const phase6Label = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 6' : '六期', 'geekblue')
+  const appABPhaseLabel = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'geekblue')
 
   const visible = (key: string) => can(NAV_MODULE[key]) !== 'none'
 
@@ -144,8 +144,8 @@ export default function AppLayout() {
           },
         ]
       : []),
-    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: phase5Label(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
-    ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: phase6Label(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
+    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: dashboardPhaseLabel(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
+    ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: appABPhaseLabel(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
   ]
 
   const TITLES: Record<string, string> = {

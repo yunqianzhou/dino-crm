@@ -241,7 +241,7 @@ export default function AppABTest() {
 
   return <div className={`ab-page ${editing ? 'ab-editing' : ''}`} ref={pageRef}>
     {messageHolder}{modalHolder}
-    <div className="ab-heading"><div><Space><Title level={3} style={{ margin: 0 }}>APP A/B test配置</Title><Tag color="geekblue">六期</Tag><Tag>交互原型</Tag></Space><Paragraph type="secondary" style={{ margin: '10px 0 0' }}>配置适用人群，创建实验，再编排流程与页面</Paragraph></div>
+    <div className="ab-heading"><div><Space><Title level={3} style={{ margin: 0 }}>APP A/B test配置</Title><Tag color="geekblue">五期</Tag><Tag>交互原型</Tag></Space><Paragraph type="secondary" style={{ margin: '10px 0 0' }}>配置适用人群，创建实验，再编排流程与页面</Paragraph></div>
       {editing && <Space wrap><Button icon={<ArrowLeftOutlined />} onClick={back}>返回列表</Button>{dirty && <Text type="warning">未保存</Text>}{!locked && <Button icon={<SaveOutlined />} onClick={saveDraft}>保存草稿</Button>}</Space>}
     </div>
     <Alert className="ab-prototype-note" type="info" showIcon message="本页为可交互配置原型：草稿、发布、实验开启与关闭均仅保存在当前浏览器，不向真实 App 下发，也不产生真实分流。" />
