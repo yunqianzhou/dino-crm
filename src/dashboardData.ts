@@ -88,6 +88,48 @@ export function dashboardDateRows(population: Student[], calls: CallRecord[], le
 }
 
 export type DashboardGrouping = 'cc' | 'date' | 'intent' | 'age' | 'registrationAge' | 'source'
+export const COHORT_METRICS = ['leads', 'connected', 'booked', 'attended', 'paid'] as const
+export type CohortMetric = typeof COHORT_METRICS[number]
+export type CohortDimension = 'date' | 'cc' | 'source'
+export type CohortMetrics = Record<CohortMetric, Student[]>
+export type CohortRow = { id: string; value: string; dimension: CohortDimension; metrics: CohortMetrics; children?: CohortRow[] }
+
+/** Recorded outcomes for a registration cohort, including users who have since paid.
+ * Missing historical evidence is not inferred from a user's current sales stage.
+ * These independent counts are deliberately not converted to funnel percentages.
+ */
+export function dashboardCohortMetrics(population: Student[], calls: CallRecord[], filters: DashboardFilters, orders: Order[] = []): CohortMetrics {
+  const eligible = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+    (!filters.userType || resolveUserType(s) === filters.userType) && !!s.phone?.trim() && inVietnamRange(s.registerTime, filters.start, filters.end))
+  const connected = new Set(calls.filter(c => c.result === '已接通' && inVietnamRange(c.time, '', '')).map(c => c.studentId))
+  const paid = new Set(orders.filter(isDashboardPaidOrder).map(o => o.studentId))
+  const hasEvent = (s: Student, node: string, results: string[]) => (s.salesLifecycleEvents || []).some(e =>
+    e.node === node && results.includes(e.result) && inVietnamRange(e.reportedAt, '', ''))
+  return {
+    leads: eligible,
+    connected: eligible.filter(s => connected.has(s.studentId) || hasEvent(s, 'contact', ['已接通'])),
+    // A cancelled appointment still proves that a booking was created in the past.
+    booked: eligible.filter(s => (s.salesAppointments || []).some(a => inVietnamRange(a.createdAt, '', '')) || hasEvent(s, 'appointment', ['已预约', '已改期'])),
+    attended: eligible.filter(s => hasEvent(s, 'attendance', ['已出勤']) || hasEvent(s, 'consultation', ['咨询完成', '咨询未完成'])),
+    paid: eligible.filter(s => paid.has(s.studentId)),
+  }
+}
+
+export function dashboardCohortRows(metrics: CohortMetrics, primary: CohortDimension, secondary: CohortDimension | ''): CohortRow[] {
+  const key = (s: Student, dimension: CohortDimension) => dimension === 'date'
+    ? dayjs.utc(s.registerTime).utcOffset(420).format('YYYY-MM-DD') : dashboardGroupKey(s, dimension)
+  const group = (source: CohortMetrics, dimension: CohortDimension, path: string[][], nested: boolean): CohortRow[] => {
+    const values = [...new Set(source.leads.map(s => key(s, dimension)))].sort((a, b) => dimension === 'date' ? b.localeCompare(a) : a.localeCompare(b))
+    return values.map(value => {
+      const subset = Object.fromEntries(COHORT_METRICS.map(metric => [metric, source[metric].filter(s => key(s, dimension) === value)])) as CohortMetrics
+      const rowPath = [...path, [dimension, value]]
+      return { id: JSON.stringify(rowPath), value, dimension, metrics: subset,
+        children: !nested && secondary && secondary !== dimension ? group(subset, secondary, rowPath, true) : undefined }
+    })
+  }
+  return group(metrics, primary, [], false)
+}
+
 export function dashboardGroupKey(s: Student, group: Exclude<DashboardGrouping, 'date'>, now = dayjs.utc().toISOString()) {
   if (group === 'cc') return s.salesOwner || '__unassigned__'
   if (group === 'intent') return s.purchaseIntention || '未填写'

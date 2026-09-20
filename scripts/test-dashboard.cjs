@@ -7,7 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/managementDemo.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
-  const { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
+  const { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, dashboardCohortMetrics, dashboardCohortRows, COHORT_METRICS, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
   const user = (id, extra = {}) => ({ studentId: id, name: id, phone: '+840000000', account: id, businessLine: '越南', status: '未付费-未体验', userType: '正式用户', registerTime: '2026-09-01 00:00:00', ...extra })
   const a = user('a', { salesOwner: 'a@example.com' })
   const b = user('b', { salesOwner: 'b@example.com', salesProgress: '暂不跟进' })
@@ -181,5 +181,34 @@ try {
   assert.equal(paymentDailyRows[0].users, 1, 'whole-period payer total must deduplicate across dates')
   assert.equal(dashboardDateRows(demo.students, demo.callRecords, demo.lessons, filters, demo.orders).reduce((sum, r) => sum + r.metrics.paid.length, 0), 24)
   for (const group of ['cc', 'age', 'intent', 'registrationAge']) assert.equal(dashboardGroupRows(demoPayments, group).reduce((sum, r) => sum + r.metrics.paid.length, 0), 24)
+  // Registration cohorts retain paid users and later outcomes, never current status guesses.
+  const cohortPeople = [
+    user('history', { salesOwner: 'cc-a', salesAppointments: [{ createdAt: '2026-09-10T00:00:00Z', appointmentStatus: '已取消', attendanceStatus: '已出勤' }] }),
+    user('recorded', { salesOwner: 'cc-b', salesLifecycleEvents: [{ node: 'consultation', result: '咨询完成', reportedAt: '2026-09-12T00:00:00Z' }] }),
+    user('paid-cohort', { status: '付费', salesOwner: 'cc-a' }),
+    user('outside-cohort', { registerTime: '2026-09-02T00:00:00Z' }),
+    user('test-cohort', { userType: '测试用户' }), user('no-phone', { phone: '' }),
+  ]
+  const cohortFilter = { ...filters, start: '2026-09-01', end: '2026-09-01' }
+  const cohortCalls = [{ studentId: 'history', result: '已接通', time: '2026-09-10T00:00:00Z' }, { studentId: 'history', result: '已接通', time: '2026-09-11T00:00:00Z' }, { studentId: 'paid-cohort', result: '已接通', time: 'invalid' }]
+  const cohortOrders = [paidOrder('later-payment', 'paid-cohort', { paidTime: '2026-09-13T00:00:00Z' })]
+  const cohort = dashboardCohortMetrics(cohortPeople, cohortCalls, cohortFilter, cohortOrders)
+  assert.deepEqual(cohort.leads.map(s => s.studentId), ['history', 'recorded', 'paid-cohort'])
+  assert.deepEqual(cohort.connected.map(s => s.studentId), ['history'], 'later repeated calls count once; invalid dates excluded')
+  assert.deepEqual(cohort.booked.map(s => s.studentId), ['history'], 'cancellation does not erase a past booking')
+  assert.deepEqual(cohort.attended.map(s => s.studentId), ['recorded'], 'current attendance flags cannot substitute for historical records')
+  assert.deepEqual(cohort.paid.map(s => s.studentId), ['paid-cohort'], 'keep paid cohort users and later payments')
+  assert.equal(dashboardCohortMetrics(cohortPeople, cohortCalls, { ...cohortFilter, owner: 'cc-a' }, cohortOrders).leads.length, 2)
+  const cohortTree = dashboardCohortRows(cohort, 'date', 'cc')
+  assert.equal(cohortTree.length, 1)
+  assert.equal(cohortTree[0].children.length, 2)
+  assert.equal(new Set([cohortTree[0].id, ...cohortTree[0].children.map(row => row.id)]).size, 3)
+  for (const key of COHORT_METRICS) {
+    assert.equal(cohortTree[0].metrics[key].length, cohort[key].length)
+    assert.equal(cohortTree[0].children.reduce((sum, row) => sum + row.metrics[key].length, 0), cohort[key].length, 'subgroups must preserve ' + key)
+  }
+  assert(dashboardCohortRows(cohort, 'cc', '').every(row => !row.children))
+  assert(dashboardCohortRows(cohort, 'cc', 'cc').every(row => !row.children))
+  assert.equal(dashboardCohortMetrics(cohortPeople, cohortCalls, { ...cohortFilter, start: '2026-10-01', end: '2026-10-31' }, cohortOrders).leads.length, 0)
   console.log('Dashboard checks passed: UTC+7 boundaries, deduplication, permissions, shared stages, dimensional totals, reason history, demo migration and recorded activity.')
 } finally { rmSync(tmp, { recursive: true, force: true }) }

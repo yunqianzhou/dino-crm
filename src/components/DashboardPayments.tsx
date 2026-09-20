@@ -1,4 +1,4 @@
-import { Button, Card, Empty, Modal, Segmented, Select, Space, Table } from 'antd'
+import { Button, Card, DatePicker, Empty, Modal, Segmented, Select, Space, Table } from 'antd'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Order, Student } from '../types'
@@ -9,9 +9,9 @@ import { usePerm } from '../perm'
 import { useStore } from '../store'
 import LocalTime from './LocalTime'
 
-type Props = { population: Student[]; orders: Order[]; filters: DashboardFilters; rangeLabel: string }
+type Props = { population: Student[]; orders: Order[]; filters: DashboardFilters; rangeLabel: string; independentDates?: boolean }
 
-export default function DashboardPayments({ population, orders, filters, rangeLabel }: Props) {
+export default function DashboardPayments({ population, orders, filters, rangeLabel, independentDates }: Props) {
   const d = useDashboardText()
   const { t, lang } = useI18n()
   const { can } = usePerm()
@@ -72,6 +72,7 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
 
   return <Card title={d('revenueTitle')} className="dashboard-payments" extra={<span className="dashboard-section-note">{d('paidDate')} · {rangeLabel} · UTC+7</span>}>
     <p className="dashboard-help">{d('revenueHelp')}</p>
+    {independentDates && <><div className="dashboard-date dashboard-local-dates"><span>{d('paidDate')}</span><DatePicker.RangePicker aria-label={d('paidDate')} value={filters.start && filters.end ? [dayjs(filters.start), dayjs(filters.end)] : null} placeholder={[d('allDates'), d('allDates')]} onChange={v => change({ paymentStart: v?.[0]?.format('YYYY-MM-DD') || '', paymentEnd: v?.[1]?.format('YYYY-MM-DD') || '' })} /></div><p className="dashboard-help">{d('paymentDateHelp')}</p></>}
     <div className="dashboard-table-tools">
       <Segmented value={grouping} onChange={v => change({ revenueGroup: String(v) })} options={[{ value: 'cc', label: d('ccTitle') }, { value: 'date', label: d('paidDate') }]} />
       {summaries.length > 1 && <label className="dashboard-column-picker"><span>{d('currency')}</span><Select aria-label={d('currency')} value={selected?.currency} onChange={v => change({ paymentCurrency: v })} style={{ minWidth: 140 }} options={summaries.map(s => ({ value: s.currency, label: currencyName(s.currency) }))} /></label>}

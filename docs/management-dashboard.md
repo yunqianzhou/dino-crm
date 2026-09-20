@@ -10,8 +10,8 @@ Route: `#/management-dashboard`. Uses the existing prototype store. No productio
 - Period activity: distinct user IDs per metric. Registration uses registration time, calls use call time, bookings use appointment creation time. Attendance/completion use explicit lifecycle record timestamps (`reportedAt`); current status and appointment update timestamps are not treated as historical evidence.
 - All date boundaries use Vietnam UTC+7. Period columns are independent and must not be divided to produce conversion rates.
 - Historical conversion rates are deferred: the prior registration-cohort implementation did not establish complete history and must not be shown as a reliable funnel. Counting rules retain the user-approved definitions: contact / leads, booked / contacted, attended / booked, paid / attended, and paid / leads. Current-stage percentages are only stage / current leads.
-- Channel source remains an optional breakdown under More breakdowns, alongside purchase intent, age and registration age. Existing source labels do not imply a completed business-source mapping.
-- Payments appear only in Sales activity, using the same payment dates and eligible users as its paid-user count. Show amount paid and amount per distinct payer, with currencies kept separate. Refunded orders restate their original payment period; these amounts are not reconciled accounting revenue.
+- CC, date, channel source, purchase intent, age and registration age are six equally visible breakdown controls. Existing source labels do not imply a completed business-source mapping.
+- Payments appear in both modes. In Sales activity they share the activity dates; in Current stage they have independent payment-date filters, explicitly separate from registration dates. Both use the selected current CC. Show amount paid and amount per distinct payer, with currencies kept separate. Refunded orders restate their original payment period; these amounts are not reconciled accounting revenue.
 
 ## Navigation
 
@@ -49,10 +49,10 @@ The business Base was read via the existing authorized Lark API (table field met
 | Follow-up reasons | No-show, incomplete consultation, pause and close | `sales_lifecycle_event.action`, `reason_code`, `reported_at`; categories use CRM options |
 | Detailed Lark rejection reasons | Not mapped automatically | Lark has more detailed categories than CRM; unknown free text groups as Other |
 | Appointment confirmation, city, deposits and remaining balance | Deferred | No verified complete equivalent in the audited sales tables |
-| Sources and campaigns | Source is an optional secondary breakdown; campaigns deferred | Source mapping is incomplete |
+| Sources and campaigns | Source is visible alongside the other breakdowns; campaigns deferred | Source mapping is incomplete |
 | Paid users | Supported in the prototype from paid orders | Positive amount and valid payment time; deduplicate by user; live payment reconciliation remains pending |
 | Historical conversion rates | Deferred; approved formulas retained in Counting rules | Complete event history remains unresolved |
-| Payment amounts | Sales activity only, separate by currency | Successful positive paid orders; original period restated on refund; no accounting revenue claim |
+| Payment amounts | Both modes, explicit payment dates, separate by currency | Successful positive paid orders; original period restated on refund; no accounting revenue claim |
 
 Current-stage reasons use the latest matching explicit record for users still in that stage. Missing reasons remain a separate category. Activity reasons use recorded dates and distinct users within each reason; users can occur in multiple reason rows, so these rows have no additive grand total or share. Every count opens matching users using the same shared data and permissions; Phase 3 return links preserve the selected dimension and details.
 
@@ -66,12 +66,16 @@ Paid users are an independent order-based metric in both views and all supported
 The current view filters these users by registration date, alongside (but outside) the current unpaid sales-lead total and its nine-stage denominator. The activity view filters orders by payment date in Vietnam UTC+7. Daily rows include days with only a payment, and the whole-period summary deduplicates repeat payments across dates. CC attribution remains current ownership. Clicking a count uses the existing user and Order Center Phase 3 detail links. The shared synthetic dataset contains 24 qualifying paid users; this does not imply a production payment integration has been completed.
 
 
-## Usability revision (2026-09-20)
+## Usability revision and content restoration (2026-09-20)
 
-- Current view: overall counts → current stages → CC breakdown → reasons. The long conversion table was removed. Both modes clearly display the date meaning, selected range, current CC and UTC+7.
-- CC and date are the primary breakdown controls. Source, intent, age and registration age are available from More breakdowns. Current view defaults to five useful metrics; all nine stages remain available in Visible metrics. Column selections survive navigation and are separate for the two modes.
-- The payment panel follows activity details. Its order counts, payer counts and amount open exact matching details; users can open only their qualifying orders and then the existing Phase 3 order detail. CC/date, currency, user selection and dialog state return with the dashboard URL.
+- Current view retains overall counts, all nine stages, current breakdown, registration-cohort outcomes, payments and follow-up reasons. No module disappears when switching to activity mode except the explicitly current-stage distribution.
+- All six breakdown dimensions are equally visible in one wrapping button group. The current table defaults to all 11 metrics (lead total, nine stages, paid users); activity defaults to all seven. Optional column choices are preserved, with Show all metrics to restore the full table.
+- Registration-cohort outcomes restore the old lead/contact/booking/attendance/payment counts and date → CC/source hierarchy. Paid users remain in the original registered cohort. Subsequent events are not restricted to registration dates. Counts open exact users at both parent and child levels, preserving the path and modal on return.
+- Historical counts require recorded evidence: calls/contact events, appointment creation/booking events, attendance/consultation events and paid orders. Cancelled bookings still demonstrate a booking was created. Current appointment attendance flags alone are not historical evidence. Missing records do not prove that an outcome never happened.
+- Historical conversion percentages remain deferred; all five approved formulas and the reason are visible in the restored section as well as Counting rules. Independent record counts are not divided into a purported funnel.
+- Current mode shares the global registration dates with the cohort section and provides separate payment dates. Activity mode shares global activity dates with payments and provides separate registration dates for cohort outcomes. Current CC is shared across all sections. Local date selections persist in the dashboard URL.
+- Payment order counts, payer counts and amounts open exact matching details; users can open qualifying orders and the existing Phase 3 detail. CC/date, currency, user selection and dialog state return with the dashboard URL.
 - User detail actions remain visible while scrolling. Summary cards have a full-card hit area and keyboard focus remains on the count button.
 - No fixtures, customer records, permissions or other CRM modules were changed.
 
-Validation: dashboard data tests and production build pass. Browser verification covered English and Chinese, CC selection, an explicit date range, sales and user detail return, payment users → matching orders → order detail → restored payment dialog, and daily payment grouping. Payment tests include UTC+7 boundaries, distinct users, owner filtering, currency isolation and refunds.
+Validation includes cohort retention of later payments, repeated-call deduplication, cancelled booking evidence, missing attendance history, owner/test-user exclusions, subgroup totals and empty ranges, in addition to the existing UTC+7, currency and refund tests. Browser checks cover unified dimensions, all columns, expandable hierarchy, exact user details and return navigation, independent dates, empty states and English labels.

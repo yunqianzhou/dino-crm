@@ -50,3 +50,19 @@
 @media(max-width:1100px){.dashboard-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-period .dashboard-paid{grid-column:auto}.dashboard-stages{gap:8px 18px}}
 @media(max-width:760px){.dashboard-heading{align-items:flex-start}.dashboard-heading h2.ant-typography{font-size:22px}.dashboard-stages{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-payment-totals{grid-template-columns:1fr}.dashboard-payments .ant-card-head-wrapper{align-items:flex-start;flex-direction:column;padding-block:12px;gap:5px}.dashboard-section-note{display:block}}
 @media(max-width:580px){.dashboard-kpis,.dashboard-stages{grid-template-columns:1fr}.dashboard-date .ant-picker{width:100%}.dashboard-filters .ant-space{width:100%}.management-dashboard{gap:14px}.dashboard-kpis .ant-card-body{padding:18px}.dashboard-table-tools{align-items:stretch;flex-direction:column}.dashboard-heading h2.ant-typography{font-size:20px}}
+
+.dashboard-dimensions{display:flex;flex-wrap:wrap;gap:8px}
+.dashboard-dimensions .ant-radio-button-wrapper{border:1px solid #d9e1ec;border-radius:6px}
+.dashboard-dimensions .ant-radio-button-wrapper::before{display:none}
+.dashboard-local-dates{margin-bottom:10px}
+.dashboard-hierarchy-controls{display:flex;flex-wrap:wrap;gap:14px 24px;margin-bottom:12px}
+.dashboard-hierarchy-controls>div{display:flex;align-items:center;flex-wrap:wrap;gap:10px;color:#69778b;font-size:13px}
+.dashboard-cohort-totals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:18px 0 24px}
+.dashboard-cohort-totals>div{display:flex;flex-direction:column;gap:10px;padding:14px;background:#f5f8fc;border-radius:8px;min-width:0}
+.dashboard-cohort-totals span{font-size:13px;color:#64748b}
+.dashboard-cohort-totals .dashboard-count{font-size:26px}
+.dashboard-conversion-note{margin-top:18px;padding:14px 18px;background:#fffaf0;border:1px solid #f4e6c6;border-radius:8px;color:#71613f;font-size:12px;line-height:1.7}
+.dashboard-conversion-note p{margin:6px 0}
+.dashboard-conversion-note ul{display:flex;flex-wrap:wrap;gap:6px 26px;margin:8px 0 0;padding-left:18px}
+@media(max-width:1100px){.dashboard-cohort-totals{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.dashboard-cohort-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.dashboard-cohort .ant-card-head-wrapper{align-items:flex-start;flex-direction:column;padding-block:12px;gap:5px}}
