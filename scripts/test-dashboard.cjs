@@ -285,7 +285,7 @@ try {
   const twoCCQuery = new URLSearchParams('view=cohort&cc=cc-a&cc=cc-b')
   for (const question of ['current', 'period', 'payments', 'cohort']) assert.deepEqual(dashboardSwitchView(twoCCQuery, question).getAll('cc'), ['cc-a', 'cc-b'])
   // Direct links constrain the existing list to the exact clicked users/orders.
-  const { dashboardListScope, matchesDashboardScope } = require(join(tmp, 'dashboardNavigation.js'))
+  const { dashboardListScope, matchesDashboardScope, dashboardMetricDestination, dashboardSalesRows } = require(join(tmp, 'dashboardNavigation.js'))
   const clicked = dashboardListScope('Selected payments', [paidUsers[0], paidUsers[0]], periodOrders)
   assert.deepEqual(clicked.studentIds, ['payer'])
   assert(matchesDashboardScope(clicked, 'payer', 'one'))
@@ -294,6 +294,19 @@ try {
   assert(!matchesDashboardScope(dashboardListScope('Zero', []), 'payer'))
   assert(matchesDashboardScope(undefined, 'payer'))
   assert.deepEqual(JSON.parse(JSON.stringify(clicked)), clicked, 'list scope survives browser history serialization')
+  // Every people metric shares the routing rule across cards, rows and question tabs.
+  for (const metric of [...COHORT_METRICS, ...Object.keys(demoCurrent), ...Object.keys(demoPeriod), 'assigned', 'unassigned', 'noShow', 'incomplete', 'paused', 'closed']) {
+    assert.deepEqual(dashboardMetricDestination(metric), metric === 'paid' ? { path: '/users-v2', module: 'usersV2' } : { path: '/sales-v3', module: 'salesV3' })
+  }
+  const historicalSelection = dashboardListScope('Registered cohort', [a, b, pool, paid])
+  assert.deepEqual(dashboardSalesRows(rows, historicalSelection, null, true, '').map(s => s.studentId), ['a', 'b', 'pool', 'paid'], 'sales drilldown preserves paid and unassigned cohort members without duplicates')
+  assert.deepEqual(dashboardSalesRows(rows, historicalSelection, ['越南'], false, 'a@example.com').map(s => s.studentId), ['a', 'pool', 'paid'], 'snapshot cannot bypass current owner permissions')
+  assert.deepEqual(dashboardSalesRows(rows, historicalSelection, ['韩国'], true, ''), [], 'snapshot cannot bypass current business-line permissions')
+  assert.deepEqual(dashboardSalesRows(rows, dashboardListScope('Zero', []), null, true, ''), [], 'a zero count cannot open an unrestricted sales list')
+  for (const metric of ['leads', 'connected', 'booked', 'attended']) {
+    const recorded = dashboardCohortMetrics(demo.students, demo.callRecords, { ...filters, owner: ccSelection }, demo.orders)[metric]
+    assert.deepEqual(dashboardSalesRows(demo.students, dashboardListScope(metric, recorded), null, true, ''), recorded, 'multi-CC cohort scope is preserved for ' + metric)
+  }
   const { dashboardNumberCompare, dashboardMoneyValue } = require(join(tmp, 'dashboardSort.js'))
   const sortValues = [12, null, 2, 100, 0]
   assert.deepEqual([...sortValues].sort((a, b) => dashboardNumberCompare(a, b, 'ascend')), [0, 2, 12, 100, null])

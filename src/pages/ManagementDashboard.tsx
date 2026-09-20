@@ -12,7 +12,7 @@ import { CONSULTATION_STAGES } from '../salesLifecycle'
 import type { Student } from '../types'
 import DashboardPayments from '../components/DashboardPayments'
 import { dashboardMoneyValue, dashboardNumberCompare } from '../dashboardSort'
-import { dashboardListScope } from '../dashboardNavigation'
+import { dashboardListScope, dashboardMetricDestination } from '../dashboardNavigation'
 import DashboardMoneyCell from '../components/DashboardMoneyCell'
 import { DASHBOARD_VIEWS, dashboardView, dashboardViewRange, dashboardSwitchView, type DashboardView } from '../dashboardView'
 import './ManagementDashboard.css'
@@ -90,24 +90,24 @@ export default function ManagementDashboard() {
  const cohortName = (row: CohortRow) => groupName(row.dimension, row.value)
  const cohortRowLabel = (row: CohortRow) => { const parent = cohortAllRows.find(parent => parent.children?.some(child => child.id === row.id)); return parent ? `${cohortName(parent)} → ${cohortName(row)}` : cohortName(row) }
  const scopeLabel = (label: string) => `${label} · ${d(activeText.date)}: ${rangeLabel} · ${selectedOwners.length ? selectedOwners.map(ownerName).join(' / ') : d('allCC')}`
- const openUsers = (users: Student[], label: string) => {
+ const openPeople = (users: Student[], label: string, metric = 'leads') => {
    const back = new URLSearchParams(query); clearDetail(back)
-   navigate('/users-v2', { state: { dashboardReturn: location.pathname + '?' + back.toString(), dashboardScope: dashboardListScope(scopeLabel(label), users) } })
+   navigate(dashboardMetricDestination(metric).path, { state: { dashboardReturn: location.pathname + '?' + back.toString(), dashboardScope: dashboardListScope(scopeLabel(label), users) } })
  }
- const openCohort = (metric: CohortMetric, row?: CohortRow) => openUsers((row?.metrics || cohort)[metric], `${cohortTitle(metric)}${row ? ' · ' + cohortRowLabel(row) : ''}`)
- const cohortCount = (key: CohortMetric, row?: CohortRow) => can('usersV2') === 'none' ? <span>{(row?.metrics || cohort)[key].length.toLocaleString()}</span> : <button className="dashboard-count" aria-label={`${cohortTitle(key)} · ${row ? cohortRowLabel(row) + ' · ' : ''}${(row?.metrics || cohort)[key].length}`} onClick={() => openCohort(key, row)}>{(row?.metrics || cohort)[key].length.toLocaleString()}</button>
+ const openCohort = (metric: CohortMetric, row?: CohortRow) => openPeople((row?.metrics || cohort)[metric], `${cohortTitle(metric)}${row ? ' · ' + cohortRowLabel(row) : ''}`, metric)
+ const cohortCount = (key: CohortMetric, row?: CohortRow) => can(dashboardMetricDestination(key).module) === 'none' ? <span>{(row?.metrics || cohort)[key].length.toLocaleString()}</span> : <button className="dashboard-count" aria-label={`${cohortTitle(key)} · ${row ? cohortRowLabel(row) + ' · ' : ''}${(row?.metrics || cohort)[key].length}`} onClick={() => openCohort(key, row)}>{(row?.metrics || cohort)[key].length.toLocaleString()}</button>
  const paymentFilters = filters
  const paymentRange = paymentFilters.start && paymentFilters.end ? `${paymentFilters.start} — ${paymentFilters.end}` : d('allDates')
  const reasonName = (id: string) => id === '__unknown__' ? d('unknown') : t(`sales.consultation.reasonOption.${id}`)
  const open = (metric: string, group?: DashboardGrouping, value?: string, owner?: string) => {
    const grouped = group === 'date' ? dateRows.find(row => row.id === value)?.metrics : group && value ? dashboardGroupRows(metrics, group).find(row => row.id === value)?.metrics : metrics
    const users = (grouped?.[metric] || []).filter(s => !owner || (s.salesOwner || '__unassigned__') === owner)
-   openUsers(users, `${title(metric)}${group && value ? ' · ' + groupName(group, value) : ''}${owner ? ' / ' + ownerName(owner) : ''}`)
+   openPeople(users, `${title(metric)}${group && value ? ' · ' + groupName(group, value) : ''}${owner ? ' / ' + ownerName(owner) : ''}`, metric)
  }
- const openReason = (id: string) => openUsers(reasonRows.find(row => row.id === id)?.users || [], `${d(reasonKind)} · ${reasonName(id)}`)
+ const openReason = (id: string) => openPeople(reasonRows.find(row => row.id === id)?.users || [], `${d(reasonKind)} · ${reasonName(id)}`)
  const reset = () => change({ start: '', end: '', cc: '' })
  const today = dayjs().utcOffset(420)
- const count = (key: string, n = (metrics[key] || []).length, group?: DashboardGrouping, value?: string, owner?: string) => can('usersV2') === 'none' ? <span>{n.toLocaleString()}</span> : <button className="dashboard-count" onClick={() => open(key, group, value, owner)} aria-label={`${title(key)} · ${group && value ? groupName(group, value) + ' · ' : ''}${owner ? ownerName(owner) + ' / ' : ''}${n}`}>{n.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}</button>
+ const count = (key: string, n = (metrics[key] || []).length, group?: DashboardGrouping, value?: string, owner?: string) => can(dashboardMetricDestination(key).module) === 'none' ? <span>{n.toLocaleString()}</span> : <button className="dashboard-count" onClick={() => open(key, group, value, owner)} aria-label={`${title(key)} · ${group && value ? groupName(group, value) + ' · ' : ''}${owner ? ownerName(owner) + ' / ' : ''}${n}`}>{n.toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}</button>
  return <div className="management-dashboard">
    <header className="dashboard-heading"><div><Space><Tag color="blue">{d('scope')}</Tag><Tag>{d('demoTag')}</Tag></Space><Typography.Title level={2}>{d('title')}</Typography.Title><Typography.Text type="secondary">{d('subtitle')}</Typography.Text></div><Button onClick={() => setRulesOpen(true)}>{d('rules')}</Button></header>
    <nav className="dashboard-questions" aria-label={d('chooseQuestion')}>{DASHBOARD_VIEWS.map(value => <button key={value} aria-pressed={view === value} onClick={() => switchView(value)}><strong>{d(viewText[value].label)}</strong><span>{d(viewText[value].question)}</span></button>)}</nav>
@@ -162,11 +162,11 @@ export default function ManagementDashboard() {
      <p className="dashboard-help" style={{ marginTop: 16 }}>{d(filters.mode === 'current' ? 'currentReasonHelp' : 'periodReasonHelp')}</p>
      <Table sticky={{ offsetHeader: 104 }} rowKey="id" size="middle" pagination={false} dataSource={reasonRows} locale={{ emptyText: <Empty description={d('noReasons')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
        { title: d('reason'), dataIndex: 'id', render: id => reasonName(id) },
-       { title: d('usersCount'), width: 150, sorter: (a, b) => a.users.length - b.users.length, render: (_, row) => can('usersV2') === 'none' ? <span>{row.users.length}</span> : <button className="dashboard-count" aria-label={`${d(reasonKind)} · ${reasonName(row.id)} · ${row.users.length}`} onClick={() => openReason(row.id)}>{row.users.length}</button> },
+       { title: d('usersCount'), width: 150, sorter: (a, b) => a.users.length - b.users.length, render: (_, row) => can('salesV3') === 'none' ? <span>{row.users.length}</span> : <button className="dashboard-count" aria-label={`${d(reasonKind)} · ${reasonName(row.id)} · ${row.users.length}`} onClick={() => openReason(row.id)}>{row.users.length}</button> },
        ...(filters.mode === 'current' ? [{ title: d('share'), width: 220, sorter: (a: typeof reasonRows[number], b: typeof reasonRows[number]) => a.users.length - b.users.length, render: (_: unknown, row: typeof reasonRows[number]) => <Progress size="small" percent={Math.round(row.users.length / (reasonRows.reduce((sum, r) => sum + r.users.length, 0) || 1) * 1000) / 10} /> }] : []),
      ]} summary={() => reasonRows.length ? <Table.Summary fixed="top"><Table.Summary.Row>
        <Table.Summary.Cell index={0}><strong>{d('currentTotal')}</strong></Table.Summary.Cell>
-       <Table.Summary.Cell index={1}>{can('usersV2') === 'none' ? reasonUsers.length : <button className="dashboard-count" onClick={() => openUsers(reasonUsers, d(reasonKind))}>{reasonUsers.length}</button>}</Table.Summary.Cell>
+       <Table.Summary.Cell index={1}>{can('salesV3') === 'none' ? reasonUsers.length : <button className="dashboard-count" onClick={() => openPeople(reasonUsers, d(reasonKind))}>{reasonUsers.length}</button>}</Table.Summary.Cell>
        {filters.mode === 'current' && <Table.Summary.Cell index={2}>100%</Table.Summary.Cell>}
      </Table.Summary.Row></Table.Summary> : null} />
    </Card>}

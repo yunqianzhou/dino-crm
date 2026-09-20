@@ -31,6 +31,7 @@ import { CALL_RESULTS } from '../types'
 import { useI18n } from '../i18n'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
+import { dashboardSalesRows, matchesDashboardScope } from '../dashboardNavigation'
 import { usePerm } from '../perm'
 import { isClaimedLead, isPoolLead, isSalesLead } from '../funnel'
 import { resolveUserType } from '../userType'
@@ -86,6 +87,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const [dashboardQuery] = useSearchParams()
   const targetStudentId = phase3 ? dashboardQuery.get('studentId') || '' : ''
   const dashboardContext = useDashboardContext()
+  const dashboardScope = phase3 ? dashboardContext.dashboardScope : undefined
   const students = useStore((s) => s.students)
   const channels = useStore((s) => s.channels)
   const lessons = useStore((s) => s.lessons ?? [])
@@ -102,11 +104,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const canManageSettings = can(phase3 ? 'salesV3_config' : 'sales_config') === 'operate'
   // 全业务线（超管）或拥有重新分配权限的主管可见范围内全部领取记录
   const seeAllOwners = allowedLines() === null || canReassign
+  const dashboardRows = dashboardScope ? dashboardSalesRows(students, dashboardScope, allowedLines(), seeAllOwners, actor) : undefined
   // 当拥有分配与掉库设置权限时，视为 Leader 身份以显示横幅和设置入口
   const isLeader = canManageSettings
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
 
-  useEffect(() => { if (targetStudentId) setLineSel([]) }, [targetStudentId])
+  useEffect(() => { if (targetStudentId || dashboardScope) setLineSel([]) }, [targetStudentId, dashboardScope])
 
   // 可被分配的销售：启用状态、非系统管理员、且角色具备销售模块「操作」权限
   const salesAccounts = useMemo(
@@ -166,18 +169,18 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
     return matchLine(bl)
   }
   const poolAll = useMemo(
-    () => students.filter((s) => isPoolLead(s, lessons)).filter(lineHit),
+    () => students.filter((s) => isPoolLead(s, lessons) && matchesDashboardScope(dashboardScope, s.studentId)).filter(lineHit),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [students, channels, lessons, lineSel, matchLine],
+    [students, channels, lessons, lineSel, matchLine, dashboardScope],
   )
   const followAll = useMemo(
-    () =>
+    () => dashboardRows ? dashboardRows.filter(lineHit) :
       students
         .filter((s) => isClaimedLead(s, lessons))
         .filter(lineHit)
         .filter((s) => seeAllOwners || s.salesOwner === actor),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [students, channels, lessons, lineSel, matchLine, seeAllOwners, actor],
+    [students, channels, lessons, lineSel, matchLine, seeAllOwners, actor, dashboardRows],
   )
 
   // 业务线筛选选项：渠道业务线 + 学员中出现的业务线（空业务线不入选项）
@@ -198,7 +201,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
   const leadText = (s: Student) =>
     `${s.phone ?? ''} ${s.studentId} ${s.localName ?? s.name} ${s.country ?? ''}`.toLowerCase()
 
-  const salesLeads = useMemo(() => [...poolAll, ...followAll], [poolAll, followAll])
+  const salesLeads = useMemo(() => [...new Map([...poolAll, ...followAll].map(student => [student.studentId, student])).values()], [poolAll, followAll])
   const filterOptionsFromLeads = (pick: (student: Student) => string | undefined) =>
     Array.from(new Set(salesLeads.map(pick).filter((value): value is string => Boolean(value)))).sort()
   const ageGroupOptions = useMemo(() => filterOptionsFromLeads((s) => s.ageGroup), [salesLeads])
@@ -278,10 +281,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
   const callScoped = useMemo(() => {
-    let list = callRecords.filter((c) => matchLine(c.businessLine) && (!targetStudentId || c.studentId === targetStudentId))
+    let list = callRecords.filter((c) => matchLine(c.businessLine) && matchesDashboardScope(dashboardScope, c.studentId) && (!targetStudentId || c.studentId === targetStudentId))
     if (!seeAllOwners) list = list.filter((c) => c.agent === actor)
     return list
-  }, [callRecords, targetStudentId, lineSel, matchLine, seeAllOwners, actor])
+  }, [callRecords, targetStudentId, lineSel, matchLine, seeAllOwners, actor, dashboardScope])
 
   const matchesCallDate = (call: CallRecord) => {
     return matchesLocalDateRange(call.time, callDateRange, call.businessLine)
@@ -669,6 +672,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       key: 'consultationStage',
       width: 245,
       render: (_: unknown, s) => {
+        if (dashboardScope && !isSalesLead(s, lessons)) return <Text type="secondary">—</Text>
         const stage = consultationStage(s, callRecords)
         if (s.businessLine !== '越南') return <Text type="secondary">—</Text>
         const appointment = stage === '已预约' ? currentAppointment(s) : undefined
@@ -824,14 +828,16 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       sorter: (a: Student, b: Student) => dayjs(a.salesUpdatedAt || 0).valueOf() - dayjs(b.salesUpdatedAt || 0).valueOf(),
       render: (v, r) => <LocalTime time={v} country={r.country || r.businessLine} />,
     },
-    ...(canEdit || canDial || canReassign
+    ...(canEdit || canDial || canReassign || (dashboardScope && canClaim)
       ? [
           {
             title: t('common.action'),
             key: 'op',
             width: phase3 ? 220 : canReassign ? 350 : 250,
             fixed: 'right' as const,
-            render: (_: unknown, r: Student) => phase3 ? (
+            render: (_: unknown, r: Student) => phase3 && dashboardScope && !isClaimedLead(r, lessons) ? (
+              isPoolLead(r, lessons) && canClaim ? <Button type="link" icon={<CheckOutlined />} onClick={() => claim(r)}>{t('perm.sales_claim')}</Button> : <Text type="secondary">—</Text>
+            ) : phase3 ? (
               <Space size={8}>
                 {canDial && (
                   <Button type="link" icon={<PhoneOutlined />} disabled={!r.phone} onClick={() => setDialing(r)}>
@@ -1046,7 +1052,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
       }
     >
       {phase3 && <DashboardLinkContext filter />}
-      <Alert
+      {!dashboardScope && <Alert
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
@@ -1059,7 +1065,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           </div>
         }
         description={showIntro ? t('sales.intro') : undefined}
-      />
+      />}
 
       <Tabs
         activeKey={tab}
@@ -1085,7 +1091,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false }
           },
           {
             key: 'follow',
-            label: `${t('sales.tab.follow')} (${followData.length})`,
+            label: `${dashboardScope ? text('看板筛选结果', 'Dashboard results') : t('sales.tab.follow')} (${followData.length})`,
             children: (
               <>
                 {filterBar}
