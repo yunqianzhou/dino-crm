@@ -42,6 +42,7 @@ type ModuleNode = { key: ModuleKey; children?: ModuleNode[] }
 type ModuleRow = { key: ModuleKey; depth: number; ancestors: ModuleKey[] }
 
 const MODULE_HIERARCHY: ModuleNode[] = [
+  { key: 'appABTest' },
   { key: 'users', children: [{ key: 'users_edit' }, { key: 'users_phone_view' }, { key: 'users_export' }] },
   { key: 'sales', children: [{ key: 'sales_claim' }, { key: 'sales_dial' }, { key: 'sales_update' }, { key: 'sales_reassign' }, { key: 'sales_config' }] },
   { key: 'orders', children: [{ key: 'orders_export' }] },
@@ -102,6 +103,7 @@ export default function SystemConfig() {
   const lines = BUSINESS_LINES
 
   const moduleLabel = (m: ModuleKey) => {
+    if (m === 'appABTest') return lang === 'en' ? 'APP A/B test (Phase 6)' : 'APP A/B test配置（六期）'
     if (m === 'marketingV2_channel_types') return lang === 'en' ? 'Manage channel types' : '维护渠道类型（独立授权）'
     const marketingV2Labels: Partial<Record<ModuleKey, string>> = lang === 'en' ? {
       marketingV2: 'Marketing Center', marketingV2_channels: 'Channel management', marketingV2_channels_edit: 'Create and edit channels', marketingV2_channels_status: 'Enable / disable channels', marketingV2_skus: 'SKU catalog (view only)',

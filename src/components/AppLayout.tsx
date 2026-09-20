@@ -17,6 +17,7 @@ import {
   SolutionOutlined,
   HistoryOutlined,
   DashboardOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { logout, useSession } from '../auth'
@@ -33,6 +34,7 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/channels': 'channels',
   '/landing': 'landing',
   '/management-dashboard': 'salesV3',
+  '/app-ab-test': 'appABTest',
   '/users': 'users',
   '/sales': 'sales',
   '/sales-v3': 'salesV3',
@@ -76,6 +78,8 @@ export default function AppLayout() {
   const phase3Label = (text: string) => phaseLabel(text, t('app.phase3'), 'purple')
   const phase4Label = (text: string) => phaseLabel(text, '四期', 'cyan')
   const phase5Label = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'green')
+
+  const phase6Label = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 6' : '六期', 'geekblue')
 
   const visible = (key: string) => can(NAV_MODULE[key]) !== 'none'
 
@@ -141,9 +145,11 @@ export default function AppLayout() {
         ]
       : []),
     ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: phase5Label(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
+    ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: phase6Label(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
   ]
 
   const TITLES: Record<string, string> = {
+    '/app-ab-test': lang === 'en' ? 'APP A/B test configuration' : 'APP A/B test配置',
     '/management-dashboard': lang === 'en' ? 'Management Dashboard' : '管理看板',
     '/channels': t('app.nav.channels'),
     '/landing': t('app.nav.landing'),
@@ -187,7 +193,7 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ height: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark" width={220}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark" width={252}>
         <div
           style={{
             height: 56,

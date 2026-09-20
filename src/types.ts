@@ -353,6 +353,7 @@ export type DataScope = 'all' | 'line'
 
 // 受权限管控的功能模块
 export type ModuleKey =
+  | 'appABTest'
   | 'marketingV2_channel_types'
   // 主模块
   | 'marketing' | 'channels' | 'landing' | 'packages' | 'coupons' | 'users' | 'usersV2' | 'sales' | 'salesV3' | 'orders' | 'ordersV3' | 'system' | 'lifecycle'
@@ -382,6 +383,7 @@ export type ModuleKey =
   | 'system_role_add' | 'system_role_edit' | 'system_role_delete' | 'system_acc_add' | 'system_acc_edit'
 
 export const PERMISSION_MODULES: ModuleKey[] = [
+  'appABTest',
   'marketing',
   'channels', 'channels_create', 'channels_edit', 'channels_delete', 'channels_gen_code', 'channels_params',
   'landing', 'landing_create', 'landing_edit',

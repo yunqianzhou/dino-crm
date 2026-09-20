@@ -3,6 +3,7 @@ import { useSession } from './auth'
 import { usePerm } from './perm'
 import type { ModuleKey } from './types'
 import Login from './pages/Login'
+import AppABTest from './pages/AppABTest'
 import ManagementDashboard from './pages/ManagementDashboard'
 import AppLayout from './components/AppLayout'
 import ChannelManagement from './pages/ChannelManagement'
@@ -41,6 +42,7 @@ const MODULE_PATH: { module: ModuleKey; path: string }[] = [
   { module: 'coupons', path: '/coupons' },
   { module: 'landing', path: '/landing' },
   { module: 'system', path: '/system' },
+  { module: 'appABTest', path: '/app-ab-test' },
 ]
 
 function firstAllowedPath(can: (m: ModuleKey) => string): string {
@@ -78,6 +80,7 @@ export default function App() {
           }
         >
           <Route index element={<HomeRedirect />} />
+          <Route path="app-ab-test" element={<Guard module="appABTest"><AppABTest /></Guard>} />
           <Route path="management-dashboard" element={<Guard module="salesV3"><ManagementDashboard /></Guard>} />
           <Route path="channels" element={<Guard module="channels"><ChannelManagement /></Guard>} />
           <Route path="landing" element={<Guard module="landing"><LandingPageManagement /></Guard>} />
