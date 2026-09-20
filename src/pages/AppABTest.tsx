@@ -1,9 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Alert, Button, Card, Checkbox, Descriptions, Empty, Form, Input, InputNumber, message, Modal, Radio, Select, Space, Steps, Table, Tabs, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
-import { usePerm } from '../perm'
+import { useCurrentAccount, usePerm } from '../perm'
+import { useSession } from '../auth'
+import ABHistoryDrawer from '../components/ABHistoryDrawer'
 import ABPlanEditor from '../components/ABPlanEditor'
-import { STORAGE_KEY, clone, closeExperiment, countries, enableExperiment, experimentState, formatDate, fromDateInput, makeId, newExperiment, newOnline, newPlan, promoteVariant, publishOnline, saveExperiment, saveOnline, seedStore, targetSummary, templates, toDateInput, validateExperiment, validateExperimentSettings, validateOnline, validateOnlineSettings, validatePlan, weightTotal } from '../abTestConfig'
+import { STORAGE_KEY, clone, closeExperiment, countries, countrySummary, platformSummary, versionSummary, matchesTargetFilters, recordABHistory, enableExperiment, experimentState, formatDate, fromDateInput, makeId, newExperiment, newOnline, newPlan, promoteVariant, publishOnline, saveExperiment, saveOnline, seedStore, targetSummary, templates, toDateInput, validateExperiment, validateExperimentSettings, validateOnline, validateOnlineSettings, validatePlan, weightTotal } from '../abTestConfig'
 import type { ABStore, Experiment, OnlineConfig, Platform, Target, Variant, VersionOperator } from '../abTestConfig'
 import './AppABTest.css'
 
@@ -78,6 +80,20 @@ export default function AppABTest() {
   const [promotionGroup, setPromotionGroup] = useState<string>()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>()
+  const [countryFilter, setCountryFilter] = useState<string>()
+  const [platformFilter, setPlatformFilter] = useState<Platform>()
+  const [relatedBase, setRelatedBase] = useState<{ id: string; name: string } | null>(null)
+  const [listPage, setListPage] = useState(1)
+  const [historySubject, setHistorySubject] = useState<{ kind: 'online' | 'experiment'; id: string; name: string } | null>(null)
+  const { account } = useCurrentAccount()
+  const session = useSession()
+  const resetFilters = () => { setSearch(''); setStatusFilter(undefined); setCountryFilter(undefined); setPlatformFilter(undefined); setRelatedBase(null); setListPage(1) }
+  const showRelated = (config: OnlineConfig) => { resetFilters(); setTab('experiment'); setRelatedBase({ id: config.id, name: config.name }) }
+  const scopeColumns = [
+    { title: '国家', key: 'country', width: 200, render: (_: unknown, x: { target: Target }) => <span className="ab-table-scope">{countrySummary(x.target)}</span> },
+    { title: '终端', key: 'platform', width: 130, render: (_: unknown, x: { target: Target }) => platformSummary(x.target) },
+    { title: '版本范围', key: 'version', width: 200, render: (_: unknown, x: { target: Target }) => <span className="ab-table-scope">{versionSummary(x.target)}</span> },
+  ]
   const loadedRaw = useRef(localStorage.getItem(STORAGE_KEY))
   const pageRef = useRef<HTMLDivElement>(null)
   const { isOperate } = usePerm()
@@ -120,13 +136,14 @@ export default function AppABTest() {
     setShowStepErrors(false); setStep(destination)
   }
   const activeStatus = editing ? editing.kind === 'online' ? onlineStatus(editing.value) : experimentState(editing.value, now) : ''
-  const persist = (next: ABStore) => {
+  const persist = (next: ABStore, action: string) => {
     if (!canEdit) throw new Error('当前角色仅可查看。')
     if (localStorage.getItem(STORAGE_KEY) !== loadedRaw.current) throw new Error('其他窗口已更新配置，请刷新后再操作，避免覆盖修改。')
-    const raw = JSON.stringify(next)
+    const audited = recordABHistory(store, next, account ? `${account.name}（${account.email}）` : session?.email ?? '当前操作人', action)
+    const raw = JSON.stringify(audited)
     localStorage.setItem(STORAGE_KEY, raw)
     loadedRaw.current = raw
-    setStore(next)
+    setStore(audited)
   }
   const open = (item: Editing, unsaved = false) => {
     setEditing(clone(item)); setDirty(unsaved); setStep(0); setShowStepErrors(false)
@@ -139,7 +156,7 @@ export default function AppABTest() {
     try {
       const item = { ...editing.value, updatedAt: new Date().toISOString() }
       const next = editing.kind === 'online' ? saveOnline(store, item as OnlineConfig) : saveExperiment(store, item as Experiment)
-      persist(next); setEditing(editing.kind === 'online' ? { kind: 'online', value: item as OnlineConfig } : { kind: 'experiment', value: item as Experiment }); setDirty(false)
+      persist(next, '保存草稿'); setEditing(editing.kind === 'online' ? { kind: 'online', value: item as OnlineConfig } : { kind: 'experiment', value: item as Experiment }); setDirty(false)
       messageApi.success('草稿已保存，尚未生效'); return true
     } catch (e) { messageApi.error((e as Error).message); return false }
   }
@@ -154,7 +171,7 @@ export default function AppABTest() {
   }
   const reviseOnline = (item: OnlineConfig) => open({ kind: 'online', value: { ...clone(item), id: makeId(), status: 'draft', replacesId: item.status === 'published' ? item.id : undefined, updatedAt: new Date().toISOString() } }, true)
   const close = (exp: Experiment) => modalApi.confirm({ title: `关闭实验「${exp.name}」？`, content: '配置与历史分组保留，关闭后不可恢复。产品规则：当前进行中的流程不切换配置，下次启动重新匹配。本原型仅演示状态变化。', okText: '关闭实验', okButtonProps: { danger: true }, cancelText: '取消', onOk: () => {
-    try { const next = closeExperiment(store, exp.id); persist(next); const updated = next.experiments.find(x => x.id === exp.id)!; if (editing?.value.id === exp.id) setEditing({ kind: 'experiment', value: updated }); messageApi.success('实验已关闭（原型演示）') }
+    try { const next = closeExperiment(store, exp.id); persist(next, '关闭实验'); const updated = next.experiments.find(x => x.id === exp.id)!; if (editing?.value.id === exp.id) setEditing({ kind: 'experiment', value: updated }); messageApi.success('实验已关闭（原型演示）') }
     catch (e) { messageApi.error((e as Error).message); return Promise.reject(e) }
   } })
   const publish = () => {
@@ -163,7 +180,7 @@ export default function AppABTest() {
     modalApi.confirm({ title: editing.kind === 'online' ? '发布此线上配置？' : '开启实验并冻结配置？', content: editing.kind === 'online' ? `适用范围：${targetSummary(editing.value.target)}。仅影响原型中的线上配置状态，不向真实 App 下发。` : '开启后，参与条件、流量、分组、时间、各组流程、页面和译文均锁定。若需调整，须复制为新实验。本操作仅演示，不产生真实分流。', okText: editing.kind === 'online' ? '确认发布' : '确认开启', cancelText: '返回检查', onOk: () => {
       try {
         const next = editing.kind === 'online' ? publishOnline(store, editing.value) : enableExperiment(store, editing.value)
-        persist(next); setDirty(false)
+        persist(next, editing.kind === 'online' ? '发布线上配置' : '开启实验'); setDirty(false)
         if (editing.kind === 'online') setEditing({ kind: 'online', value: next.online.find(x => x.id === editing.value.id)! })
         else setEditing({ kind: 'experiment', value: next.experiments.find(x => x.id === editing.value.id)! })
         messageApi.success(editing.kind === 'online' ? '线上配置已发布（原型演示）' : '实验已开启，配置已冻结（原型演示）')
@@ -246,21 +263,30 @@ export default function AppABTest() {
     </div>
     <Alert className="ab-prototype-note" type="info" showIcon message="本页为可交互配置原型：草稿、发布、实验开启与关闭均仅保存在当前浏览器，不向真实 App 下发，也不产生真实分流。" />
     {!editing ? <>
-      <Tabs activeKey={tab} onChange={value => { setTab(value); setSearch(''); setStatusFilter(undefined) }} items={[{ key: 'online', label: '线上配置' }, { key: 'experiment', label: 'A/B 实验' }]} />
+      <Tabs activeKey={tab} onChange={value => { setTab(value); resetFilters() }} items={[{ key: 'online', label: '线上配置' }, { key: 'experiment', label: 'A/B 实验' }]} />
       <div className="ab-list-intro"><div><Title level={4}>{tab === 'online' ? '线上版本配置' : 'A/B 实验管理'}</Title><Text type="secondary">{tab === 'online' ? '维护未参加有效实验用户的默认体验，按国家、终端和 App 版本匹配。' : '从线上配置快照创建实验，独立设置人群、流量、分组和生效时间。'}</Text></div><Button type="primary" icon={<PlusOutlined />} disabled={!canEdit} onClick={() => { if (tab === 'online') open({ kind: 'online', value: newOnline() }, true); else { setBaseId(liveOnline[0]?.id); setBasePicker(true) } }}>{tab === 'online' ? '新建线上配置' : '新建实验'}</Button></div>
       <Card>
-        <Space wrap className="ab-list-filters"><Input.Search aria-label="搜索配置名称" placeholder="搜索名称" allowClear value={search} onChange={e => setSearch(e.target.value)} style={{ width: 270 }} /><Select aria-label="筛选状态" placeholder="全部状态" allowClear value={statusFilter} onChange={setStatusFilter} options={(tab === 'online' ? ['草稿', '已发布', '历史版本'] : ['草稿', '待开始', '进行中', '已结束', '已关闭']).map(value => ({ value, label: value }))} style={{ width: 145 }} /><Text type="secondary">发布和开启均为原型演示</Text></Space>
-        {tab === 'online' ? <Table rowKey="id" pagination={{ pageSize: 6, showSizeChanger: false }} scroll={{ x: 850 }} dataSource={store.online.filter(x => x.name.includes(search) && (!statusFilter || onlineStatus(x) === statusFilter))} columns={[
+        <Space wrap className="ab-list-filters">
+          <Input.Search aria-label="搜索配置名称" placeholder="搜索名称" allowClear value={search} onChange={e => { setSearch(e.target.value); setListPage(1) }} style={{ width: 230 }} />
+          <Select aria-label="筛选国家" placeholder="全部国家" allowClear showSearch optionFilterProp="label" value={countryFilter} onChange={value => { setCountryFilter(value); setListPage(1) }} options={countries.filter(c => c.value !== '*')} style={{ width: 200 }} />
+          <Select aria-label="筛选终端" placeholder="全部终端" allowClear value={platformFilter} onChange={value => { setPlatformFilter(value); setListPage(1) }} options={['iOS', 'Android'].map(value => ({ value, label: value }))} style={{ width: 140 }} />
+          <Select aria-label="筛选状态" placeholder="全部状态" allowClear value={statusFilter} onChange={value => { setStatusFilter(value); setListPage(1) }} options={(tab === 'online' ? ['草稿', '已发布', '历史版本'] : ['草稿', '待开始', '进行中', '已结束', '已关闭']).map(value => ({ value, label: value }))} style={{ width: 145 }} />
+          <Button onClick={resetFilters}>重置筛选</Button>
+          <Text type="secondary">发布和开启均为原型演示</Text>
+        </Space>
+        {relatedBase && <div style={{ marginBottom: 16 }}><Tag color="blue" closable onClose={() => { setRelatedBase(null); setListPage(1) }}>关联线上配置：{relatedBase.name}</Tag></div>}
+        {tab === 'online' ? <Table rowKey="id" pagination={{ current: listPage, onChange: setListPage, pageSize: 6, showSizeChanger: false }} scroll={{ x: 1260 }} locale={{ emptyText: <Empty description="暂无匹配的线上配置" /> }} dataSource={store.online.filter(x => x.name.includes(search) && matchesTargetFilters(x.target, countryFilter, platformFilter) && (!statusFilter || onlineStatus(x) === statusFilter))} columns={[
           { title: '配置名称', key: 'name', width: 220, render: (_, x) => <div><strong>{x.name || '未命名草稿'}</strong><div><Text type="secondary">{x.revision ? `V${x.revision}` : '待发布'}{x.source ? ` · 来源：${x.source}` : ''}</Text></div></div> },
-          { title: '适用范围', key: 'target', render: (_, x) => <span className="ab-table-scope">{targetSummary(x.target)}</span> },
+          ...scopeColumns,
+          { title: '关联实验', key: 'experiments', width: 110, render: (_, x) => <Button type="link" aria-label={`查看 ${x.name} 的关联实验`} onClick={() => showRelated(x)}>{store.experiments.filter(exp => exp.base.id === x.id).length}</Button> },
           { title: '状态', key: 'status', width: 100, render: (_, x) => <Tag color={statusColor(onlineStatus(x))}>{onlineStatus(x)}</Tag> },
-          { title: '操作', key: 'actions', width: 270, render: (_, x) => <Space wrap><Button type="link" onClick={() => open({ kind: 'online', value: x })}>{x.status === 'draft' && canEdit ? '编辑草稿' : '查看 / 预览'}</Button>{x.status === 'published' && canEdit && <><Button type="link" onClick={() => reviseOnline(x)}>修改新版本</Button><Button type="link" onClick={() => startExperiment(x)}>创建实验</Button></>}</Space> },
-        ]} /> : <Table rowKey="id" pagination={{ pageSize: 6, showSizeChanger: false }} scroll={{ x: 1000 }} locale={{ emptyText: <Empty description="还没有实验。先选择线上基准，再配置参与条件和实验分组。" /> }} dataSource={store.experiments.filter(x => x.name.includes(search) && (!statusFilter || experimentState(x, now) === statusFilter))} columns={[
+          { title: '操作', key: 'actions', width: 300, fixed: 'right', render: (_, x) => <Space wrap><Button type="link" onClick={() => setHistorySubject({ kind: 'online', id: x.id, name: x.name })}>编辑历史</Button><Button type="link" onClick={() => open({ kind: 'online', value: x })}>{x.status === 'draft' && canEdit ? '编辑草稿' : '查看 / 预览'}</Button>{x.status === 'published' && canEdit && <><Button type="link" onClick={() => reviseOnline(x)}>修改新版本</Button><Button type="link" onClick={() => startExperiment(x)}>创建实验</Button></>}</Space> },
+        ]} /> : <Table rowKey="id" pagination={{ current: listPage, onChange: setListPage, pageSize: 6, showSizeChanger: false }} scroll={{ x: 1360 }} locale={{ emptyText: <Empty description="暂无匹配的实验，可调整筛选或从线上配置创建实验。" /> }} dataSource={store.experiments.filter(x => x.name.includes(search) && matchesTargetFilters(x.target, countryFilter, platformFilter) && (!relatedBase || x.base.id === relatedBase.id) && (!statusFilter || experimentState(x, now) === statusFilter))} columns={[
           { title: '实验名称', width: 200, key: 'name', render: (_, x) => <div><strong>{x.name || '未命名实验'}</strong><div><Text type="secondary">{x.variants.length} 个分组 · 实验流量 {x.traffic}%</Text></div></div> },
-          { title: '参与范围', key: 'target', render: (_, x) => <span className="ab-table-scope">{targetSummary(x.target)}</span> },
+          ...scopeColumns,
           { title: '生效时间（UTC+8）', key: 'time', width: 170, render: (_, x) => <Text type="secondary">{x.startMode === 'now' && !x.startAt ? '开启后立即开始' : formatDate(x.startAt)}<br />至 {formatDate(x.endAt)}</Text> },
           { title: '状态', key: 'status', width: 95, render: (_, x) => <Tag color={statusColor(experimentState(x, now))}>{experimentState(x, now)}</Tag> },
-          { title: '操作', key: 'actions', width: 240, render: (_, x) => <Space wrap><Button type="link" onClick={() => open({ kind: 'experiment', value: x })}>{x.status === 'draft' && canEdit ? '编辑草稿' : '查看 / 预览'}</Button>{canEdit && <><Button type="link" onClick={() => copyExperiment(x)}>复制</Button>{x.status !== 'draft' && <Button type="link" onClick={() => showPromotion(x)}>实验组转线上</Button>}{['待开始', '进行中'].includes(experimentState(x, now)) && <Button type="link" danger onClick={() => close(x)}>关闭</Button>}</>}</Space> },
+          { title: '操作', key: 'actions', width: 300, fixed: 'right', render: (_, x) => <Space wrap><Button type="link" onClick={() => setHistorySubject({ kind: 'experiment', id: x.id, name: x.name })}>编辑历史</Button><Button type="link" onClick={() => open({ kind: 'experiment', value: x })}>{x.status === 'draft' && canEdit ? '编辑草稿' : '查看 / 预览'}</Button>{canEdit && <><Button type="link" onClick={() => copyExperiment(x)}>复制</Button>{x.status !== 'draft' && <Button type="link" onClick={() => showPromotion(x)}>实验组转线上</Button>}{['待开始', '进行中'].includes(experimentState(x, now)) && <Button type="link" danger onClick={() => close(x)}>关闭</Button>}</>}</Space> },
         ]} />}
       </Card>
     </> : <>
@@ -288,6 +314,7 @@ export default function AppABTest() {
       </>}
       <div className="ab-editor-actions" style={{ left: footerBox.left, width: footerBox.width, visibility: footerBox.width ? 'visible' : 'hidden' }}><Button disabled={step === 0} onClick={() => goToStep(step - 1)}>上一步</Button><Space wrap>{!locked && stepErrors[step].length > 0 && <Button type="link" danger onClick={() => { setShowStepErrors(true); pageRef.current?.scrollIntoView({ block: 'start' }) }}>本步 {stepErrors[step].length} 项待完善</Button>}{step < 2 ? <Button type="primary" icon={<ArrowRightOutlined />} onClick={() => goToStep(step + 1)}>下一步：{step === 0 ? experiment ? '配置分组方案' : '配置流程与页面' : '预览与检查'}</Button> : !locked && <Button type="primary" onClick={publish}>{experiment ? '开启实验' : '发布线上配置'}</Button>}</Space></div>
     </>}
+    <ABHistoryDrawer store={store} subject={historySubject} onClose={() => setHistorySubject(null)} />
     <Modal title="新建实验：选择线上基准" open={basePicker} onCancel={() => setBasePicker(false)} okText="创建实验草稿" cancelText="取消" okButtonProps={{ disabled: !baseId }} onOk={() => { const base = liveOnline.find(x => x.id === baseId); if (base) startExperiment(base) }}>
       <Paragraph>各组会复制所选线上版本的流程、页面与已填写译文，之后可分别修改；不会跟随线上配置变化。</Paragraph>
       <Select aria-label="选择线上基准" value={baseId} onChange={setBaseId} style={{ width: '100%' }} options={liveOnline.map(x => ({ value: x.id, label: `${x.name} · V${x.revision}` }))} />

@@ -9,7 +9,7 @@ export type Plan = { template: string; copy: Record<string, PageCopy>; translati
 export type OnlineConfig = { id: string; name: string; target: Target; plan: Plan; status: 'draft' | 'published' | 'retired'; revision: number; replacesId?: string; source?: string; updatedAt: string }
 export type Variant = { id: string; name: string; weight: number; control: boolean; plan: Plan }
 export type Experiment = { id: string; name: string; target: Target; traffic: number; variants: Variant[]; startMode: 'now' | 'scheduled'; startAt: string; endAt: string; status: 'draft' | 'enabled' | 'closed'; closedAt?: string; base: { id: string; name: string; revision: number; plan: Plan }; updatedAt: string }
-export type ABStore = { version: 2; online: OnlineConfig[]; experiments: Experiment[] }
+export type ABStore = { version: 2; online: OnlineConfig[]; experiments: Experiment[]; history?: ABHistoryEntry[] }
 export const STORAGE_KEY = 'dinoai_app_ab_config_v2'
 export const countries = [
   { value: '*', label: '全部国家' }, { value: 'SA', label: '沙特阿拉伯（SA）' },
@@ -180,3 +180,32 @@ export function promoteVariant(exp: Experiment, variant: Variant): OnlineConfig 
 export const toDateInput = (iso: string) => iso && Number.isFinite(Date.parse(iso)) ? new Date(Date.parse(iso) + 8 * 3600000).toISOString().slice(0, 16) : ''
 export const fromDateInput = (value: string) => value && Number.isFinite(Date.parse(`${value}:00+08:00`)) ? new Date(`${value}:00+08:00`).toISOString() : ''
 export const formatDate = (iso: string) => toDateInput(iso).replace('T', ' ') || '未设置'
+
+
+export type ABHistoryEntry = {
+  id: string; kind: 'online' | 'experiment'; entityId: string; at: string; actor: string; action: string; changes: string[];
+  snapshot: OnlineConfig | Experiment;
+}
+export const countrySummary = (target: Target) => target.countries.includes('*') ? '全部国家' : target.countries.map(c => countries.find(x => x.value === c)?.label ?? c).join('、') || '未选择国家'
+export const platformSummary = (target: Target) => target.platforms.join(' / ') || '未选择终端'
+export const versionSummary = (target: Target) => target.versions.length ? target.versions.map(c => `${c.operator} ${c.value || '待填写'}`).join(' 且 ') : '全部版本'
+export function matchesTargetFilters(target: Target, country?: string, platform?: Platform): boolean {
+  return (!country || target.countries.includes('*') || target.countries.includes(country)) && (!platform || target.platforms.includes(platform))
+}
+// Store audit entries atomically with the configuration, including automatically retired versions.
+export function recordABHistory(previous: ABStore, next: ABStore, actor: string, action: string, at = new Date().toISOString()): ABStore {
+  const history = [...(previous.history ?? [])]
+  const fields: Record<string, string> = { name: '名称', target: '国家、终端或版本范围', plan: '流程、页面或译文', variants: '实验分组、比例或页面内容', traffic: '实验流量', startMode: '开始方式', startAt: '开始时间', endAt: '结束时间', status: '状态', revision: '发布版本', replacesId: '替换的线上配置', source: '配置来源', base: '线上基准' }
+  for (const kind of ['online', 'experiment'] as const) {
+    const beforeItems = kind === 'online' ? previous.online : previous.experiments
+    const afterItems = kind === 'online' ? next.online : next.experiments
+    for (const snapshot of afterItems) {
+      const before = beforeItems.find(x => x.id === snapshot.id)
+      const changes = before ? Object.entries(fields).filter(([key]) => JSON.stringify((before as any)[key]) !== JSON.stringify((snapshot as any)[key])).map(([, label]) => label) : ['首次保存完整配置']
+      if (!changes.length) continue
+      if (before && !history.some(h => h.kind === kind && h.entityId === before.id)) history.push({ id: makeId(), kind, entityId: before.id, at, actor: '系统保留', action: '编辑前快照', changes: ['开始记录前已有的配置；更早的编辑记录不可追溯'], snapshot: clone(before) })
+      history.push({ id: makeId(), kind, entityId: snapshot.id, at, actor, action: kind === 'online' && snapshot.status === 'retired' ? '被新版本替换' : action, changes, snapshot: clone(snapshot) })
+    }
+  }
+  return { ...next, history }
+}

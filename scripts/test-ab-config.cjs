@@ -28,6 +28,36 @@ try {
   assert(m.validateTarget({ ...scope, countries: [] }).length)
   assert(m.validateTarget({ ...scope, platforms: [] }).length)
 
+  // Country matching includes global configurations; dimensions intersect.
+  assert(m.matchesTargetFilters({ ...scope, countries: ['*'], platforms: ['iOS', 'Android'] }, 'US', 'iOS'))
+  assert(!m.matchesTargetFilters(scope, 'MY', 'Android'))
+  assert(!m.matchesTargetFilters(scope, 'SA', 'iOS'))
+  assert(m.matchesTargetFilters(scope, 'SA', 'Android'))
+  assert.equal(m.versionSummary({ ...scope, versions: [] }), '全部版本')
+
+  // Audit snapshots are immutable, survive serialization and capture replaced versions.
+  const originalAuditStore = m.seedStore()
+  const auditedDraft = { ...m.newOnline(), name: 'History test' }
+  const firstAudit = m.recordABHistory(originalAuditStore, m.saveOnline(originalAuditStore, auditedDraft), 'Alice', '保存草稿')
+  const editedDraft = m.clone(auditedDraft)
+  editedDraft.name = 'History renamed'
+  editedDraft.plan.copy.auth.title = 'Changed title'
+  const secondAudit = m.recordABHistory(firstAudit, m.saveOnline(firstAudit, editedDraft), 'Bob', '保存草稿')
+  assert.equal(secondAudit.history.length, 2)
+  assert.equal(secondAudit.history[0].snapshot.name, 'History test')
+  assert.equal(secondAudit.history[1].actor, 'Bob')
+  assert(secondAudit.history[1].changes.includes('流程、页面或译文'))
+  editedDraft.plan.copy.auth.title = 'Unsaved mutation'
+  assert.equal(secondAudit.history[1].snapshot.plan.copy.auth.title, 'Changed title')
+  assert.equal(JSON.parse(JSON.stringify(secondAudit)).history.length, 2)
+  const replacementDraft = { ...m.clone(originalAuditStore.online[0]), id: m.makeId(), status: 'draft', replacesId: originalAuditStore.online[0].id }
+  const replacementAudit = m.recordABHistory(originalAuditStore, m.publishOnline(originalAuditStore, replacementDraft), 'Alice', '发布线上配置')
+  const previousVersionHistory = replacementAudit.history.filter(h => h.entityId === replacementDraft.replacesId)
+  assert.deepEqual(previousVersionHistory.map(h => h.action), ['编辑前快照', '被新版本替换'])
+  assert.equal(previousVersionHistory[0].snapshot.status, 'published')
+  assert.equal(previousVersionHistory[1].snapshot.status, 'retired')
+  assert.equal(originalAuditStore.history, undefined)
+
   let store = m.seedStore()
   const base = store.online[0]
   const exp = m.newExperiment(base)
