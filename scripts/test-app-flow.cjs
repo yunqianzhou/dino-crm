@@ -22,6 +22,25 @@ try {
  const invalid=structuredClone(graph);invalid.nodes[2].failureTo='deleted';assert(f.validateFlow(invalid).length)
  assert(f.validateFlow({...graph,skipPaywallAfterSuccess:false}).length)
  const pre=f.makeFlow(['value','paywall','lesson','auth','home'],'EXPERIENCE_FIRST');pre.nodes[1].successTo='step-4';assert.deepEqual(f.validateFlow(pre),[]);assert.equal(f.simulateFlow(pre,{'step-2':'success'}).some(x=>x.page==='lesson'),false);assert.equal(f.simulateFlow(pre,{'step-2':'failure'}).some(x=>x.page==='lesson'),true)
+ const moduleFlow=f.makeFlow(['auth','name','age','level','goal','teacher','lesson','home'],'REGISTER_FIRST')
+ assert.deepEqual(f.validateFlow(moduleFlow),[])
+ const moved={...moduleFlow,nodes:f.moveFlowUnit(moduleFlow.nodes,1,1)}
+ assert.deepEqual(moved.nodes.map(n=>n.page),['auth','teacher','name','age','level','goal','lesson','home'],'Moving onboarding must move all four pages together')
+ assert.deepEqual(f.validateFlow(moved),[])
+ assert.deepEqual(f.moveFlowUnit(moduleFlow.nodes,2,-1),moved.nodes,'Adjacent nodes must move around the whole module')
+ const shuffled=structuredClone(moduleFlow);[shuffled.nodes[2],shuffled.nodes[3]]=[shuffled.nodes[3],shuffled.nodes[2]]
+ assert(f.validateFlow(shuffled).some(x=>x.includes('完整模块')))
+ const split=structuredClone(moduleFlow);split.nodes.splice(3,0,{id:'inserted',page:'report'})
+ assert(f.validateFlow(split).some(x=>x.includes('完整模块')))
+ const incomplete=structuredClone(moduleFlow);incomplete.nodes.splice(2,1)
+ assert(f.validateFlow(incomplete).some(x=>x.includes('完整模块')))
+ const duplicated=structuredClone(moduleFlow);duplicated.nodes.splice(5,0,{id:'duplicate',page:'name'})
+ assert(f.validateFlow(duplicated).some(x=>x.includes('完整模块')))
+ const intoModule=f.makeFlow(['auth','paywall','name','age','level','goal','lesson','home'],'REGISTER_FIRST');intoModule.nodes[1].successTo='step-4'
+ assert(f.validateFlow(intoModule).some(x=>x.includes('模块内部')),'Branches cannot enter age, level or goal directly')
+ const restored={...shuffled,nodes:f.restoreOnboarding(shuffled.nodes,()=> 'restored-node')}
+ assert.deepEqual(restored.nodes,moduleFlow.nodes,'Repair must preserve page IDs and restore the fixed order')
+ assert.deepEqual(f.validateFlow(restored),[])
  const wire=f.serializeFlow(graph);assert.equal(wire.nodes[2].on_success,'step-4');assert.equal(wire.policies.skip_all_paywalls_after_payment_success,true)
  const reg=f.makeFlow(['auth','lesson','paywall','home'],'REGISTER_FIRST');assert.deepEqual(f.validateFlow(reg),[])
  const first=f.makeFlow(['lesson','auth','paywall','home'],'REGISTER_FIRST');assert(f.validateFlow(first).length)

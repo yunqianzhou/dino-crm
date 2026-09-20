@@ -9,20 +9,20 @@ import type { VisualPlan } from '../appBusinessConfig'
 import ABPageEditor from './ABPageEditor'
 import ABUnitEditor from './ABUnitEditor'
 import ABFlowEditor from './ABFlowEditor'
-import { flowStandards } from '../appFlowConfig'
+import { flowStandards, flowUnits } from '../appFlowConfig'
 
 export default function ABVisualPlanEditor({value,onChange,readOnly=false,target}:{value:VisualPlan;onChange:(p:VisualPlan)=>void;readOnly?:boolean;target:Target}) {
  const [node,setNode]=useState(value.contents[value.flowId]?.steps?.[0]??'auth'),[language,setLanguage]=useState('zh'),[member,setMember]=useState(false),[flowOpen,setFlowOpen]=useState(false)
- const flowContent=effectiveContent(value,value.flowId),graph=flowContent.flow!,steps=graph.nodes.map(n=>n.page),slots=registry.filter(s=>s.node===node&&!s.flow),plan=fullPlan(value)
+ const flowContent=effectiveContent(value,value.flowId),graph=flowContent.flow!,steps=graph.nodes.map(n=>n.page),units=flowUnits(graph.nodes),slots=registry.filter(s=>s.node===node&&!s.flow),plan=fullPlan(value)
  const update=(contents:VisualPlan['contents'])=>{if(!readOnly)onChange({...value,contents:{...value.contents,...contents}})}
  const pick=(n:string)=>{setNode(n);setMember(false)}
  return <div className="ab-plan-editor">
   <div className="ab-section-title"><h3>选择首次使用流程</h3><Typography.Text type="secondary">点击流程节点，配置对应页面</Typography.Text></div>
   <div className="ab-template-grid ab-two-standards">{flowStandards.map((t,i)=><button key={t.id} className={`ab-template ${graph.standard===t.standard?'is-active':''}`} disabled={readOnly} aria-pressed={graph.standard===t.standard} onClick={()=>{onChange({...value,flowId:t.id});pick(value.contents[t.id]?.flow?.nodes[0]?.page??(i===0?'auth':'value'))}}><div><span>标准 {i+1}</span>{graph.standard===t.standard&&<CheckOutlined/>}</div><h3>{t.name}</h3><p>{t.desc}</p></button>)}</div>
   <Card size="small" title="流程与页面" style={{margin:'16px 0'}} extra={<Button type="primary" onClick={()=>setFlowOpen(true)}>{readOnly?'查看流程与分支':'配置流程与分支'}</Button>}>
-   <div className="ab-flow">{steps.map((n,i)=><div className="ab-flow-item" key={`${i}-${n}`}><button className={node===n?'selected':''} onClick={()=>pick(n)}><span>{String(i+1).padStart(2,'0')}</span>{labels[n]}{registry.some(s=>s.node===n)&&<i/>}</button>{i<steps.length-1&&<ArrowRightOutlined/>}</div>)}</div>
+   <div className="ab-flow">{units.map((unit,i)=><div className="ab-flow-item" key={unit.nodes[0].id}>{unit.onboarding?<div className="ab-onboarding-module"><div className="ab-onboarding-caption"><strong>{String(i+1).padStart(2,'0')} 资料采集</strong><span>内部顺序固定</span></div><div className="ab-onboarding-pages">{unit.nodes.map((n,j)=><div className="ab-flow-item" key={n.id}><button className={node===n.page?'selected':''} onClick={()=>pick(n.page)}>{labels[n.page]}<i/></button>{j<unit.nodes.length-1&&<ArrowRightOutlined/>}</div>)}</div></div>:<button className={node===unit.nodes[0].page?'selected':''} onClick={()=>pick(unit.nodes[0].page)}><span>{String(i+1).padStart(2,'0')}</span>{labels[unit.nodes[0].page]}{registry.some(s=>s.node===unit.nodes[0].page)&&<i/>}</button>}{i<units.length-1&&<ArrowRightOutlined/>}</div>)}</div>
    <div className="ab-retention-entry"><Typography.Text type="secondary">其他页面</Typography.Text>{['value','auth','retention-promo','retention-regular'].filter(n=>!steps.includes(n)).map(n=><Button key={n} size="small" type={node===n?'primary':'default'} onClick={()=>pick(n)}>{labels[n]}</Button>)}</div>
-   <Typography.Paragraph type="secondary" style={{margin:'12px 0 0'}}>上方展示节点顺序；购买页按支付结果选择去向。点击“配置流程与分支”调整顺序并预览实际路径。</Typography.Paragraph>
+   <Typography.Paragraph type="secondary" style={{margin:'12px 0 0'}}>资料采集为整体模块，内部按固定顺序展示；点击其中的页面可配置内容。点击“配置流程与分支”调整模块位置和支付路径。</Typography.Paragraph>
   </Card>
   <div className="ab-plan-toolbar"><Space><strong>{labels[node]}</strong><Tag color="blue">页面配置与实时预览</Tag></Space><Select aria-label="预览语言" value={language} onChange={setLanguage} options={languages} style={{width:190}}/></div>
   {slots.length?<>

@@ -18,3 +18,11 @@
 .ab-flow-trace .is-skipped { color:#8190a4; }
 @media(max-width:900px){.ab-flow-config-grid{grid-template-columns:1fr}.ab-flow-simulator{position:static}.ab-template-grid.ab-two-standards{grid-template-columns:1fr}}
 .ab-phone.ab-phone-tablet { width:430px;max-width:100%;border-radius:26px; }
+
+.ab-onboarding-module { border:1px solid #cbd8fa;background:#f5f8ff;border-radius:8px;padding:8px 10px; }
+.ab-onboarding-caption { display:flex;align-items:center;gap:14px;font-size:12px;margin-bottom:8px;color:#334769; }
+.ab-onboarding-caption span { color:#72819b; }
+.ab-onboarding-pages,.ab-onboarding-order { display:flex;align-items:center;gap:8px; }
+.ab-onboarding-order { flex-wrap:wrap;margin-bottom:10px; }
+.ab-onboarding-order span { display:inline-flex;align-items:center;gap:8px; }
+.ab-onboarding-order .anticon { color:#9baeca; }
