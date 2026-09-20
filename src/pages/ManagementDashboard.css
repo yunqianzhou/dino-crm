@@ -75,11 +75,6 @@
 .dashboard-questions button[aria-pressed=true] strong{color:#215cc1}
 .dashboard-questions button:hover{border-color:#83a8eb}
 .dashboard-questions button:focus-visible{outline:2px solid #2364dd;outline-offset:3px}
-.dashboard-reading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:4px 4px 2px}
-.dashboard-reading h3{font-size:20px;color:#23395b;margin:0 0 10px}
-.dashboard-reading p{font-size:14px;color:#405777;line-height:1.8;margin:0 0 6px;max-width:1020px}
-.dashboard-reading span{font-size:13px;color:#78869a;line-height:1.7}
-.dashboard-reading>.ant-btn{flex-shrink:0;font-size:12px;padding-inline:0}
 .dashboard-reading-example{background:#f5f8fe;border-radius:8px;padding:8px 16px}
 .dashboard-reading-example p{display:flex;gap:18px;margin:12px 0;line-height:1.7}
 .dashboard-reading-example strong{flex:0 0 90px;color:#365b92}
@@ -88,8 +83,8 @@
 .dashboard-source-matrix .ant-card-head-title{white-space:normal}
 .dashboard-source-matrix .ant-table-cell{font-size:12px}
 .dashboard-zero{color:#9ba6b5}
-@media(max-width:1100px){.dashboard-matrix-pair{grid-template-columns:1fr}.dashboard-reading{flex-direction:column;gap:0}.dashboard-questions button{padding:13px 12px}}
-@media(max-width:760px){.dashboard-questions{grid-template-columns:repeat(2,minmax(0,1fr));position:static}.dashboard-questions strong{font-size:14px}.dashboard-reading h3{font-size:18px}.dashboard-reading-example p{flex-direction:column;gap:3px}.dashboard-reading-example strong{flex:auto}}
+@media(max-width:1100px){.dashboard-matrix-pair{grid-template-columns:1fr}.dashboard-questions button{padding:13px 12px}}
+@media(max-width:760px){.dashboard-questions{grid-template-columns:repeat(2,minmax(0,1fr));position:static}.dashboard-questions strong{font-size:14px}.dashboard-reading-example p{flex-direction:column;gap:3px}.dashboard-reading-example strong{flex:auto}}
 
 .dashboard-rate-guide{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:14px}
 .dashboard-rate-guide>div{display:flex;flex-direction:column;gap:6px}

@@ -13,7 +13,7 @@ The supplied business dashboard and follow-up conversation establish the priorit
 
 ## Reading the page
 
-Four always-visible question buttons keep all content in the same dashboard. Each view has one date filter with an explicit meaning, a plain-language interpretation of the current numbers, and a suggested next action. Dates are remembered separately for each view. Current CC is shared. Counting rules include an example of one user registering, being contacted and paying on three different dates.
+Four always-visible question buttons keep all content in the same dashboard. Each view has one date filter with an explicit meaning. The repeated reading-guide section is removed from all four views; the metric cards and tables follow the filters directly. Dates are remembered separately for each view. Current CC is shared. Counting rules include an example of one user registering, being contacted and paying on three different dates.
 
 | View | Date meaning | Content |
 | --- | --- | --- |
