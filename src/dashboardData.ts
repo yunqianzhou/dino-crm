@@ -63,7 +63,7 @@ export function dashboardPaymentSummary(orders: Order[]) {
     const rows = orders.filter(o => (o.currency?.trim() || '__unknown__') === currency)
     const users = new Set(rows.map(o => o.studentId)).size
     const amount = rows.reduce((sum, o) => sum + o.paidAmount, 0)
-    return { currency, orders: rows, users, amount, averagePerUser: users ? amount / users : null }
+    return { currency, orders: rows, users, amount, averagePerUser: users ? amount / users : null, averagePerOrder: rows.length ? amount / rows.length : null }
   })
 }
 
@@ -93,6 +93,37 @@ export type CohortMetric = typeof COHORT_METRICS[number]
 export type CohortDimension = 'date' | 'cc' | 'source'
 export type CohortMetrics = Record<CohortMetric, Student[]>
 export type CohortRow = { id: string; value: string; dimension: CohortDimension; metrics: CohortMetrics; children?: CohortRow[] }
+export const COHORT_RATES = [
+  { key: 'rateContact', numerator: 'connected', denominator: 'leads', formula: 'connectFormula' },
+  { key: 'rateBooking', numerator: 'booked', denominator: 'connected', formula: 'bookFormula' },
+  { key: 'rateAttendance', numerator: 'attended', denominator: 'booked', formula: 'attendanceFormula' },
+  { key: 'ratePaid', numerator: 'paid', denominator: 'attended', formula: 'attendancePaidFormula' },
+  { key: 'rateTotal', numerator: 'paid', denominator: 'leads', formula: 'totalPaidFormula' },
+] as const
+
+/** Reference ratios from recorded cohort outcomes, never from independent daily activity.
+ * Reject a step when its numerator includes users with no denominator evidence.
+ */
+export function dashboardCohortRates(metrics: CohortMetrics) {
+  return COHORT_RATES.map(rate => {
+    const denominatorIds = new Set(metrics[rate.denominator].map(s => s.studentId))
+    const numerator = metrics[rate.numerator].length
+    const denominator = denominatorIds.size
+    const reason: 'zeroDenominator' | 'missingHistory' | null = !denominator ? 'zeroDenominator' : metrics[rate.numerator].some(s => !denominatorIds.has(s.studentId)) ? 'missingHistory' : null
+    return { ...rate, numeratorCount: numerator, denominatorCount: denominator, reason, value: reason ? null : numerator / denominator * 100 }
+  })
+}
+
+/** Monetary columns follow the table's date definition: registration cohort or payment activity. */
+export function dashboardBreakdownPayments(orders: Order[], population: Student[], filters: DashboardFilters, group?: DashboardGrouping, value?: string, owner?: string) {
+  const rows = population.filter(s => (!owner || (s.salesOwner || '__unassigned__') === owner) &&
+    (!group || group === 'date' || !value || dashboardGroupKey(s, group) === value) &&
+    (filters.mode !== 'current' || inVietnamRange(s.registerTime, group === 'date' && value ? value : filters.start, group === 'date' && value ? value : filters.end)))
+  return dashboardPaymentOrders(orders, rows, { ...filters,
+    start: filters.mode === 'current' ? '' : group === 'date' && value ? value : filters.start,
+    end: filters.mode === 'current' ? '' : group === 'date' && value ? value : filters.end,
+  })
+}
 
 /** Recorded outcomes for a registration cohort, including users who have since paid.
  * Missing historical evidence is not inferred from a user's current sales stage.
