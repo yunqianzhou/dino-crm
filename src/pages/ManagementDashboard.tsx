@@ -8,15 +8,13 @@ import { useStore } from '../store'
 import { usePerm } from '../perm'
 import { useI18n } from '../i18n'
 import { useDashboardText, type DashboardWord } from '../dashboardText'
-import { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupRows, dashboardGroupKey, dashboardReasonRows, dashboardConversionMetrics, dashboardRevenue, REASON_KINDS, PERIOD_METRICS, CONVERSION_METRICS, type DashboardFilters, type DashboardGrouping, type ReasonKind } from '../dashboardData'
+import { dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupRows, dashboardReasonRows, REASON_KINDS, PERIOD_METRICS, type DashboardFilters, type DashboardGrouping, type ReasonKind } from '../dashboardData'
 import { consultationStage, CONSULTATION_STAGES, CONSULTATION_STAGE_COLOR } from '../salesLifecycle'
 import { isSalesLead } from '../funnel'
 import type { Student } from '../types'
 import LocalTime from '../components/LocalTime'
+import DashboardPayments from '../components/DashboardPayments'
 import './ManagementDashboard.css'
-
-type ConversionDimension = 'date' | 'cc' | 'source'
-type ConversionRow = { id: string; name: string; metrics: Record<typeof CONVERSION_METRICS[number], Student[]>; children?: ConversionRow[] }
 
 export default function ManagementDashboard() {
  const d = useDashboardText()
@@ -33,7 +31,7 @@ export default function ManagementDashboard() {
  const navigate = useNavigate()
  const date = (key: string) => { const v = query.get(key) || ''; return /^\d{4}-\d{2}-\d{2}$/.test(v) && dayjs(v).isValid() ? v : '' }
  const filters: DashboardFilters = { mode: query.get('mode') === 'period' ? 'period' : 'current', start: date('start'), end: date('end'), owner: query.get('cc') || '', userType: '正式用户' }
- const clearDetail = (params: URLSearchParams) => ['detail', 'detailCC', 'detailDate', 'detailGroup', 'detailValue', 'detailReason', 'detailKind', 'type'].forEach(key => params.delete(key))
+ const clearDetail = (params: URLSearchParams) => ['detail', 'detailCC', 'detailDate', 'detailGroup', 'detailValue', 'detailReason', 'detailKind', 'paymentDetail', 'paymentValue', 'paymentView', 'paymentUser', 'type'].forEach(key => params.delete(key))
  const change = (values: Record<string, string>) => { const next = new URLSearchParams(query); Object.entries(values).forEach(([k, v]) => next.set(k, v)); clearDetail(next); setQuery(next) }
  const scope = allowedLines()
  const population = dashboardPopulation(students, scope, scope === null || can('salesV3_reassign') === 'operate', actor)
@@ -42,6 +40,11 @@ export default function ManagementDashboard() {
  const ownerIds = [...new Set(population.map(s => s.salesOwner || '__unassigned__'))].sort()
  const title = (metric: string) => (CONSULTATION_STAGES as readonly string[]).includes(metric) ? t(`sales.consultation.stage.${metric}`) : d(metric as DashboardWord)
  const keys = filters.mode === 'current' ? ['total', ...CONSULTATION_STAGES, 'paid'] : [...PERIOD_METRICS]
+ const defaultColumns = filters.mode === 'current' ? ['total', '待外呼', '已接通待预约', '咨询完成待支付', 'paid'] : [...PERIOD_METRICS]
+ const columnParam = filters.mode === 'current' ? 'currentColumns' : 'periodColumns'
+ const requestedColumns = (query.get(columnParam) || '').split(',').filter(key => keys.includes(key))
+ const visibleKeys = requestedColumns.length ? keys.filter(key => requestedColumns.includes(key)) : defaultColumns
+ const rangeLabel = filters.start && filters.end ? `${filters.start} — ${filters.end}` : d('allDates')
  const groupValues: DashboardGrouping[] = ['cc', 'date', 'source', 'intent', 'age', 'registrationAge']
  const grouping = (groupValues.includes(query.get('group') as DashboardGrouping) ? query.get('group') : 'cc') as DashboardGrouping
  const groupLabels = { cc: d('ccTitle'), date: d('dateTitle'), source: d('groupSource'), intent: d('groupIntent'), age: d('groupAge'), registrationAge: d('groupRegistrationAge') }
@@ -50,44 +53,6 @@ export default function ManagementDashboard() {
  const breakdownRows = (grouping === 'date' ? dateRows : dashboardGroupRows(metrics, grouping)).map(row => ({ ...row, name: groupName(grouping, row.id) }))
  const reasonKind = (REASON_KINDS.includes(query.get('reasonKind') as ReasonKind) ? query.get('reasonKind') : 'noShow') as ReasonKind
  const reasonRows = dashboardReasonRows(population, calls, lessons, filters, reasonKind)
- const conversion = dashboardConversionMetrics(population, calls, filters, orders)
- const conversionDimensions: ConversionDimension[] = ['date', 'cc', 'source']
- const conversionPrimary = (conversionDimensions.includes(query.get('conversionPrimary') as ConversionDimension) ? query.get('conversionPrimary') : 'date') as ConversionDimension
- const conversionSecondaryOptions = conversionDimensions.filter(value => value !== conversionPrimary)
- const conversionSecondary = (conversionSecondaryOptions.includes(query.get('conversionSecondary') as ConversionDimension) ? query.get('conversionSecondary') : 'cc') as ConversionDimension | ''
- const conversionDimensionLabel = (dimension: ConversionDimension) => dimension === 'date' ? d('registerDates') : dimension === 'cc' ? d('currentCC') : d('source')
- const conversionKey = (s: Student, dimension: ConversionDimension) => dimension === 'date'
-   ? dayjs.utc(s.registerTime).utcOffset(420).format('YYYY-MM-DD')
-   : dashboardGroupKey(s, dimension)
- const conversionName = (dimension: ConversionDimension, id: string) => dimension === 'cc' ? ownerName(id) : groupName(dimension, id)
- const conversionRows = (() => {
-   const groupRows = (dimension: ConversionDimension, matches: (s: Student) => boolean, parentId = ''): ConversionRow[] => {
-     const ids = [...new Set(conversion.leads.filter(matches).map(s => conversionKey(s, dimension)))]
-     ids.sort((a, b) => dimension === 'date' ? b.localeCompare(a) : b.localeCompare(a))
-     return ids.map(id => {
-       const inGroup = (s: Student) => matches(s) && conversionKey(s, dimension) === id
-       const children = conversionSecondary && dimension === conversionPrimary
-         ? groupRows(conversionSecondary as ConversionDimension, inGroup, id)
-         : undefined
-       return { id: `${parentId}${dimension}:${id}`, name: conversionName(dimension, id), metrics: Object.fromEntries(CONVERSION_METRICS.map(key => [key, conversion[key].filter(inGroup)])) as ConversionRow['metrics'], children }
-     })
-   }
-   return groupRows(conversionPrimary, () => true)
- })()
- const paidRevenueOrders = dashboardRevenue(orders, population, filters)
- const revenueGroup = (query.get('revenueGroup') === 'date' ? 'date' : 'cc') as 'cc' | 'date'
- const revenueRows = (() => {
-   const key = (order: typeof paidRevenueOrders[number]) => {
-     if (revenueGroup === 'date') return dayjs.utc(order.paidTime).utcOffset(420).format('YYYY-MM-DD')
-     return population.find(s => s.studentId === order.studentId)?.salesOwner || '__unassigned__'
-   }
-   const groups = new Map<string, typeof paidRevenueOrders>()
-   paidRevenueOrders.forEach(order => { const id = key(order); groups.set(id, [...(groups.get(id) || []), order]) })
-   return [...groups].map(([id, rows]) => ({ id, name: revenueGroup === 'cc' ? ownerName(id) : id, orders: rows, revenue: rows.reduce((sum, o) => sum + o.paidAmount, 0), payers: new Set(rows.map(o => o.studentId)).size })).sort((a, b) => b.revenue - a.revenue)
- })()
- const totalRevenue = paidRevenueOrders.reduce((sum, order) => sum + order.paidAmount, 0)
- const totalPayers = new Set(paidRevenueOrders.map(order => order.studentId)).size
- const formatMoney = (value: number) => new Intl.NumberFormat(lang === 'zh' ? 'zh-CN' : 'en-US', { maximumFractionDigits: 0 }).format(value)
  const reasonName = (id: string) => id === '__unknown__' ? d('unknown') : t(`sales.consultation.reasonOption.${id}`)
  const open = (metric: string, group?: DashboardGrouping, value?: string) => { const next = new URLSearchParams(query); clearDetail(next); next.set('detail', metric); if (group && value) { next.set('detailGroup', group); next.set('detailValue', value) }; setQuery(next) }
  const openReason = (id: string) => { const next = new URLSearchParams(query); clearDetail(next); next.set('detailReason', id); next.set('detailKind', reasonKind); setQuery(next) }
@@ -114,7 +79,7 @@ export default function ManagementDashboard() {
    { title: d('intent'), width: 130, render: (_, s) => groupName('intent', s.purchaseIntention || '未填写') },
    { title: d('age'), dataIndex: 'ageGroup', width: 100, render: v => v || d('unknown') },
    { title: d('stageTitle'), width: 180, render: (_, s) => isSalesLead(s, lessons) ? <Tag color={CONSULTATION_STAGE_COLOR[consultationStage(s, calls)]}>{title(consultationStage(s, calls))}</Tag> : t(`enum.status.${s.status}`) },
-   { title: t('common.action'), width: 260, render: (_, s) => <Space wrap>
+   { title: t('common.action'), width: 240, fixed: 'right', render: (_, s) => <Space wrap>
      {can('salesV3') !== 'none' && isSalesLead(s, lessons) && <Button size="small" type="link" onClick={() => go(`/sales-v3?studentId=${encodeURIComponent(s.studentId)}&tab=${s.salesOwner ? 'follow' : 'pool'}`)}>{d('salesAction')}</Button>}
      {can('usersV2') !== 'none' && <Button size="small" type="link" onClick={() => go(`/users-v2/${encodeURIComponent(s.studentId)}`)}>{d('userAction')}</Button>}
      {can('ordersV3') !== 'none' && <Button size="small" type="link" onClick={() => go(`/orders-v3?studentId=${encodeURIComponent(s.studentId)}`)}>{d('orderAction')}</Button>}
@@ -127,41 +92,29 @@ export default function ManagementDashboard() {
      <Select aria-label={d('currentCC')} value={filters.owner} style={{ minWidth: 180 }} onChange={v => change({ cc: v })} options={[{ value: '', label: d('allCC') }, ...ownerIds.map(id => ({ value: id, label: ownerName(id) }))]} />
      <div className="dashboard-date"><span>{d(filters.mode === 'current' ? 'registerDates' : 'recordDates')}</span><DatePicker.RangePicker value={filters.start && filters.end ? [dayjs(filters.start), dayjs(filters.end)] : null} placeholder={[d('allDates'), d('allDates')]} presets={[{ label: d('today'), value: [today, today] }, { label: d('last7'), value: [today.subtract(6, 'day'), today] }, { label: d('thisMonth'), value: [today.startOf('month'), today] }]} onChange={v => change({ start: v?.[0]?.format('YYYY-MM-DD') || '', end: v?.[1]?.format('YYYY-MM-DD') || '' })} /></div>
      {(filters.owner || filters.start || filters.end) && <Button type="text" onClick={reset}>{d('resetFilters')}</Button>}
-   </Space><p className="dashboard-help">{d(filters.mode === 'current' ? 'currentHelp' : 'periodHelp')}</p></Card>
+   </Space><div className="dashboard-filter-summary"><strong>{d(filters.mode === 'current' ? 'registerDates' : 'recordDates')}：{rangeLabel}</strong><span>{ownerName(filters.owner) || d('allCC')} · UTC+7</span></div><p className="dashboard-help">{d(filters.mode === 'current' ? 'currentHelp' : 'periodHelp')}</p></Card>
    <div className={`dashboard-kpis ${filters.mode === 'period' ? 'dashboard-period' : ''}`}>
-     {(filters.mode === 'current' ? ['total', 'assigned', 'unassigned', 'paid'] : [...PERIOD_METRICS]).map(key => <Card key={key} className={key === 'paid' ? 'dashboard-paid' : undefined}><div className="dashboard-kpi-label">{title(key)}</div>{count(key)}{key === 'paid' && <p className="dashboard-paid-hint">{d(filters.mode === 'current' ? 'paidCurrent' : 'paidPeriod')}</p>}<ArrowRightOutlined /></Card>)}
+     {(filters.mode === 'current' ? ['total', 'assigned', 'unassigned', 'paid'] : [...PERIOD_METRICS]).map(key => <Card key={key} className={key === 'paid' ? 'dashboard-paid' : undefined}><div className="dashboard-kpi-label">{title(key)}</div>{count(key)}{key === 'paid' && <p className="dashboard-paid-hint">{d(filters.mode === 'current' ? 'paidCurrent' : 'paidPeriod')}</p>}{key !== 'paid' && <p className="dashboard-kpi-hint">{d(`${key}Hint` as DashboardWord)}</p>}<ArrowRightOutlined /></Card>)}
    </div>
-   <Card title={d('conversionTitle')} className="dashboard-conversion">
-     <div className="dashboard-analysis-head"><div><p className="dashboard-help">{d('conversionHelp')}</p><Tag color="gold">{d('cohortTag')}</Tag></div><div className="dashboard-dimension-picker"><span>{d('groupBy')}</span><Select aria-label={d('primaryDimension')} value={conversionPrimary} onChange={v => change({ conversionPrimary: v, conversionSecondary: v === conversionSecondary ? conversionSecondaryOptions.find(option => option !== v) || 'cc' : conversionSecondary })} options={conversionDimensions.map(value => ({ value, label: conversionDimensionLabel(value) }))} /><ArrowRightOutlined /><Select aria-label={d('secondaryDimension')} value={conversionSecondary} onChange={v => change({ conversionSecondary: v })} options={conversionSecondaryOptions.map(value => ({ value, label: conversionDimensionLabel(value) }))} /></div></div>
-     <p className="dashboard-hierarchy-note">{d('hierarchyHelp')}</p>
-     <Table rowKey="id" size="middle" dataSource={conversionRows} scroll={{ x: 1220 }} pagination={false} expandable={{ indentSize: 20, defaultExpandAllRows: false, expandRowByClick: true, columnTitle: d('expand') }} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
-       { title: conversionDimensionLabel(conversionPrimary), dataIndex: 'name', fixed: 'left', width: 250, render: (name: string, row: ConversionRow) => <span className={row.children?.length ? 'conversion-parent-label' : undefined}>{name}</span> },
-       { title: d('leads'), width: 110, render: (_: unknown, row: typeof conversionRows[number]) => row.metrics.leads.length },
-       ...CONVERSION_METRICS.slice(1).map(key => ({ title: title(key), width: 140, render: (_: unknown, row: typeof conversionRows[number]) => <div className="conversion-cell"><span>{row.metrics[key].length}</span><small>{row.metrics.leads.length ? `${Math.round(row.metrics[key].length / row.metrics.leads.length * 100)}%` : '—'}</small></div> })),
-     ]} />
-   </Card>
-   <Card title={d('revenueTitle')} className="dashboard-revenue">
-     <div className="dashboard-analysis-head"><div><p className="dashboard-help">{d('revenueHelp')}</p><div className="dashboard-revenue-totals"><span><small>{d('revenue')}</small><strong>{formatMoney(totalRevenue)} VND</strong></span><span><small>{d('aov')}</small><strong>{formatMoney(totalPayers ? totalRevenue / totalPayers : 0)} VND</strong></span></div></div><Segmented value={revenueGroup} onChange={v => change({ revenueGroup: String(v) })} options={[{ value: 'cc', label: d('ccTitle') }, { value: 'date', label: d('paidDate') }]} /></div>
-     <Table rowKey="id" size="middle" pagination={revenueGroup === 'date' ? { pageSize: 10, showSizeChanger: false } : false} dataSource={revenueRows} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
-       { title: revenueGroup === 'cc' ? d('currentCC') : d('paidDate'), dataIndex: 'name' },
-       { title: d('paidOrders'), width: 160, render: (_: unknown, row: typeof revenueRows[number]) => row.orders.length },
-       { title: d('paidUsers'), width: 160, dataIndex: 'payers' },
-       { title: d('revenue'), width: 190, render: (_: unknown, row: typeof revenueRows[number]) => `${formatMoney(row.revenue)} VND` },
-       { title: d('aov'), width: 190, render: (_: unknown, row: typeof revenueRows[number]) => `${formatMoney(row.payers ? row.revenue / row.payers : 0)} VND` },
-     ]} />
-   </Card>
-   {filters.mode === 'current' && <Card title={d('stageTitle')}><p className="dashboard-help">{d('stageHelp')}</p><div className="dashboard-stages">{CONSULTATION_STAGES.map(stage => <div key={stage}><div className="dashboard-stage-line"><span>{title(stage)}</span>{count(stage)}</div><Progress percent={metrics.total?.length ? Math.round((metrics[stage]?.length || 0) / metrics.total.length * 1000) / 10 : 0} size="small" strokeColor="#5086ee" format={p => `${p}%`} /><span className="dashboard-stage-share">{d('stageShare')}</span></div>)}</div></Card>}
+   {filters.mode === 'current' && <Card title={d('stageTitle')} extra={<span className="dashboard-section-note">{d('stageShare')}</span>}><p className="dashboard-help">{d('stageHelp')}</p><div className="dashboard-stages">{CONSULTATION_STAGES.map(stage => <div key={stage}><div className="dashboard-stage-line"><span>{title(stage)}</span>{count(stage)}</div><Progress percent={metrics.total?.length ? Math.round((metrics[stage]?.length || 0) / metrics.total.length * 1000) / 10 : 0} size="small" strokeColor="#5086ee" format={p => `${p}%`} /></div>)}</div></Card>}
    <Card title={d(filters.mode === 'period' ? 'breakdown' : 'currentBreakdown')}>
-    <Segmented style={{ marginBottom: 16 }} value={grouping} onChange={v => change({ group: String(v) })} className="dashboard-grouping" options={groupValues.map(value => ({ value, label: groupLabels[value] }))} />
+    <div className="dashboard-table-tools">
+      <Space wrap>
+        <Segmented value={['cc', 'date'].includes(grouping) ? grouping : ''} onChange={v => change({ group: String(v) })} options={['cc', 'date'].map(value => ({ value, label: groupLabels[value as DashboardGrouping] }))} />
+        <Select aria-label={d('moreGroups')} placeholder={d('moreGroups')} value={['cc', 'date'].includes(grouping) ? undefined : grouping} allowClear onChange={v => change({ group: v || 'cc' })} style={{ minWidth: 165 }} options={groupValues.filter(value => !['cc', 'date'].includes(value)).map(value => ({ value, label: groupLabels[value] }))} />
+      </Space>
+      <label className="dashboard-column-picker"><span>{d('visibleColumns')}</span><Select mode="multiple" popupMatchSelectWidth={260} aria-label={d('visibleColumns')} value={visibleKeys} maxTagCount={0} maxTagPlaceholder={selected => `${selected.length} ${d('columnsUnit')}`} style={{ width: 150 }} onChange={values => change({ [columnParam]: values.length ? values.join(',') : defaultColumns.join(',') })} options={keys.map(key => ({ value: key, label: title(key) }))} /></label>
+    </div>
     <p className="dashboard-help">{d(grouping === 'cc' ? 'ccHelp' : grouping === 'date' ? filters.mode === 'current' ? 'dateCurrentHelp' : 'datePeriodHelp' : grouping === 'registrationAge' ? 'registrationAgeHelp' : 'groupHelp')}</p>
-    <Table rowKey="id" size="middle" dataSource={breakdownRows} scroll={{ x: filters.mode === 'current' ? 1650 : 1200 }} pagination={grouping === 'date' ? { pageSize: 10, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
-     { title: grouping === 'cc' ? d('currentCC') : grouping === 'date' ? d(filters.mode === 'current' ? 'registerDates' : 'recordDates') : d(grouping), dataIndex: 'name', key: 'group', fixed: 'left', width: 170 },
-     ...keys.map(key => ({ title: title(key), key, width: 135, render: (_: unknown, row: typeof breakdownRows[number]) => count(key, (row.metrics[key] || []).length, grouping, row.id) })),
+    <Table rowKey="id" size="middle" dataSource={breakdownRows} scroll={{ x: 160 + visibleKeys.length * 125 }} pagination={grouping === 'date' ? { pageSize: 10, showSizeChanger: false } : false} locale={{ emptyText: <Empty description={d('noRows')} image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} columns={[
+     { title: grouping === 'cc' ? d('currentCC') : grouping === 'date' ? d(filters.mode === 'current' ? 'registerDates' : 'recordDates') : d(grouping), dataIndex: 'name', key: 'group', fixed: 'left', width: 160 },
+     ...visibleKeys.map(key => ({ title: title(key), key, width: 125, render: (_: unknown, row: typeof breakdownRows[number]) => count(key, (row.metrics[key] || []).length, grouping, row.id) })),
     ]} summary={() => breakdownRows.length ? <Table.Summary.Row>
       <Table.Summary.Cell index={0}><strong>{d(filters.mode === 'current' ? 'currentTotal' : 'periodTotal')}</strong></Table.Summary.Cell>
-      {keys.map((key, i) => <Table.Summary.Cell index={i + 1} key={key}>{count(key)}</Table.Summary.Cell>)}
+      {visibleKeys.map((key, i) => <Table.Summary.Cell index={i + 1} key={key}>{count(key)}</Table.Summary.Cell>)}
     </Table.Summary.Row> : null} />
    </Card>
+   {filters.mode === 'period' && <DashboardPayments population={population} orders={orders} filters={filters} rangeLabel={rangeLabel} />}
    <Card title={d('reasons')}>
      <Segmented className="dashboard-grouping" value={reasonKind} onChange={v => change({ reasonKind: String(v) })} options={REASON_KINDS.map(value => ({ value, label: d(value) }))} />
      <p className="dashboard-help" style={{ marginTop: 16 }}>{d(filters.mode === 'current' ? 'currentReasonHelp' : 'periodReasonHelp')}</p>
@@ -171,13 +124,17 @@ export default function ManagementDashboard() {
        ...(filters.mode === 'current' ? [{ title: d('share'), width: 220, render: (_: unknown, row: typeof reasonRows[number]) => <Progress size="small" percent={Math.round(row.users.length / (reasonRows.reduce((sum, r) => sum + r.users.length, 0) || 1) * 1000) / 10} /> }] : []),
      ]} />
    </Card>
-   <p className="dashboard-footnote">{d('demo')} <Button type="link" size="small" onClick={() => setRulesOpen(true)}>{d('rules')}</Button></p>
-   <Modal open={rulesOpen} onCancel={() => setRulesOpen(false)} footer={<Button onClick={() => setRulesOpen(false)}>{t('common.close')}</Button>} title={d('rules')}>
-     {[d('formalOnly'), d('paidRule'), d('currentHelp'), d('periodHelp'), d('periodNote'), d('registrationAgeHelp'), d('intentNote'), d('limits')].map(text => <p key={text}>{text}</p>)}
+   <p className="dashboard-footnote">{d('demo')} {d('conversionStatus')} <Button type="link" size="small" onClick={() => setRulesOpen(true)}>{d('rules')}</Button></p>
+   <Modal width={720} styles={{ body: { maxHeight: '60vh', overflowY: 'auto' } }} open={rulesOpen} onCancel={() => setRulesOpen(false)} footer={<Button onClick={() => setRulesOpen(false)}>{t('common.close')}</Button>} title={d('rules')}>
+     <Typography.Title level={5}>{d('conversionRules')}</Typography.Title>
+     <p className="dashboard-help">{d('conversionDeferred')}</p>
+     <ul className="dashboard-formulas">{['connectFormula', 'bookFormula', 'attendanceFormula', 'attendancePaidFormula', 'totalPaidFormula'].map(key => <li key={key}>{d(key as DashboardWord)}</li>)}</ul>
+     <Typography.Title level={5}>{d('rules')}</Typography.Title>
+     {[d('formalOnly'), d('paidRule'), d('currentHelp'), d('periodHelp'), d('periodNote'), d('revenueHelp'), d('registrationAgeHelp'), d('intentNote'), d('limits')].map(text => <p key={text}>{text}</p>)}
    </Modal>
    <Modal open={!!detail || !!detailReason} onCancel={close} footer={<Button onClick={close}>{t('common.close')}</Button>} width={1280} title={`${d('users')} · ${detailLabel}`}>
-    <p className="dashboard-help">{detailRows.length} {d('count')} · {d('currentCC')} · UTC+7</p>
-    <Table rowKey="studentId" columns={columns} dataSource={detailRows} scroll={{ x: 1100 }} pagination={{ pageSize: 10, showSizeChanger: false, showTotal: n => t('common.total', { n }) }} locale={{ emptyText: d('noRows') }} />
+    <p className="dashboard-help">{detailRows.length} {d('count')} · {d(filters.mode === 'current' ? 'registerDates' : 'recordDates')}：{detailGroup === 'date' ? detailValue : rangeLabel} · {filters.owner ? ownerName(filters.owner) : d('allCC')} · UTC+7</p>
+    <Table rowKey="studentId" columns={columns} dataSource={detailRows} scroll={{ x: 1300, y: 'min(55vh, 520px)' }} pagination={{ pageSize: 10, showSizeChanger: false, showTotal: n => t('common.total', { n }) }} locale={{ emptyText: d('noRows') }} />
    </Modal>
  </div>
 }

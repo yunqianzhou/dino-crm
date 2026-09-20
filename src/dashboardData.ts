@@ -8,7 +8,6 @@ dayjs.extend(utc)
 
 export type DashboardFilters = { mode: 'current' | 'period'; start: string; end: string; owner: string; userType: string }
 export const PERIOD_METRICS = ['registered', 'called', 'connected', 'booked', 'attended', 'completed', 'paid'] as const
-export const CONVERSION_METRICS = ['leads', 'connected', 'booked', 'attended', 'paid'] as const
 /** A paid profile flag is not payment evidence; count only valid, positive paid orders. */
 export function isDashboardPaidOrder(order: Order) {
   return order.orderStatus === '已支付' && Number.isFinite(order.paidAmount) && order.paidAmount > 0 &&
@@ -50,32 +49,22 @@ export function dashboardMetrics(population: Student[], calls: CallRecord[], les
   return metrics
 }
 
-/**
- * Registration-cohort funnel used for management conversion analysis.
- * The denominator is always a lead's registration date. Later actions are
- * intentionally not date-restricted: this answers "what did this cohort
- * eventually convert to?", rather than mixing unrelated daily activities.
- */
-export function dashboardConversionMetrics(population: Student[], calls: CallRecord[], filters: DashboardFilters, orders: Order[] = []) {
-  const eligible = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
-    (!filters.userType || resolveUserType(s) === filters.userType) && !!s.phone?.trim() && inVietnamRange(s.registerTime, filters.start, filters.end))
-  const callIds = new Set(calls.filter(c => c.result === '已接通').map(c => c.studentId))
-  const paidIds = new Set(orders.filter(isDashboardPaidOrder).map(o => o.studentId))
-  const hasEvent = (s: Student, node: string, outcomes: string[]) => (s.salesLifecycleEvents || []).some(e => e.node === node && outcomes.includes(e.result))
-  return {
-    leads: eligible,
-    connected: eligible.filter(s => callIds.has(s.studentId)),
-    booked: eligible.filter(s => (s.salesAppointments || []).some(a => a.appointmentStatus !== '已取消') || hasEvent(s, 'appointment', ['已预约', '已改期'])),
-    attended: eligible.filter(s => (s.salesAppointments || []).some(a => a.attendanceStatus === '已出勤') || hasEvent(s, 'attendance', ['已出勤'])),
-    paid: eligible.filter(s => paidIds.has(s.studentId)),
-  } as Record<typeof CONVERSION_METRICS[number], Student[]>
-}
-
-/** Revenue is recognised from paid orders and stays separate from the cohort funnel. */
-export function dashboardRevenue(orders: Order[], students: Student[], filters: DashboardFilters) {
+/** Payment activity uses the same successful orders and UTC+7 dates as paid-user counts. */
+export function dashboardPaymentOrders(orders: Order[], students: Student[], filters: DashboardFilters) {
   const allowed = new Set(students.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType)).map(s => s.studentId))
   return orders.filter(o => allowed.has(o.studentId) && isDashboardPaidOrder(o) && inVietnamRange(o.paidTime, filters.start, filters.end))
+}
+
+/** Never sum unlike currencies. A user with several paid orders is one payer in that currency. */
+export function dashboardPaymentSummary(orders: Order[]) {
+  const currencies = [...new Set(orders.map(o => o.currency?.trim() || '__unknown__'))].sort()
+  return currencies.map(currency => {
+    const rows = orders.filter(o => (o.currency?.trim() || '__unknown__') === currency)
+    const users = new Set(rows.map(o => o.studentId)).size
+    const amount = rows.reduce((sum, o) => sum + o.paidAmount, 0)
+    return { currency, orders: rows, users, amount, averagePerUser: users ? amount / users : null }
+  })
 }
 
 /** Daily rows use the same metric definitions and filters as the headline counts. */
