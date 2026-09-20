@@ -130,7 +130,7 @@
         <div class="field span2" id="form-sku-wrap" style="display:none"><label>6. SKU</label><div id="form-sku-list" class="payment-sku-list"></div><select id="form-sku" hidden></select><div class="help">无需选择 SKU，支付落地页会平铺展示当前渠道价格方案内的全部 SKU。</div></div>
         <div class="field span2" id="form-promo-wrap" style="display:none"><label>7. 是否使用优惠</label><select id="form-promo-code"></select><div class="help" id="form-promo-help">默认使用该 SKU 对应的 Promo Code；可改为按原价展示。</div></div>
         <div class="field span2" id="form-plan-summary" style="display:none"></div>
-        <div class="field span2" id="form-content-wrap" style="display:none"><label>6. 帖子标识或帖子链接 <em>*</em></label><input id="form-content-id" placeholder="例如：TikTok 帖子链接或帖子编号"><div class="help">KOL 的每一条对外内容需单独创建落地页，并以该值完成按帖子归因。</div></div>
+        <div class="field span2" id="form-content-wrap" style="display:none"><label id="form-content-label">6. 帖子标识或帖子链接 <em>*</em></label><input id="form-content-id" placeholder="例如：TikTok 帖子链接或帖子编号"><div class="help">KOL 的每一条对外内容需单独创建落地页，并以该值完成按帖子归因。</div></div>
         <div class="field span2" id="form-lp-id-wrap" style="display:none"><label>LP ID</label><div class="meta-row"><input id="form-lp-id" readonly value="—"><button class="btn" type="button" id="copy-form-lp-id">复制</button></div><div class="help">选择渠道后自动生成；每个落地页唯一，可复制使用。</div></div>
         <div class="field span2"><label>落地页名称</label><input id="form-personal-title" placeholder="例如：韩国秋季新客优惠"></div>
         <div class="field span2" id="form-preview" style="display:none"></div>
@@ -559,6 +559,7 @@
       if(!payment){$('form-sku').innerHTML='';$('form-promo-code').innerHTML='';$('form-plan-summary').innerHTML=''}
       $('form-lp-id-wrap').style.display=subject?'':'none';
       $('form-content-wrap').style.display=subject?.type==='KOL'?'':'none';
+      $('form-content-label').innerHTML=(payment?'8. ':'6. ')+'帖子标识或帖子链接 <em>*</em>';
       const skin=$('form-template-id').value;syncTemplateOptions(subject?.line||$('form-line').value);
       if([...$('form-template-id').options].some(option=>option.value===skin))$('form-template-id').value=skin;
       if(subject){if(!pendingLandingLpId)pendingLandingLpId=newLpId(subject.line);$('form-lp-id').value=pendingLandingLpId}
