@@ -130,7 +130,7 @@
         <div class="field span2" id="form-sku-wrap" style="display:none"><label>6. SKU</label><div id="form-sku-list" class="payment-sku-list"></div><select id="form-sku" hidden></select><div class="help">无需选择 SKU，支付落地页会平铺展示当前渠道价格方案内的全部 SKU。</div></div>
         <div class="field span2" id="form-promo-wrap" style="display:none"><label>7. 是否使用优惠</label><select id="form-promo-code"></select><div class="help" id="form-promo-help">默认使用该 SKU 对应的 Promo Code；可改为按原价展示。</div></div>
         <div class="field span2" id="form-plan-summary" style="display:none"></div>
-        <div class="field span2" id="form-content-wrap" style="display:none"><label id="form-content-label">6. 帖子标识或帖子链接 <em>*</em></label><input id="form-content-id" placeholder="例如：TikTok 帖子链接或帖子编号"><div class="help">KOL 的每一条对外内容需单独创建落地页，并以该值完成按帖子归因。</div></div>
+        <div class="field span2" id="form-content-wrap" style="display:none"><label id="form-content-label">8. 帖子标识或帖子链接 <em>*</em></label><input id="form-content-id" placeholder="例如：TikTok 帖子链接或帖子编号"><div class="help">KOL 的每一条对外内容需单独创建落地页，并以该值完成按帖子归因。</div></div>
         <div class="field span2" id="form-lp-id-wrap" style="display:none"><label>LP ID</label><div class="meta-row"><input id="form-lp-id" readonly value="—"><button class="btn" type="button" id="copy-form-lp-id">复制</button></div><div class="help">选择渠道后自动生成；每个落地页唯一，可复制使用。</div></div>
         <div class="field span2"><label>落地页名称</label><input id="form-personal-title" placeholder="例如：韩国秋季新客优惠"></div>
         <div class="field span2" id="form-preview" style="display:none"></div>
@@ -423,6 +423,9 @@
     function isOfferAvailable(offer){const now=today();return !!offer&&offer.status==='生效中'&&offer.from<=now&&offer.to>=now}
     function syncLinkSelection(){const subject=distributors.find(x=>x.name===$('form-owner').value),isAds=subject?.type==='广告投放',isKol=subject?.type==='KOL';$('form-lp-id-wrap').style.display=isAds?'':'none';$('form-lp-id').value=isAds?(subject.lpId||'—'):'—';$('form-content-wrap').style.display=isKol?'':'none';$('form-template-wrap').style.display=subject?.line==='韩国'?'':'none';if(subject){syncTemplateOptions(subject.line);refreshSetOptions(undefined,subject.line,subject)}else{$('form-set').innerHTML='<option value="">请先选择渠道</option>';}const offer=offers[$('form-set').value];$('form-offer-rules').innerHTML=offer?'<div class="template-box"><b>已选优惠明细</b><div class="help">优惠码：'+esc(offer.code)+'</div><div style="margin-top:8px">'+offer.rules.map(rule=>'<span class="tag blue">'+esc(rule)+'</span>').join(' ')+'</div></div>':'';resetLinkPreview()}
     function isPlanAvailable(plan){return !!distributors.find(x=>x.id===plan.channelId)}
+    function syncContentFieldStep(){
+      $('form-content-label').innerHTML=(isPaymentPage()?'8. ':'6. ')+'帖子标识或帖子链接 <em>*</em>';
+    }
     function renderChannelPickerOptions(owners,selectedId){
       const search=$('form-owner-search'),panel=$('form-owner-options'),typing=document.activeElement===search&&!search.dataset.selected;
       panel.innerHTML=owners.length?owners.map(owner=>'<button type="button" role="option" class="channel-option '+(owner.id===selectedId?'active':'')+'" data-channel-option="'+esc(owner.id)+'"><b>'+esc(owner.name)+'</b><small>'+esc(owner.channelCode)+' · '+esc(owner.type)+' · '+esc(owner.line)+'</small></button>').join(''):'<div class="channel-empty">暂无匹配渠道</div>';
@@ -514,6 +517,7 @@
       editingLinkId=id;previewLinkId=x.id;pendingLandingLpId=x.lpId||'';
       $('link-modal-title').textContent='编辑落地页';$('create-link').textContent='确认保存';
       $('form-lp-type').value=String(x.lpType||'10');
+      syncContentFieldStep();
       $('form-sku').innerHTML='';$('form-promo-code').innerHTML='';
       $('form-line').innerHTML='<option value="">请选择业务线</option>'+businessLines.map(line=>'<option>'+line+'</option>').join('');
       $('form-line').value=channel.line;
@@ -559,7 +563,7 @@
       if(!payment){$('form-sku').innerHTML='';$('form-promo-code').innerHTML='';$('form-plan-summary').innerHTML=''}
       $('form-lp-id-wrap').style.display=subject?'':'none';
       $('form-content-wrap').style.display=subject?.type==='KOL'?'':'none';
-      $('form-content-label').innerHTML=(payment?'8. ':'6. ')+'帖子标识或帖子链接 <em>*</em>';
+      syncContentFieldStep();
       const skin=$('form-template-id').value;syncTemplateOptions(subject?.line||$('form-line').value);
       if([...$('form-template-id').options].some(option=>option.value===skin))$('form-template-id').value=skin;
       if(subject){if(!pendingLandingLpId)pendingLandingLpId=newLpId(subject.line);$('form-lp-id').value=pendingLandingLpId}
