@@ -1,6 +1,11 @@
 import { defaultPageDetails, validatePageDetails } from './abPageConfig'
 import type { PageDetails } from './abPageConfig'
-export type Platform = 'iOS' | 'Android'
+export type DevicePlatform = 'ios_app' | 'ios_pad' | 'android_app' | 'android_pad'
+export type Platform = 'iOS' | 'Android' | DevicePlatform
+export const devicePlatforms: {value:DevicePlatform;label:string}[] = [{value:'ios_app',label:'iOS 手机'},{value:'ios_pad',label:'iOS Pad'},{value:'android_app',label:'Android 手机'},{value:'android_pad',label:'Android Pad'}]
+export const platformLabel=(value:string)=>devicePlatforms.find(p=>p.value===value)?.label??(value==='iOS'?'iOS（旧配置，未区分设备）':value==='Android'?'Android（旧配置，未区分设备）':value)
+export const expandPlatforms=(values:Platform[])=>[...new Set(values.flatMap(p=>p==='iOS'?['ios_app','ios_pad']:p==='Android'?['android_app','android_pad']:[p]))]
+export const platformOverlap=(a:Platform[],b:Platform[])=>expandPlatforms(a).some(p=>expandPlatforms(b).includes(p))
 export type VersionOperator = '>' | '>=' | '=' | '<' | '<='
 export type VersionCondition = { operator: VersionOperator; value: string }
 export type Target = { countries: string[]; platforms: Platform[]; versions: VersionCondition[] }
@@ -97,7 +102,7 @@ export function targetsOverlap(a: Target, b: Target): boolean {
   return countryOverlap && a.platforms.some(p => b.platforms.includes(p)) && versionRangeExists([...a.versions, ...b.versions])
 }
 export function targetSummary(target: Target): string {
-  return `${target.countries.map(c => countries.find(x => x.value === c)?.label ?? c).join('、') || '未选择国家'} · ${target.platforms.join(' / ') || '未选择终端'} · ${target.versions.length ? target.versions.map(c => `${c.operator} ${c.value || '待填写'}`).join(' 且 ') : '全部版本'}`
+  return `${target.countries.map(c => countries.find(x => x.value === c)?.label ?? c).join('、') || '未选择国家'} · ${target.platforms.map(platformLabel).join(' / ') || '未选择终端'} · ${target.versions.length ? target.versions.map(c => `${c.operator} ${c.value || '待填写'}`).join(' 且 ') : '全部版本'}`
 }
 export function experimentState(exp: Experiment, now = Date.now()): '草稿' | '待开始' | '进行中' | '已结束' | '已关闭' {
   if (exp.status === 'draft') return '草稿'
@@ -187,7 +192,7 @@ export type ABHistoryEntry = {
   snapshot: OnlineConfig | Experiment;
 }
 export const countrySummary = (target: Target) => target.countries.includes('*') ? '全部国家' : target.countries.map(c => countries.find(x => x.value === c)?.label ?? c).join('、') || '未选择国家'
-export const platformSummary = (target: Target) => target.platforms.join(' / ') || '未选择终端'
+export const platformSummary = (target: Target) => target.platforms.map(platformLabel).join(' / ') || '未选择终端'
 export const versionSummary = (target: Target) => target.versions.length ? target.versions.map(c => `${c.operator} ${c.value || '待填写'}`).join(' 且 ') : '全部版本'
 export function matchesTargetFilters(target: Target, country?: string, platform?: Platform): boolean {
   return (!country || target.countries.includes('*') || target.countries.includes(country)) && (!platform || target.platforms.includes(platform))

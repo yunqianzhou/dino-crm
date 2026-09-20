@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { Alert, Button, Card, Input, Select, Space, Typography } from 'antd'
-import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Alert, Select, Space, Typography } from 'antd'
 import { contentPlan, extractContent, defaultMembers } from '../appConfigModel'
 import type { Slot, UnitContent } from '../appConfigModel'
-import { labels, languages, templates } from '../abTestConfig'
+import { languages, labels } from '../abTestConfig'
 import type { Target } from '../abTestConfig'
 import ABPageEditor from './ABPageEditor'
 import ABMemberEditor from './ABMemberEditor'
+import ABFlowEditor from './ABFlowEditor'
+import { makeFlow, flowStandard } from '../appFlowConfig'
 export default function ABUnitEditor({slot,content,onChange,readOnly=false,target}:{slot:Slot;content:UnitContent;onChange:(c:UnitContent)=>void;readOnly?:boolean;target:Target}){
- const [language,setLanguage]=useState('zh');const [addPage,setAddPage]=useState<string>()
- const steps=content.steps??[]
- if(slot.flow)return <Card title="流程步骤"><Alert showIcon type="info" message="按顺序执行；登录时机由登录步骤的位置确定。跳过、依赖和异常恢复由 App 处理。" style={{marginBottom:16}}/><Space style={{marginBottom:16}}><Typography.Text>从模板填充</Typography.Text><Select aria-label="填充流程模板" disabled={readOnly} style={{width:260}} options={templates.map(t=>({value:t.id,label:t.name}))} onChange={id=>onChange({...content,steps:templates.find(t=>t.id===id)!.nodes.map(n=>n.startsWith('paywall')?'paywall':n)})}/></Space>{steps.map((node,i)=><div className="app-flow-step" key={`${i}-${node}`}><span className="app-step-index">{i+1}</span><strong>{labels[node]}</strong>{i===0&&<span>起点</span>}{i===steps.length-1&&<span>终点</span>}<Space style={{marginLeft:'auto'}}><Button aria-label={`上移步骤 ${i+1}`} disabled={readOnly||i===0} icon={<ArrowUpOutlined/>} onClick={()=>{const next=[...steps];[next[i-1],next[i]]=[next[i],next[i-1]];onChange({...content,steps:next})}}/><Button aria-label={`下移步骤 ${i+1}`} disabled={readOnly||i===steps.length-1} icon={<ArrowDownOutlined/>} onClick={()=>{const next=[...steps];[next[i+1],next[i]]=[next[i],next[i+1]];onChange({...content,steps:next})}}/><Button aria-label={`移除步骤 ${i+1}`} disabled={readOnly} icon={<DeleteOutlined/>} onClick={()=>onChange({...content,steps:steps.filter((_,n)=>n!==i)})}/></Space></div>)}<Space style={{marginTop:16}}><Select aria-label="新增流程页面" value={addPage} disabled={readOnly} placeholder="选择注册页面" style={{width:220}} options={['value','auth','name','age','level','goal','teacher','lesson','report','plan','paywall','home'].map(value=>({value,label:labels[value]}))} onChange={setAddPage}/><Button disabled={readOnly||!addPage} onClick={()=>{onChange({...content,steps:[...steps.slice(0,-1),addPage!,...steps.slice(-1)]});setAddPage(undefined)}}>插入终点之前</Button></Space><Alert type="warning" style={{marginTop:16}} message="同一购买页可重复出现；课前、课后如何绑定不同内容仍待 APP 协议明确。"/></Card>
+ const [language,setLanguage]=useState('zh')
+ if(slot.flow&&readOnly&&!content.flow)return <><Alert type="info" message="历史版本仅保存页面顺序，未包含支付分支配置。"/><ol>{(content.steps??[]).map((page,i)=><li key={`${i}-${page}`}>{labels[page]??page}</li>)}</ol></>
+ if(slot.flow)return <ABFlowEditor value={content.flow??makeFlow(content.steps??[],flowStandard(slot.id))} readOnly={readOnly} onChange={flow=>onChange({...content,flow,steps:flow.nodes.map(n=>n.page)})}/>
  const translated=content.pageTranslations?.[language]?.[slot.node]??{}
  return <><Space style={{width:'100%',justifyContent:'space-between',marginBottom:16}}><strong>{slot.page} / {slot.name}</strong><Select aria-label="预览语言" disabled={slot.lists?.includes('names')} value={language} onChange={setLanguage} options={languages} style={{width:200}}/></Space>{slot.pending&&<Alert type="warning" showIcon message={slot.pending} style={{marginBottom:16}}/>}{slot.members?<ABMemberEditor value={content.details.members??defaultMembers()} readOnly={readOnly} language={language} onChange={members=>onChange({...content,details:{...content.details,members}})} text={(key,base)=>language==='zh'?base:translated[key]??base} onText={(key,value)=>onChange({...content,pageTranslations:{...content.pageTranslations,[language]:{...content.pageTranslations?.[language],[slot.node]:{...translated,[key]:value}}}})}/>:<ABPageEditor key={slot.id} plan={contentPlan(content,slot)} node={slot.node} language={language} target={target} readOnly={readOnly} appMode sectionKeys={[slot.section]} onlyFields={[...(slot.copy??[]),...(slot.texts??[]),...(slot.lists??[])]} onChange={plan=>onChange(extractContent(plan,slot))}/>}<Typography.Paragraph type="secondary" style={{marginTop:16}}>文字与译文随该配置版本保存；正式多语言平台、素材服务与 APP 字典尚未接入。预览不模拟实际注册或支付。</Typography.Paragraph></>
 }
