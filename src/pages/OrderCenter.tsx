@@ -12,6 +12,8 @@ import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
+import { matchesDashboardScope } from '../dashboardNavigation'
+import { dashboardPopulation } from '../dashboardData'
 import { useDashboardText } from '../dashboardText'
 import { usePerm } from '../perm'
 import { downloadCsv } from '../export'
@@ -61,10 +63,12 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const targetStudentId = query.get('studentId') || ''
   const dashboardContext = useDashboardContext()
   const d = useDashboardText()
-  const { can } = usePerm()
+  const { can, actor, allowedLines } = usePerm()
   const canExport = can(exportPermission) === 'operate'
   const orders = useStore((s) => s.orders)
   const students = useStore((s) => s.students)
+  const dashboardScope = detailsPath === '/orders-v3' ? dashboardContext.dashboardScope : undefined
+  const permittedDashboardIds = dashboardScope ? new Set(dashboardPopulation(students, allowedLines(), allowedLines() === null || can('salesV3_reassign') === 'operate', actor).map(s => s.studentId)) : undefined
   const channels = useStore((s) => s.channels)
   const [keyword, setKeyword] = useState('')
   const [orderStatus, setOrderStatus] = useState<string | undefined>()
@@ -73,7 +77,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
 
-  useEffect(() => { if (targetStudentId) setLineSel([]) }, [targetStudentId])
+  useEffect(() => { if (targetStudentId || dashboardScope) setLineSel([]) }, [targetStudentId, dashboardScope])
 
   const lineOptions = useMemo(
     () => Array.from(new Set([...channels.map((c) => c.name), ...students.map((s) => s.businessLine)].filter(Boolean))),
@@ -108,6 +112,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
   const data = useMemo(
     () =>
       orders.filter((o) => {
+        if (dashboardScope && (!matchesDashboardScope(dashboardScope, o.studentId, o.orderId) || !permittedDashboardIds?.has(o.studentId))) return false
         if (targetStudentId && o.studentId !== targetStudentId) return false
         if (!matchLine(lineOf(o.studentId))) return false
         const kw = keyword.trim().toLowerCase()
@@ -125,7 +130,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           (!typeFilter || typeOf(o.studentId) === typeFilter)
         )
       }).sort((a, b) => ORDER_STATUS_PRIORITY[a.orderStatus] - ORDER_STATUS_PRIORITY[b.orderStatus]),
-    [orders, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
+    [orders, dashboardScope, permittedDashboardIds, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
   )
 
   const exportOrders = () => {

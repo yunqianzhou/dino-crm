@@ -57,7 +57,7 @@
 .dashboard-local-dates{margin-bottom:10px}
 .dashboard-hierarchy-controls{display:flex;flex-wrap:wrap;gap:14px 24px;margin-bottom:12px}
 .dashboard-hierarchy-controls>div{display:flex;align-items:center;flex-wrap:wrap;gap:10px;color:#69778b;font-size:13px}
-.dashboard-cohort-totals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:18px 0 24px}
+.dashboard-cohort-totals{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin:18px 0 24px}
 .dashboard-cohort-totals>div{display:flex;flex-direction:column;gap:10px;padding:14px;background:#f5f8fc;border-radius:8px;min-width:0}
 .dashboard-cohort-totals span{font-size:13px;color:#64748b}
 .dashboard-cohort-totals .dashboard-count{font-size:26px}
@@ -91,7 +91,7 @@
 @media(max-width:1100px){.dashboard-matrix-pair{grid-template-columns:1fr}.dashboard-reading{flex-direction:column;gap:0}.dashboard-questions button{padding:13px 12px}}
 @media(max-width:760px){.dashboard-questions{grid-template-columns:repeat(2,minmax(0,1fr));position:static}.dashboard-questions strong{font-size:14px}.dashboard-reading h3{font-size:18px}.dashboard-reading-example p{flex-direction:column;gap:3px}.dashboard-reading-example strong{flex:auto}}
 
-.dashboard-rate-guide{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:16px;margin-top:14px}
+.dashboard-rate-guide{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-top:14px}
 .dashboard-rate-guide>div{display:flex;flex-direction:column;gap:6px}
 .dashboard-rate-guide strong{font-size:17px;color:#9b8253}
 .dashboard-rate-guide small{color:#8b7c62;font-size:11px;line-height:1.7}
@@ -109,3 +109,12 @@
 .dashboard-payment-totals .dashboard-count{font-size:20px}
 @media(max-width:1100px){.dashboard-payment-totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.dashboard-payment-totals{grid-template-columns:1fr}}
+
+.dashboard-money-header{display:flex;flex-direction:column;gap:6px}
+.dashboard-money-header>div{display:flex;flex-wrap:wrap;gap:4px}
+.management-dashboard .ant-table-summary{background:#f3f7ff;font-weight:600}
+
+.dashboard-cohort-totals .dashboard-l2s{background:#edf6ef;border:1px solid #cce2d2}
+.dashboard-l2s strong{font-size:26px;color:#267046}
+.dashboard-l2s small{font-size:11px;color:#607969}
+@media(max-width:760px){.management-dashboard .ant-table-sticky-holder{top:0!important}}

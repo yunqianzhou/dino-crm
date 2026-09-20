@@ -58,7 +58,7 @@ A qualifying order must currently be Paid, have a finite positive paidAmount and
 
 ## Details and navigation
 
-Counts open matching users, including hierarchical date-plus-CC scopes. Current/activity child rows preserve exact subsets. User, sales and order actions retain existing permissions and return to the selected question, date range and detail dialog.
+User counts open the existing User Center list with the exact clicked user set, including current leads and users who have since paid. Payment order counts and amounts open the existing Order Center list with the exact paid-order set, currency, date and CC scope. No aggregate detail modals are used. Destination lists show a removable dashboard selection and a return-to-dashboard button. Existing module and data permissions still apply; empty clicked sets remain empty. Browser history retains the selection, and returning restores the selected dashboard question, dates and CCs.
 
 Payment rows open exact paid orders or distinct payers; date-plus-CC payment details preserve both constraints. Users can open their qualifying orders and the existing Phase 3 order detail/transactions. Legacy current/activity and detail URLs remain readable after introduction of the four question views.
 
@@ -74,4 +74,14 @@ Appointment confirmation, city, deposit/balance and more detailed business-speci
 
 The existing additive demo dataset remains unchanged: 204 Vietnam users, six CCs, 180 current leads and 24 paid users, plus orders, appointments and events. Browser sessions can contain additional prototype records or edits. Source data is preserved but hidden from the dashboard; business screenshot values are not copied in as data.
 
-`npm run test:dashboard` verifies UTC+7 boundaries, permissions, deduplication, shared stages, paid-order evidence, currency separation, refunds, registration cohorts, step-rate denominators and missing preceding-step records, AOV versus amount per payer, table payment-date semantics, source matrix totals, independent view dates and legacy URL interpretation. `npm run build` checks types and produces the site. Browser verification covers all four questions, date retention, reference-rate rows, date-to-CC expansion, exact user/order details and return navigation.
+`npm run test:dashboard` verifies UTC+7 boundaries, permissions, deduplication, shared stages, paid-order evidence, currency separation, refunds, registration cohorts, step-rate denominators and missing preceding-step records, AOV versus amount per payer, table payment-date semantics, source matrix totals, independent view dates and legacy URL interpretation. `npm run build` checks types and produces the site. Browser verification covers all four questions, date retention, reference-rate rows, date-to-CC expansion, direct user/order list navigation and return navigation.
+
+## CC selection
+
+The shared CC filter supports multiple selections and name search. An empty selection means all permitted CCs; clear restores that scope. Current leads, daily activity, cohort conversion, reasons, revenue and AOV use the union of selected CCs, without double counting. Unassigned can be selected alongside named CCs. Repeated `cc` URL parameters retain the selection across views, reloads and detail-return navigation; legacy single-CC links remain valid. Detail headers list the selected CCs unless a more specific row was opened.
+
+## Table totals and sorting
+
+Current/activity, cohort, payment and reason tables pin their totals below the column header, outside sorting and pagination. Every numeric column supports ascending and descending sorting within each hierarchy level. Combined revenue/AOV columns offer a sorting metric and, when needed, one currency; different currencies are never added for ranking. Missing rates/AOV remain last in either direction. Reason totals count distinct users even when historical reasons overlap.
+
+L2S (lead-to-paid conversion) is the final top-level KPI next to paid users and also a sortable column in the date/CC table. It uses paid users divided by the same registered cohort; the four intermediate step rates remain together below.

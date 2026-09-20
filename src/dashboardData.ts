@@ -6,7 +6,14 @@ import { consultationStage } from './salesLifecycle'
 import { resolveUserType } from './userType'
 dayjs.extend(utc)
 
-export type DashboardFilters = { mode: 'current' | 'period'; start: string; end: string; owner: string; userType: string }
+export type DashboardFilters = { mode: 'current' | 'period'; start: string; end: string; owner: string | string[]; userType: string }
+export function dashboardOwnerIds(owner: DashboardFilters['owner']): string[] {
+  return [...new Set((Array.isArray(owner) ? owner : [owner]).map(value => value.trim()).filter(Boolean))]
+}
+function matchesOwner(student: Student, owner: DashboardFilters['owner']) {
+  const ids = dashboardOwnerIds(owner)
+  return !ids.length || ids.includes(student.salesOwner || '__unassigned__')
+}
 export const PERIOD_METRICS = ['registered', 'called', 'connected', 'booked', 'attended', 'completed', 'paid'] as const
 /** A paid profile flag is not payment evidence; count only valid, positive paid orders. */
 export function isDashboardPaidOrder(order: Order) {
@@ -24,7 +31,7 @@ export function dashboardPopulation(students: Student[], scope: string[] | null,
 }
 export function dashboardMetrics(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters, orders: Order[] = []) {
   const range = (time?: string) => inVietnamRange(time, filters.start, filters.end)
-  const rows = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+  const rows = population.filter(s => matchesOwner(s, filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType))
   const current = rows.filter(s => isSalesLead(s, lessons) && range(s.registerTime))
   const metrics: Record<string, Student[]> = {}
@@ -51,7 +58,7 @@ export function dashboardMetrics(population: Student[], calls: CallRecord[], les
 
 /** Payment activity uses the same successful orders and UTC+7 dates as paid-user counts. */
 export function dashboardPaymentOrders(orders: Order[], students: Student[], filters: DashboardFilters) {
-  const allowed = new Set(students.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+  const allowed = new Set(students.filter(s => matchesOwner(s, filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType)).map(s => s.studentId))
   return orders.filter(o => allowed.has(o.studentId) && isDashboardPaidOrder(o) && inVietnamRange(o.paidTime, filters.start, filters.end))
 }
@@ -69,7 +76,7 @@ export function dashboardPaymentSummary(orders: Order[]) {
 
 /** Daily rows use the same metric definitions and filters as the headline counts. */
 export function dashboardDateRows(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters, orders: Order[] = []) {
-  const rows = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+  const rows = population.filter(s => matchesOwner(s, filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType))
   const ids = new Set(rows.map(s => s.studentId))
   const times = rows.map(s => s.registerTime)
@@ -130,7 +137,7 @@ export function dashboardBreakdownPayments(orders: Order[], population: Student[
  * These independent counts are deliberately not converted to funnel percentages.
  */
 export function dashboardCohortMetrics(population: Student[], calls: CallRecord[], filters: DashboardFilters, orders: Order[] = []): CohortMetrics {
-  const eligible = population.filter(s => (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) &&
+  const eligible = population.filter(s => matchesOwner(s, filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType) && !!s.phone?.trim() && inVietnamRange(s.registerTime, filters.start, filters.end))
   const connected = new Set(calls.filter(c => c.result === '已接通' && inVietnamRange(c.time, '', '')).map(c => c.studentId))
   const paid = new Set(orders.filter(isDashboardPaidOrder).map(o => o.studentId))
@@ -195,7 +202,7 @@ export function dashboardReasonRows(population: Student[], calls: CallRecord[], 
   const config = reasonConfig[kind]
   const current = dashboardMetrics(population, calls, lessons, { ...filters, mode: 'current' })
   const rows = filters.mode === 'current' ? current[config.stage] || [] : population.filter(s =>
-    (!filters.owner || (s.salesOwner || '__unassigned__') === filters.owner) && (!filters.userType || resolveUserType(s) === filters.userType))
+    matchesOwner(s, filters.owner) && (!filters.userType || resolveUserType(s) === filters.userType))
   const groups = new Map<string, Map<string, Student>>()
   const add = (reason: string | undefined, s: Student) => {
     const id = !reason?.trim() ? '__unknown__' : (config.reasons as readonly string[]).includes(reason) ? reason : '其他'

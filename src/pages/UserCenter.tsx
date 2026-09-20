@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Button,
@@ -31,6 +31,9 @@ import { useLineScope } from '../useLineScope'
 import { appChannelSourceText, businessLineOf, lineLabel, lpChannelSourceText, registerChannelText } from '../channel'
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
+import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
+import { matchesDashboardScope } from '../dashboardNavigation'
+import { dashboardPopulation } from '../dashboardData'
 import { downloadCsv, maskPhone } from '../export'
 
 const { Text } = Typography
@@ -61,11 +64,15 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
   const students = useStore((s) => s.students)
   const channels = useStore((s) => s.channels)
   const lessons = useStore((s) => s.lessons ?? [])
-  const { can, actor } = usePerm()
+  const { can, actor, allowedLines } = usePerm()
+  const dashboardContext = useDashboardContext()
+  const dashboardScope = phase3 ? dashboardContext.dashboardScope : undefined
+  const permittedDashboardIds = dashboardScope ? new Set(dashboardPopulation(students, allowedLines(), allowedLines() === null || can('salesV3_reassign') === 'operate', actor).map(s => s.studentId)) : undefined
   const canEdit = can(phase3 ? 'usersV2_edit' : 'users_edit') === 'operate'
   const canViewPhone = can(phase3 ? 'usersV2_phone_view' : 'users_phone_view') !== 'none'
   const canExport = can(phase3 ? 'usersV2_export' : 'users_export') !== 'none'
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
+  useEffect(() => { if (dashboardScope) setLineSel([]) }, [dashboardScope])
   const [keyword, setKeyword] = useState('')
   const [statusFilter, setStatusFilter] = useState<string | undefined>()
   const [typeFilter, setTypeFilter] = useState<string | undefined>()
@@ -97,7 +104,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
     () =>
       students.filter((s) => {
         // 分流规则：未付费-未体验且有手机号的用户进入「销售中心」，其余展示在此
-        if (!inUserCenter(s, lessons)) return false
+        if (dashboardScope ? !matchesDashboardScope(dashboardScope, s.studentId) || !permittedDashboardIds?.has(s.studentId) : !inUserCenter(s, lessons)) return false
         const kw = keyword.trim().toLowerCase()
         const matchKw =
           !kw ||
@@ -111,7 +118,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
         const bl = businessLineOf(channels, s)
         return matchKw && matchLine(bl) && matchStatus && matchType && matchCountry
       }),
-    [students, channels, lessons, keyword, lineSel, statusFilter, typeFilter, countryFilter, matchLine],
+    [students, channels, lessons, keyword, lineSel, statusFilter, typeFilter, countryFilter, matchLine, dashboardScope, permittedDashboardIds],
   )
 
   const phoneLocked = editing ? hasPhoneLogin(editing) : false
@@ -233,7 +240,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
       dataIndex: 'studentId',
       width: 190,
       fixed: 'left',
-      render: (v: string) => <Link to={`/users-v2/${v}`}>{v}</Link>,
+      render: (v: string) => <Link to={`/users-v2/${v}`} state={dashboardContext.state}>{v}</Link>,
     },
     {
       title: t('user.col.name'),
@@ -389,7 +396,7 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
   const phase3Columns: ColumnsType<Student> = [
     {
       title: t('user.col.id'), dataIndex: 'studentId', width: 190, fixed: 'left',
-      render: (v: string) => <Link to={`/users-v2/${v}`}>{v}</Link>,
+      render: (v: string) => <Link to={`/users-v2/${v}`} state={dashboardContext.state}>{v}</Link>,
     },
     { title: t('user.col.name'), dataIndex: 'localName', width: 140, render: (_: unknown, r) => r.localName || r.name },
     {
@@ -462,7 +469,8 @@ export default function UserCenter({ phase3 = false }: { phase3?: boolean }) {
 
   return (
     <Card className="page-card" bordered={false} title={<span className="section-title">{t('user.titleV2')}</span>}>
-      <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('user.funnelTip')} />
+      {phase3 && <DashboardLinkContext />}
+      {!dashboardScope && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('user.funnelTip')} />}
       <Space wrap style={{ marginBottom: 16 }}>
         <Input
           allowClear
