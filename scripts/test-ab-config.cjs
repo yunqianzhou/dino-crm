@@ -7,6 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-ab-config-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/abTestConfig.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--skipLibCheck'], { stdio: 'inherit' })
   const m = require(join(tmp, 'abTestConfig.js'))
+  const pages = require(join(tmp, 'abPageConfig.js'))
   const cond = (operator, value) => ({ operator, value })
   assert.equal(m.versionMatches('1.10.0', [cond('>', '1.9.0')]), true)
   assert.equal(m.versionMatches('1.8.0', [cond('>=', '1.8.0'), cond('<', '1.9.0')]), true)
@@ -62,19 +63,57 @@ try {
   assert.notEqual(exp.base.plan.copy.auth.title, 'New online content')
   const overlap = { ...m.newOnline(), name: 'Overlapping config' }
   assert(m.validateOnline(overlap, store.online).some(e => e.includes('重叠')))
+  assert.deepEqual(m.validateOnlineSettings(overlap), [])
+  assert(m.validateOnlineSettings({ ...overlap, name: '' }).some(e => e.includes('名称')))
+  assert(m.validateExperimentSettings(invalid).some(e => e.includes('流量')))
+  assert(m.validatePlan({ ...exp.variants[0].plan, pages: { name: { ...exp.variants[0].plan.pages.name, assets: { background: { mode: 'custom', src: '' } } } } }).some(e => e.includes('素材')))
   assert.throws(() => m.publishOnline(store, overlap), /重叠/)
 
+  // New page resources, structural options and translations belong to each group snapshot.
+  const detail = exp.variants[1].plan.pages.name
+  detail.assets.background = { mode: 'custom', src: 'asset:test-image', name: 'background.png' }
+  detail.settings.showGuide = false
+  exp.variants[1].plan.pages['retention-promo'].settings.period = 'yearly'
+  exp.variants[1].plan.pageTranslations.en = { name: { guide: 'Hello {昵称}' } }
+  assert.equal(exp.variants[0].plan.pages.name.assets.background.mode, 'inherit')
+  assert.equal(pages.previewVariables('Hi {昵称}, {当前定级}', '', 'L2'), 'Hi , L2')
+  assert.equal(pages.validAssetSource('javascript:alert(1)'), false)
+  assert.equal(pages.validAssetSource('https://images.example.com/hero.gif'), true)
+  const edited = m.clone(exp)
+  edited.variants[1].plan.pages.level.lists.options.reverse()
+  assert(m.validateExperiment(edited).some(x => x.includes('业务') || x.includes('顺序')))
+  const configured = m.clone(exp)
+  const paywall = configured.variants[1].plan.pages.paywall
+  paywall.settings.productMode = 'custom'
+  paywall.settings.skus = [pages.demoProducts(configured.target)[0].id]
+  paywall.settings.defaultSku = 'missing'
+  assert(m.validateExperiment(configured).some(x => x.includes('默认套餐')))
+  paywall.settings.defaultSku = paywall.settings.skus[0]
+  assert.deepEqual(m.validateExperiment(configured), [])
+  configured.target.platforms = ['iOS']
+  assert(m.validateExperiment(configured).some(x => x.includes('商品范围')))
+  const cleared = m.clone(exp)
+  cleared.variants[0].plan.copy.name.button = ''
+  assert.deepEqual(m.validateExperiment(cleared), [])
+  assert.equal(cleared.variants[0].plan.pages.name.assets.guide.mode, 'inherit')
   const now = Date.now()
   store = m.enableExperiment(store, exp, now)
   const enabled = store.experiments.find(x => x.id === exp.id)
   exp.variants[1].plan.translations.en.auth.title = 'Should not leak'
   assert.equal(enabled.variants[1].plan.translations.en.auth.title, 'Hello B')
+  detail.assets.background.src = 'asset:changed-after-enable'
+  assert.equal(enabled.variants[1].plan.pages.name.assets.background.src, 'asset:test-image')
   assert.equal(m.experimentState(enabled, now), '进行中')
   assert.equal(m.experimentState(enabled, Date.parse(enabled.endAt)), '已结束')
   assert.throws(() => m.saveExperiment(store, { ...m.clone(enabled), status: 'draft', traffic: 80 }), /冻结/)
   assert.throws(() => m.enableExperiment(store, enabled), /冻结/)
   const promotion = m.promoteVariant(enabled, enabled.variants[1])
   assert.equal(promotion.status, 'draft')
+  assert.equal(promotion.plan.pages.name.assets.background.src, 'asset:test-image')
+  assert.equal(promotion.plan.pages['retention-promo'].settings.period, 'yearly')
+  assert.equal(promotion.plan.pageTranslations.en.name.guide, 'Hello {昵称}')
+  promotion.plan.pages.name.settings.showGuide = true
+  assert.equal(enabled.variants[1].plan.pages.name.settings.showGuide, false)
   assert.equal(promotion.plan.translations.en.auth.title, 'Hello B')
   promotion.plan.copy.auth.title = 'Promoted edit'
   assert.equal(enabled.variants[1].plan.copy.auth.title, 'B-only title')

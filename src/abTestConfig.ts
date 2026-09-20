@@ -1,9 +1,11 @@
+import { defaultPageDetails, validatePageDetails } from './abPageConfig'
+import type { PageDetails } from './abPageConfig'
 export type Platform = 'iOS' | 'Android'
 export type VersionOperator = '>' | '>=' | '=' | '<' | '<='
 export type VersionCondition = { operator: VersionOperator; value: string }
 export type Target = { countries: string[]; platforms: Platform[]; versions: VersionCondition[] }
 export type PageCopy = { title: string; body: string; button: string; animation: 'static' | 'breathe' | 'shake' }
-export type Plan = { template: string; copy: Record<string, PageCopy>; translations: Record<string, Record<string, PageCopy>> }
+export type Plan = { template: string; copy: Record<string, PageCopy>; translations: Record<string, Record<string, PageCopy>>; pages?: Record<string, PageDetails>; pageTranslations?: Record<string, Record<string, Record<string, string>>> }
 export type OnlineConfig = { id: string; name: string; target: Target; plan: Plan; status: 'draft' | 'published' | 'retired'; revision: number; replacesId?: string; source?: string; updatedAt: string }
 export type Variant = { id: string; name: string; weight: number; control: boolean; plan: Plan }
 export type Experiment = { id: string; name: string; target: Target; traffic: number; variants: Variant[]; startMode: 'now' | 'scheduled'; startAt: string; endAt: string; status: 'draft' | 'enabled' | 'closed'; closedAt?: string; base: { id: string; name: string; revision: number; plan: Plan }; updatedAt: string }
@@ -23,7 +25,7 @@ export const templates = [
   { id: 'experience-first', name: '先体验，支付后注册', badge: '方案 02', desc: '游客先体验课程，购买页结束后衔接注册。', nodes: ['value', 'name', 'age', 'level', 'goal', 'teacher', 'lesson', 'report', 'plan', 'paywall', 'auth', 'home'] },
   { id: 'double-paywall', name: '课前和课后各一次购买页', badge: '方案 03', desc: '两处购买页独立配置，点击购买时先登录。', nodes: ['value', 'name', 'age', 'level', 'goal', 'plan', 'paywall-before', 'teacher', 'lesson', 'report', 'paywall-after', 'auth', 'home'] },
 ]
-export const labels: Record<string, string> = { value: '首启价值页', auth: '注册登录', name: '孩子称呼', age: '孩子年龄', level: '英语水平', goal: '学习目标', teacher: '选老师', lesson: '体验课', report: '完课报告', plan: '学习计划', paywall: '主购买页', 'paywall-before': '课前购买页', 'paywall-after': '课后购买页', home: '首页' }
+export const labels: Record<string, string> = { value: '首启价值页', auth: '注册登录', name: '孩子称呼', age: '孩子年龄', level: '英语水平', goal: '学习目标', teacher: '选老师', lesson: '体验课', report: '完课报告', plan: '学习计划', paywall: '主购买页', 'paywall-before': '课前购买页', 'paywall-after': '课后购买页', home: '首页', 'retention-promo': '挽留支付 · Promo', 'retention-regular': '挽留支付 · 普通' }
 const defaults: Record<string, Omit<PageCopy, 'animation'>> = {
   value: { title: '让孩子自信开口说英语', body: '和 Dino 一起，在有趣的互动中开启英语学习之旅。', button: '我是新用户' },
   auth: { title: '开启孩子的英语成长之旅', body: '每一次开口，都是成长的一小步。', button: '继续注册 / 登录' },
@@ -31,6 +33,8 @@ const defaults: Record<string, Omit<PageCopy, 'animation'>> = {
   age: { title: '孩子今年几岁？', body: '我们会推荐适合孩子年龄的学习内容。', button: '继续' },
   level: { title: '孩子的英语水平怎么样？', body: '选择最符合当前情况的一项。', button: '继续' },
   goal: { title: '你希望孩子收获什么？', body: '让每一次练习，都更接近学习目标。', button: '继续' },
+  'retention-promo': { title: 'Dino 为你准备了专属优惠', body: '你的优惠码已解锁特别价格。', button: '领取专属优惠' },
+  'retention-regular': { title: '让孩子的进步继续发生', body: '选择适合孩子的学习计划。', button: '立即订阅' },
   paywall: { title: '给孩子更多开口的机会', body: '开启专属英语学习旅程，让进步每天发生。', button: '开启学习之旅' },
 }
 export const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
@@ -38,7 +42,8 @@ export const makeId = () => globalThis.crypto.randomUUID()
 export const isPaywall = (node: string) => node.startsWith('paywall')
 export const isEditableNode = (node: string) => Boolean(defaults[isPaywall(node) ? 'paywall' : node])
 export function newPlan(): Plan {
-  return { template: templates[0].id, copy: Object.fromEntries(Object.keys(labels).filter(isEditableNode).map(node => [node, { ...defaults[isPaywall(node) ? 'paywall' : node], animation: 'static' }])), translations: {} }
+  const copy: Record<string, PageCopy> = Object.fromEntries(Object.keys(labels).filter(isEditableNode).map(node => [node, { ...defaults[isPaywall(node) ? 'paywall' : node], animation: 'static' }]))
+  return { template: templates[0].id, copy, translations: {}, pages: Object.fromEntries(Object.keys(copy).map(node => [node, defaultPageDetails(node, copy[node])])), pageTranslations: {} }
 }
 export const defaultTarget = (): Target => ({ countries: ['SA'], platforms: ['Android'], versions: [{ operator: '>=', value: '1.8.0' }, { operator: '<', value: '1.9.0' }] })
 export function newOnline(): OnlineConfig {
@@ -101,18 +106,17 @@ export function experimentState(exp: Experiment, now = Date.now()): '草稿' | '
   return new Date(exp.startAt).getTime() > now ? '待开始' : '进行中'
 }
 export const weightTotal = (variants: Variant[]) => variants.reduce((sum, v) => sum + Math.round(v.weight * 100), 0) / 100
-function validatePlan(plan: Plan): string[] {
-  const errors: string[] = []
+export function validatePlan(plan: Plan, target?: Target): string[] {
+  const errors: string[] = validatePageDetails(plan, target)
   if (!templates.some(t => t.id === plan.template)) errors.push('请选择可用的流程模板。')
   for (const [lang, copies] of Object.entries({ zh: plan.copy, ...plan.translations })) {
     for (const [node, text] of Object.entries(copies)) {
       if (!['static', 'breathe', 'shake'].includes(text.animation)) errors.push(`${lang} / ${labels[node]}：按钮动效无效。`)
-      if (!text.button.trim()) errors.push(`${lang} / ${labels[node]}：请填写按钮文案。`)
     }
   }
   return errors
 }
-export function validateExperiment(exp: Experiment, now = Date.now()): string[] {
+export function validateExperimentSettings(exp: Experiment, now = Date.now()): string[] {
   const errors = validateTarget(exp.target)
   if (!exp.name.trim()) errors.unshift('请填写实验名称。')
   if (!Number.isFinite(exp.traffic) || exp.traffic <= 0 || exp.traffic > 100) errors.push('实验流量必须大于 0% 且不超过 100%。')
@@ -125,12 +129,16 @@ export function validateExperiment(exp: Experiment, now = Date.now()): string[] 
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) errors.push('结束时间必须晚于开始时间。')
   if (exp.status === 'draft' && exp.startMode === 'scheduled' && start <= now) errors.push('定时开始时间必须晚于当前时间。')
   if (exp.status === 'draft' && end <= now) errors.push('结束时间必须晚于当前时间。')
-  exp.variants.forEach(v => errors.push(...validatePlan(v.plan).map(e => `${v.name}：${e}`)))
   return errors
 }
+export function validateExperiment(exp: Experiment, now = Date.now()): string[] {
+  return [...validateExperimentSettings(exp, now), ...exp.variants.flatMap(v => validatePlan(v.plan, exp.target).map(e => `${v.name}：${e}`))]
+}
+export function validateOnlineSettings(config: OnlineConfig): string[] {
+  return [...(!config.name.trim() ? ['请填写线上配置名称。'] : []), ...validateTarget(config.target)]
+}
 export function validateOnline(config: OnlineConfig, all: OnlineConfig[]): string[] {
-  const errors = [...validateTarget(config.target), ...validatePlan(config.plan)]
-  if (!config.name.trim()) errors.unshift('请填写线上配置名称。')
+  const errors = [...validateOnlineSettings(config), ...validatePlan(config.plan, config.target)]
   if (config.replacesId && !all.some(x => x.id === config.replacesId && x.status === 'published')) errors.push('要替换的线上版本已失效，请重新选择。')
   all.filter(x => x.status === 'published' && x.id !== config.id && x.id !== config.replacesId && targetsOverlap(x.target, config.target)).forEach(x => errors.push(`适用范围与「${x.name}」重叠，请调整范围或选择替换该配置。`))
   return errors

@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Alert, Button, Card, Checkbox, Descriptions, Empty, Form, Input, InputNumber, message, Modal, Radio, Select, Space, Steps, Table, Tabs, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, ArrowRightOutlined, CheckCircleOutlined, CopyOutlined, DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
 import { usePerm } from '../perm'
 import ABPlanEditor from '../components/ABPlanEditor'
-import { STORAGE_KEY, clone, closeExperiment, countries, enableExperiment, experimentState, formatDate, fromDateInput, makeId, newExperiment, newOnline, newPlan, promoteVariant, publishOnline, saveExperiment, saveOnline, seedStore, targetSummary, templates, toDateInput, validateExperiment, validateOnline, weightTotal } from '../abTestConfig'
+import { STORAGE_KEY, clone, closeExperiment, countries, enableExperiment, experimentState, formatDate, fromDateInput, makeId, newExperiment, newOnline, newPlan, promoteVariant, publishOnline, saveExperiment, saveOnline, seedStore, targetSummary, templates, toDateInput, validateExperiment, validateExperimentSettings, validateOnline, validateOnlineSettings, validatePlan, weightTotal } from '../abTestConfig'
 import type { ABStore, Experiment, OnlineConfig, Platform, Target, Variant, VersionOperator } from '../abTestConfig'
 import './AppABTest.css'
 
@@ -26,6 +26,8 @@ function loadStore(): ABStore {
         const c = copy as Record<string, unknown>
         if (plan.copy[key] && c && ['title', 'body', 'button'].every(k => typeof c[k] === 'string') && ['static', 'breathe', 'shake'].includes(String(c.animation))) plan.copy[key] = clone(c) as unknown as typeof plan.copy[string]
       }
+      // Let the new page fields inherit the migrated copy instead of new default text.
+      delete plan.pages
       seed.online.unshift({ ...newOnline(), name: '旧版页面预览草稿', plan: { ...plan, template: legacy.template } })
     }
     return seed
@@ -65,6 +67,8 @@ export default function AppABTest() {
   const [tab, setTab] = useState('online')
   const [editing, setEditing] = useState<Editing | null>(null)
   const [step, setStep] = useState(0)
+  const [showStepErrors, setShowStepErrors] = useState(false)
+  const [footerBox, setFooterBox] = useState({ left: 0, width: 0 })
   const [activeGroup, setActiveGroup] = useState('')
   const [dirty, setDirty] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -87,12 +91,34 @@ export default function AppABTest() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
 
+  useLayoutEffect(() => {
+    if (!editing || !pageRef.current) return
+    const measure = () => { const r = pageRef.current?.getBoundingClientRect(); if (r) setFooterBox(old => old.left === r.left && old.width === r.width ? old : { left: r.left, width: r.width }) }
+    measure()
+    const observer = new ResizeObserver(measure); observer.observe(pageRef.current)
+    window.addEventListener('resize', measure); window.addEventListener('scroll', measure, true)
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true) }
+  }, [editing?.value.id])
+
   const locked = !canEdit || Boolean(editing && editing.value.status !== 'draft')
   const experiment = editing?.kind === 'experiment' ? editing.value : null
   const online = editing?.kind === 'online' ? editing.value : null
   const currentVariant = experiment?.variants.find(v => v.id === activeGroup) ?? experiment?.variants[0]
   const liveOnline = store.online.filter(x => x.status === 'published')
   const errors = editing ? editing.kind === 'online' ? validateOnline(editing.value, store.online) : validateExperiment(editing.value, now) : []
+  const stepErrors = editing ? [
+    experiment ? validateExperimentSettings(experiment, now) : validateOnlineSettings(online!),
+    experiment ? experiment.variants.flatMap(v => validatePlan(v.plan, experiment.target).map(e => `${v.name}：${e}`)) : validatePlan(online!.plan, online!.target),
+    errors,
+  ] : [[], [], []]
+  const goToStep = (destination: number) => {
+    if (!locked && destination > step) {
+      for (let index = 0; index < destination; index++) {
+        if (stepErrors[index].length) { setStep(index); setShowStepErrors(true); pageRef.current?.scrollIntoView({ block: 'start' }); messageApi.error('请先修正当前步骤的问题'); return }
+      }
+    }
+    setShowStepErrors(false); setStep(destination)
+  }
   const activeStatus = editing ? editing.kind === 'online' ? onlineStatus(editing.value) : experimentState(editing.value, now) : ''
   const persist = (next: ABStore) => {
     if (!canEdit) throw new Error('当前角色仅可查看。')
@@ -103,7 +129,7 @@ export default function AppABTest() {
     setStore(next)
   }
   const open = (item: Editing, unsaved = false) => {
-    setEditing(clone(item)); setDirty(unsaved); setStep(0)
+    setEditing(clone(item)); setDirty(unsaved); setStep(0); setShowStepErrors(false)
     if (item.kind === 'experiment') setActiveGroup(item.value.variants[0]?.id ?? '')
   }
   const changeOnline = (patch: Partial<OnlineConfig>) => { if (online && !locked) { setEditing({ kind: 'online', value: { ...online, ...patch } }); setDirty(true) } }
@@ -210,10 +236,10 @@ export default function AppABTest() {
 
   const planEditor = editing && <>
     {experiment && <Tabs activeKey={currentVariant?.id} onChange={setActiveGroup} items={experiment.variants.map(v => ({ key: v.id, label: <Space>{v.name || '未命名分组'}<Tag color={v.control ? 'blue' : 'purple'}>{v.control ? '对照组' : '实验组'}</Tag><Text type="secondary">{v.weight}%</Text></Space> }))} />}
-    {online ? <ABPlanEditor platforms={online.target.platforms} key={online.id} plan={online.plan} readOnly={locked} onChange={plan => changeOnline({ plan })} /> : currentVariant && <ABPlanEditor platforms={experiment!.target.platforms} key={currentVariant.id} plan={currentVariant.plan} basePlan={experiment!.base.plan} readOnly={locked} onChange={plan => changeVariant(currentVariant.id, { plan })} />}
+    {online ? <ABPlanEditor target={online.target} key={online.id} plan={online.plan} readOnly={locked} onChange={plan => changeOnline({ plan })} /> : currentVariant && <ABPlanEditor target={experiment!.target} key={currentVariant.id} plan={currentVariant.plan} basePlan={experiment!.base.plan} readOnly={locked} onChange={plan => changeVariant(currentVariant.id, { plan })} />}
   </>
 
-  return <div className="ab-page" ref={pageRef}>
+  return <div className={`ab-page ${editing ? 'ab-editing' : ''}`} ref={pageRef}>
     {messageHolder}{modalHolder}
     <div className="ab-heading"><div><Space><Title level={3} style={{ margin: 0 }}>APP A/B test配置</Title><Tag color="geekblue">六期</Tag><Tag>交互原型</Tag></Space><Paragraph type="secondary" style={{ margin: '10px 0 0' }}>配置适用人群，创建实验，再编排流程与页面</Paragraph></div>
       {editing && <Space wrap><Button icon={<ArrowLeftOutlined />} onClick={back}>返回列表</Button>{dirty && <Text type="warning">未保存</Text>}{!locked && <Button icon={<SaveOutlined />} onClick={saveDraft}>保存草稿</Button>}</Space>}
@@ -240,7 +266,8 @@ export default function AppABTest() {
     </> : <>
       <div className="ab-edit-meta"><Space wrap><strong>{editing.value.name || (experiment ? '新建实验' : '新建线上配置')}</strong><Tag color={statusColor(activeStatus)}>{activeStatus}</Tag>{editing.value.status !== 'draft' && <Tag>配置只读</Tag>}</Space><Space>{canEdit && experiment && experiment.status !== 'draft' && <><Button icon={<CopyOutlined />} onClick={() => copyExperiment(experiment)}>复制为新实验</Button><Button onClick={() => showPromotion(experiment)}>实验组转线上</Button>{['待开始', '进行中'].includes(activeStatus) && <Button danger onClick={() => close(experiment)}>关闭实验</Button>}</>}{canEdit && online?.status === 'published' && <Button icon={<CopyOutlined />} onClick={() => reviseOnline(online)}>修改新版本</Button>}</Space></div>
       {experiment?.status !== 'draft' && experiment && <Alert className="ab-freeze-note" type="warning" showIcon message="本实验配置已冻结" description="可以预览各组页面与译文；如需修改条件、流量、分组、时间或内容，请复制为新实验。关闭或结束后也不能恢复编辑。" />}
-      <nav className="ab-step-nav" aria-label="配置步骤"><Steps size="small" responsive={false} current={step} onChange={setStep} className="ab-steps" items={[{ title: experiment ? '实验设置' : '适用范围' }, { title: experiment ? '分组方案' : '流程与页面' }, { title: experiment ? '检查并开启' : '检查并发布' }]} /></nav>
+      <nav className="ab-step-nav" aria-label="配置步骤"><Steps size="small" responsive={false} current={step} onChange={goToStep} className="ab-steps" items={[{ title: experiment ? '实验设置' : '适用范围' }, { title: experiment ? '分组方案' : '流程与页面' }, { title: experiment ? '检查并开启' : '检查并发布' }]} /></nav>
+      {showStepErrors && !locked && step < 2 && stepErrors[step].length > 0 && <Alert className="ab-step-errors" type="error" showIcon message={`本步骤有 ${stepErrors[step].length} 项需要修正，暂不能进入下一步`} description={<ul>{stepErrors[step].map((error, i) => <li key={i}>{error}</li>)}</ul>} />}
       {step === 0 ? settings : step === 1 ? planEditor : <>
         <Card title={locked ? '配置概览' : '发布前检查'} className="ab-review-card">
           <Descriptions column={2} size="small" bordered items={[
@@ -254,12 +281,12 @@ export default function AppABTest() {
               <Select aria-label="替换现有线上配置" allowClear value={online.replacesId} placeholder="不替换，新增投放" options={liveOnline.filter(x => x.id !== online.id).map(x => ({ value: x.id, label: `${x.name} · V${x.revision} · ${targetSummary(x.target)}` }))} onChange={replacesId => changeOnline({ replacesId })} />
             </Form.Item>
           </Form>}
-          {!locked && (errors.length ? <Alert type="error" showIcon message={`有 ${errors.length} 项需要处理`} description={<ul>{errors.map((error, index) => <li key={index}>{error}</li>)}</ul>} /> : <Alert type="success" showIcon icon={<CheckCircleOutlined />} message="人群、版本条件、比例和时间等本地校验已通过" description="仍需正式接口校验素材、商品、客户端兼容与实际投放冲突。当前操作只改变原型数据。" />)}
+          {!locked && (errors.length ? <Alert type="error" showIcon message={`有 ${errors.length} 项需要处理`} description={<ul>{errors.map((error, index) => <li key={index}>{error}</li>)}</ul>} /> : <Alert type="success" showIcon icon={<CheckCircleOutlined />} message="人群、版本条件、比例和时间等本地校验已通过" description="仍需正式接口校验真实素材规范、商品可售性、客户端兼容与实际投放冲突。当前操作只改变原型数据。" />)}
           <Paragraph type="secondary" style={{ margin: '16px 0 0' }}>已填写的基础文案和译文随方案一同保存{experiment ? '、冻结' : ''}。未填写的语言在本原型中回退基础中文；正式多语言发布与服务端校验尚未接入。</Paragraph>
         </Card>
         {planEditor}
       </>}
-      <div className="ab-editor-actions"><Button disabled={step === 0} onClick={() => setStep(step - 1)}>上一步</Button><Space>{step < 2 ? <Button type="primary" icon={<ArrowRightOutlined />} onClick={() => setStep(step + 1)}>下一步：{step === 0 ? experiment ? '配置分组方案' : '配置流程与页面' : '预览与检查'}</Button> : !locked && <Button type="primary" onClick={publish}>{experiment ? '开启实验' : '发布线上配置'}</Button>}</Space></div>
+      <div className="ab-editor-actions" style={{ left: footerBox.left, width: footerBox.width, visibility: footerBox.width ? 'visible' : 'hidden' }}><Button disabled={step === 0} onClick={() => goToStep(step - 1)}>上一步</Button><Space wrap>{!locked && stepErrors[step].length > 0 && <Button type="link" danger onClick={() => { setShowStepErrors(true); pageRef.current?.scrollIntoView({ block: 'start' }) }}>本步 {stepErrors[step].length} 项待完善</Button>}{step < 2 ? <Button type="primary" icon={<ArrowRightOutlined />} onClick={() => goToStep(step + 1)}>下一步：{step === 0 ? experiment ? '配置分组方案' : '配置流程与页面' : '预览与检查'}</Button> : !locked && <Button type="primary" onClick={publish}>{experiment ? '开启实验' : '发布线上配置'}</Button>}</Space></div>
     </>}
     <Modal title="新建实验：选择线上基准" open={basePicker} onCancel={() => setBasePicker(false)} okText="创建实验草稿" cancelText="取消" okButtonProps={{ disabled: !baseId }} onOk={() => { const base = liveOnline.find(x => x.id === baseId); if (base) startExperiment(base) }}>
       <Paragraph>各组会复制所选线上版本的流程、页面与已填写译文，之后可分别修改；不会跟随线上配置变化。</Paragraph>
