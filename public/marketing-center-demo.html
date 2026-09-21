@@ -91,7 +91,7 @@
         <section class="page" id="channels">
           <div class="card">
             <div class="section-head"><div><div class="section-title">渠道管理</div><div class="section-note">先维护业务线下的渠道类型，再建立具体的销售、KOL、Meta、Google 等渠道。</div></div><button class="btn primary" id="open-new-owner">＋ 新增渠道</button></div>
-            <div class="filters"><input class="input search-input" id="owner-keyword" placeholder="渠道名称 / 账号 / 渠道码"><select class="select" id="owner-line"><option value="">业务线</option><option>韩国</option><option>越南</option></select><select class="select" id="owner-type"><option value="">渠道类型</option><option>广告投放</option><option>KOL</option><option>销售</option></select><select class="select" id="owner-platform-filter"><option value="">投放平台</option><option>Meta</option><option>Google</option><option>TikTok</option><option>Messenger</option><option>Line</option></select></div>
+            <div class="filters"><input class="input search-input" id="owner-keyword" placeholder="渠道名称 / 渠道码"><select class="select" id="owner-line"><option value="">业务线</option><option>韩国</option><option>越南</option></select><select class="select" id="owner-type"><option value="">渠道类型</option><option>广告投放</option><option>KOL</option><option>销售</option></select><select class="select" id="owner-platform-filter"><option value="">投放平台</option><option>Meta</option><option>Google</option><option>TikTok</option><option>Messenger</option><option>Line</option></select></div>
             <table><thead><tr><th>渠道名称</th><th>渠道码</th><th>渠道类型</th><th>所属业务线</th><th>已创建落地页</th><th>操作</th></tr></thead>
               <tbody id="owner-rows"></tbody>
             </table>
@@ -186,7 +186,7 @@
         <div class="set-promo-box"><div><code id="set-promo-value">暂无优惠码</code><div class="help" id="set-promo-description"></div></div><button class="btn" type="button" id="copy-set-promo" disabled>复制</button></div>
         <div class="grid promo-limit-form" id="set-promo-limits">
           <div class="field"><label for="set-promo-total">总数量</label><input id="set-promo-total" type="number" min="1" step="1" max="2147483647" placeholder="不填则不限"><div class="help">列表展示当前剩余可使用数量 / 总数量。</div></div>
-          <div class="field"><label>每位用户上限</label><input id="set-promo-per-user" type="number" min="1" step="1" max="2147483647" value="1"><div class="help">限制单个用户可使用该 Promo Code 的次数。</div></div>
+          <div class="field"><label>每位用户上限 <em>*</em></label><input id="set-promo-per-user" type="number" min="0" step="1" max="2147483647" value="1" required><div class="help">支持编辑 0 及以上整数；设置总数量时，不得超过总数量。</div></div>
         </div>
         <div class="help" id="set-promo-limit-help">未设置上限表示不限；配置折扣或立减后可填写。</div>
         <div class="help promo-limit-error" id="set-promo-limit-error" role="alert"></div>
@@ -353,8 +353,8 @@
     function promoLimitsHtml(plan){const total=plan.promoTotalLimit,perUser=plan.promoPerUserLimit??1;if(total==null)return '<div class="promo-limits">可用数量：不限<br>每位用户上限：'+perUser+' 次</div>';const used=Number(plan.promoUsedCount||0),remaining=Math.max(0,Number(total)-used);return '<div class="promo-limits">可用数量：'+remaining.toLocaleString('en-US')+' / 总数量：'+Number(total).toLocaleString('en-US')+'<br>每位用户上限：'+perUser+' 次</div>'}
     function loadPromoLimits(plan){$('set-promo-total').value=plan?.promoTotalLimit??'';$('set-promo-per-user').value=plan?.promoPerUserLimit??1;$('set-promo-limit-error').textContent=''}
     function readPromoLimits(){
-      const input=$('set-promo-total'),perUserInput=$('set-promo-per-user'),value=input.value===''?null:Number(input.value),perUser=Number(perUserInput.value);
-      let error=input.validity.badInput||(value!==null&&(!Number.isInteger(value)||value<1||value>2147483647))?'总数量必须为 1～2,147,483,647 的整数，留空表示不限。':perUserInput.validity.badInput||!Number.isInteger(perUser)||perUser<1||perUser>2147483647?'每位用户上限必须为 1～2,147,483,647 的整数。':'';
+      const input=$('set-promo-total'),perUserInput=$('set-promo-per-user'),value=input.value===''?null:Number(input.value),perUser=Number(perUserInput.value);perUserInput.max=value===null?'2147483647':String(value);
+      let error=input.validity.badInput||(value!==null&&(!Number.isInteger(value)||value<1||value>2147483647))?'总数量必须为 1～2,147,483,647 的整数，留空表示不限。':perUserInput.value===''||perUserInput.validity.badInput||!Number.isInteger(perUser)||perUser<0||perUser>2147483647?'每位用户上限必须为 0～2,147,483,647 的整数。':value!==null&&perUser>value?'每位用户上限不得超过总数量。':'';
       $('set-promo-limit-error').textContent=error;
       return error?null:{promoTotalLimit:value,promoPerUserLimit:perUser};
     }
