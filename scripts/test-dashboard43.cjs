@@ -32,7 +32,7 @@ try {
  const first=followupMetrics(users,calls,lessons,orders,{...filters,start:'2026-09-02',end:'2026-09-02'})
  const second=followupMetrics(users,calls,lessons,orders,{...filters,start:'2026-09-03',end:'2026-09-03'})
  assert.deepEqual(first.current,second.current,'activity dates cannot change current workload')
- assert.equal(first.current['已出席待咨询'].length,1)
+ assert.equal(first.current['已预约'].length,1,'dashboard uses the existing Sales Center stage without inventing an attended/pending stage')
  assert.equal(first.activity.booked.length,1)
  assert.equal(first.activity.attended.length,0)
  assert.equal(second.activity.attended.length,1)

@@ -11,6 +11,15 @@ type Props = { population:Student[]; calls:CallRecord[]; lessons:LessonRecord[];
 export default function DashboardFollowup43(props:Props) {
  const { population,calls,lessons,orders,filters,rangeLabel } = props
  const { text,label,count,ownerName } = useDashboard43()
+ const followupLabels:Record<string,string> = {
+  '已接通待预约':text('待预约','Appointment pending'),
+  '已预约':text('已预约','Appointment booked'),
+  '未出勤待跟进':text('未出勤','No show'),
+  '咨询未完成待跟进':text('咨询未完成','Consultation incomplete'),
+  '咨询完成待支付':text('咨询已完成','Consultation completed'),
+  paid:text('已支付','Paid'),
+ }
+ const followupLabel=(key:string)=>followupLabels[key]||label(key)
  const [query,setQuery] = useSearchParams()
  const changeView = (key:string,value:string) => { const next=new URLSearchParams(query);next.set(key,value);setQuery(next) }
  const currentGroup = (['cc','intent','age','registrationAge'].includes(query.get('currentGroup')||'') ? query.get('currentGroup') : 'cc') as Exclude<DashboardGrouping,'date'|'source'>
@@ -33,13 +42,11 @@ export default function DashboardFollowup43(props:Props) {
  }))
  const exportCurrent = (keys:string[]) => <Export43 name="followup-current" sheets={()=>[{name:'Current snapshot',headers:['CRM ID','Name','Current CC',...keys.map(label)],rows:uniquePeople(keys.flatMap(k=>metrics.current[k]||[])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...keys.map(k=>Number(metrics.current[k]?.some(u=>u.studentId===s.studentId)))])},{name:'Scope',headers:['Scope','Value'],rows:[['Time','Current snapshot; activity dates do not apply'],['Exported UTC',dayjs.utc().toISOString()]]}]} />
  const exportSection = (section:'calls'|'followup') => <Export43 name={`followup-${section}`} sheets={()=>[
-  {name:'Current snapshot',headers:['CRM ID','Name','Current CC',...(section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).map(label)],rows:uniquePeople((section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).flatMap(k=>metrics.current[k]||[])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...(section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).map(k=>Number(metrics.current[k]?.some(u=>u.studentId===s.studentId)))])},
-  {name:'Period user metrics',headers:['CRM ID','Name','Current CC',...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(label)],rows:uniquePeople((section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).flatMap(k=>metrics.activity[k])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(k=>Number(metrics.activity[k].some(u=>u.studentId===s.studentId)))])},
+  {name:'Current snapshot',headers:['CRM ID','Name','Current CC',...(section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).map(section==='followup'?followupLabel:label)],rows:uniquePeople((section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).flatMap(k=>metrics.current[k]||[])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...(section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).map(k=>Number(metrics.current[k]?.some(u=>u.studentId===s.studentId)))])},
+  {name:'Period user metrics',headers:['CRM ID','Name','Current CC',...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(section==='followup'?followupLabel:label)],rows:uniquePeople((section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).flatMap(k=>metrics.activity[k])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(k=>Number(metrics.activity[k].some(u=>u.studentId===s.studentId)))])},
   ...(section==='calls'?[{name:'Calls',headers:['CRM ID','Call ID','Time UTC','Result','Agent'],rows:calls.filter(c=>allowed.has(c.studentId)&&activityTime(c.time)).map(c=>[c.studentId,c.id,c.time,c.result,c.agent])}]:[
-   {name:'Bookings created',headers:['CRM ID','Appointment ID','Created UTC','Scheduled local','Timezone','Creator'],rows:selected.flatMap(s=>(s.salesAppointments||[]).filter(a=>activityTime(a.createdAt)).map(a=>[s.studentId,a.appointmentId,a.createdAt,a.scheduledStartAt,a.timezone,a.createdBy]))},
    {name:'Payments',headers:['CRM ID','Order ID','Paid UTC','Currency','Amount'],rows:dashboardPaymentOrders(orders,selected,filters).map(o=>[o.studentId,o.orderId,o.paidTime,o.currency,o.paidAmount])},
   ]),
-  {name:'Recorded events',headers:['CRM ID','Event ID','Node','Result','Reason','Occurred UTC','Recorded UTC','Recorded by','Appointment ID'],rows:selected.flatMap(s=>(s.salesLifecycleEvents||[]).filter(e=>activityTime(e.reportedAt)).map(e=>[s.studentId,e.eventId,e.node,e.result,e.reason,e.occurredAt,e.reportedAt,e.reportedBy,e.appointmentId]))},
   {name:'Scope',headers:['Scope','Value'],rows:[['Current workload','Snapshot as of export; activity dates do not apply'],['Grouping',groupLabel(currentGroup)],['Activity dates UTC+7',rangeLabel],['CC',Array.isArray(filters.owner)?filters.owner.join(','):filters.owner],['Deduplication','Unique CRM users per metric, raw events are not deduplicated'],['Exported UTC',dayjs.utc().toISOString()]]},
  ]} />
  const block = (section:'calls'|'followup') => {
@@ -50,9 +57,9 @@ export default function DashboardFollowup43(props:Props) {
     <Radio.Group className="dashboard-dimensions" optionType="button" buttonStyle="solid" value={currentGroup} onChange={e=>setCurrentGroup(e.target.value)} options={['cc','intent','age','registrationAge'].map(value=>({value,label:groupLabel(value)}))}/>
     {exportSection(section)}
    </div>
-   <MetricTable43 key={`${section}-${currentGroup}`} rows={comparisonRows(currentKeys,activityKeys)} total={{...metrics.current,...metrics.activity}} keys={[...currentKeys,...activityKeys]} currentKeys={currentKeys} labels={{booked:text('新建预约人数','Newly booked users')}} firstTitle={`${groupLabel(currentGroup)} → ${text('活动日期','Activity date')}`} context={rangeLabel} orders={section==='followup'?dashboardPaymentOrders(orders,selected,filters):undefined}/>
-   <p className="dashboard-help dashboard-bottom-note">{text('展开查看每日活动；日期行的“—”表示不重复展示当前待处理。期间合计按用户去重，不等于每日人数相加。','Expand for daily activity. A dash on date rows means current workload is not repeated. Period totals deduplicate users across days.')}</p>
-   {section==='followup'&&<p className="dashboard-help dashboard-bottom-note">{text('预约出席来自销售预约登记，独立于体验课完成。支付人数、金额 / AOV 按本期支付日期统计。','Appointment attendance uses sales appointment records, independently of trial completion. Paid users and amount / AOV use payment dates in this period.')}</p>}
+   <MetricTable43 key={`${section}-${currentGroup}`} rows={comparisonRows(currentKeys,activityKeys)} total={{...metrics.current,...metrics.activity}} keys={[...currentKeys,...activityKeys]} currentKeys={currentKeys} labels={section==='followup'?followupLabels:undefined} firstTitle={`${groupLabel(currentGroup)} → ${section==='followup'?text('支付日期','Payment date'):text('活动日期','Activity date')}`} context={rangeLabel} orders={section==='followup'?dashboardPaymentOrders(orders,selected,filters):undefined}/>
+   {section==='calls'&&<p className="dashboard-help dashboard-bottom-note">{text('展开查看每日活动；日期行的“—”表示不重复展示当前状态。期间合计按用户去重，不等于每日人数相加。','Expand for daily activity. A dash on date rows means current status is not repeated. Period totals deduplicate users across days.')}</p>}
+   {section==='followup'&&<p className="dashboard-help dashboard-bottom-note">{text('前五项按当前跟进阶段统计；已支付、金额 / AOV 按所选期间的支付日期统计。展开查看每日支付，当前阶段列不重复展示。','The first five columns use current follow-up stages. Paid users and amount / AOV use payment dates in the selected period. Expand for daily payments; current stages are not repeated.')}</p>}
   </Card>
  }
  const [inventoryOpen,setInventoryOpen] = useState(false)

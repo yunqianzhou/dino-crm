@@ -48,7 +48,7 @@ export default function ManagementDashboard() {
  <p>{text('范围：越南业务线、正式用户和当前账号可见数据。所有人数按 CRM 用户 ID 去重。','Scope: formal Vietnam users visible to the current account. All user counts deduplicate by CRM user ID.')}</p>
  <p>{text('转化总览：同一注册批次的线索、有效外呼、接通、预约、体验课完成、已支付人数。结果须发生在注册后，不要求在注册筛选期间内；各环节独立，允许跳步。','Conversion: leads, valid calls, connections, bookings, completed trials and payers within one registration cohort. Outcomes must follow registration, but may occur after the registration date range. Steps are independent.')}</p>
  <p>{text('L2S = 已支付人数 ÷ 线索数；无线索显示 —。体验课完成需真实体验课完课记录，不由销售预约或咨询状态推断。','L2S = paid users / leads, or — when there are no leads. Trial completion requires a completed trial lesson record; appointment and consultation statuses cannot substitute for it.')}</p>
- <p>{text('销售跟进：当前状态不受活动日期影响；本期活动按通话、预约创建、结果登记或支付日期统计。预约出席沿用销售预约登记。','Follow-up: current states ignore activity dates. Activity uses call, booking creation, result recording or payment dates. Attendance refers to sales appointments.')}</p>
+ <p>{text('销售跟进：沿用销售中心现有跟进阶段，当前状态不受活动日期影响；所选期间的外呼、接通按通话日期统计，已支付及金额 / AOV 按支付日期统计。','Follow-up uses the existing Sales Center stages. Current states ignore activity dates; calls and connections use call dates, while paid users and amount / AOV use payment dates.')}</p>
  <p>{text('支付只认有效已支付、实付大于 0 的订单；不同币种不相加。AOV = 实付金额 ÷ 已支付订单数。数据导出沿用当前权限和对应区块筛选。','Payment requires valid paid orders with positive amounts. Currencies are never added together. AOV = paid amount / paid orders. Exports respect permissions and the scope of their section.')}</p>
  </Modal>
  </div>
