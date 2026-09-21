@@ -3,6 +3,7 @@ const { mkdtempSync, symlinkSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { resolve, join } = require('node:path')
 const { execFileSync } = require('node:child_process')
+execFileSync(process.execPath, [resolve('scripts/test-dashboard43.cjs')], { stdio: 'inherit' })
 const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/managementDemo.ts', 'src/dashboardView.ts', 'src/dashboardNavigation.ts', 'src/dashboardSort.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
@@ -247,8 +248,8 @@ try {
   // Question views keep their own date meaning and preserve old shared detail links.
   const { dashboardView, dashboardViewRange, dashboardSwitchView } = require(join(tmp, 'dashboardView.js'))
   assert.equal(dashboardView(new URLSearchParams()), 'cohort')
-  assert.equal(dashboardView(new URLSearchParams('mode=period')), 'period')
-  assert.equal(dashboardView(new URLSearchParams('detail=paid')), 'current')
+  assert.equal(dashboardView(new URLSearchParams('mode=period')), 'followup')
+  assert.equal(dashboardView(new URLSearchParams('detail=paid')), 'followup')
   const legacyPayment = new URLSearchParams('mode=current&start=2026-09-01&end=2026-09-10&paymentStart=2026-09-11&paymentEnd=2026-09-12&paymentDetail=1')
   assert.equal(dashboardView(legacyPayment), 'payments')
   assert.deepEqual(dashboardViewRange(legacyPayment, 'payments'), { start: '2026-09-11', end: '2026-09-12' })
@@ -283,7 +284,7 @@ try {
   }
   assert.deepEqual(dashboardCohortMetrics(demo.students, demo.callRecords, { ...filters, owner: ccSelection }, demo.orders), dashboardCohortMetrics(selectedPeople, demo.callRecords, filters, demo.orders))
   const twoCCQuery = new URLSearchParams('view=cohort&cc=cc-a&cc=cc-b')
-  for (const question of ['current', 'period', 'payments', 'cohort']) assert.deepEqual(dashboardSwitchView(twoCCQuery, question).getAll('cc'), ['cc-a', 'cc-b'])
+  for (const question of ['followup', 'payments', 'cohort']) assert.deepEqual(dashboardSwitchView(twoCCQuery, question).getAll('cc'), ['cc-a', 'cc-b'])
   // Direct links constrain the existing list to the exact clicked users/orders.
   const { dashboardListScope, matchesDashboardScope, dashboardMetricDestination, dashboardSalesRows } = require(join(tmp, 'dashboardNavigation.js'))
   const clicked = dashboardListScope('Selected payments', [paidUsers[0], paidUsers[0]], periodOrders)

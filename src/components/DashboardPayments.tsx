@@ -7,6 +7,7 @@ import { useDashboardText } from '../dashboardText'
 import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
 import { useStore } from '../store'
+import { Export43 } from './Dashboard43Shared'
 import { dashboardListScope } from '../dashboardNavigation'
 
 type Props = { population: Student[]; orders: Order[]; filters: DashboardFilters; rangeLabel: string }
@@ -61,6 +62,7 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
   return <Card title={d('revenueTitle')} className="dashboard-payments" extra={<span className="dashboard-section-note">{d('paidDate')} · {rangeLabel} · UTC+7</span>}>
     <p className="dashboard-help">{d('revenueHelp')}</p>
     <div className="dashboard-table-tools">
+      <Export43 name="payments" orders disabled={!matchingOrders.length} sheets={() => [{ name:'Paid orders', headers:['Order ID','CRM ID','Current CC','Paid UTC','Currency','Amount'], rows:matchingOrders.map(o => [o.orderId,o.studentId,ownerName(students.get(o.studentId)?.salesOwner || '__unassigned__'),o.paidTime,o.currency,o.paidAmount]) },{name:'Scope',headers:['Scope','Value'],rows:[['Paid dates UTC+7',rangeLabel],['Current CC',ownerLabel],['Currency',currency],['Exported UTC',dayjs.utc().toISOString()]]}]} />
       <Segmented value={grouping} onChange={v => change({ revenueGroup: String(v) })} options={[{ value: 'cc', label: d('ccTitle') }, { value: 'date', label: d('paidDate') }]} />
       {summaries.length > 1 && <label className="dashboard-column-picker"><span>{d('currency')}</span><Select aria-label={d('currency')} value={selected?.currency} onChange={v => change({ paymentCurrency: v })} style={{ minWidth: 140 }} options={summaries.map(s => ({ value: s.currency, label: currencyName(s.currency) }))} /></label>}
     </div>

@@ -113,3 +113,27 @@
 .dashboard-l2s strong{font-size:26px;color:#267046}
 .dashboard-l2s small{font-size:11px;color:#607969}
 @media(max-width:760px){.management-dashboard .ant-table-sticky-holder{top:0!important}}
+
+/* 4.3: three questions, six independent milestones and explicit time scopes. */
+.dashboard-questions{grid-template-columns:repeat(3,minmax(0,1fr))}
+.dashboard-version{font-size:12px;color:#8190a7;letter-spacing:.08em}
+.dashboard-funnel-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:#8090a4;font-size:12px;margin-bottom:26px}
+.dashboard-funnel-layout{display:grid;grid-template-columns:minmax(0,1fr) 185px;gap:28px}
+.dashboard-funnel-bars{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:16px}
+.dashboard-funnel-step{min-width:0}
+.dashboard-funnel-label{min-height:54px;font-size:12px;color:#50647f;display:flex;flex-direction:column;gap:5px}
+.dashboard-funnel-label small{font-size:10px;letter-spacing:.1em;color:#9aabc2}
+.dashboard-funnel-step>.dashboard-count,.dashboard-funnel-step>span{font-size:29px;line-height:1.6;font-weight:650}
+.dashboard-funnel-track{height:120px;background:#f2f5fa;display:flex;align-items:flex-end;border-radius:7px;overflow:hidden;margin-top:12px}
+.dashboard-funnel-track>div{width:100%;background:#b6cdf6;min-height:0;border-radius:7px 7px 0 0;transition:height .2s}
+.step-1 .dashboard-funnel-track>div{background:#8aafea}.step-2 .dashboard-funnel-track>div{background:#6596e2}.step-3 .dashboard-funnel-track>div{background:#437bd4}.step-4 .dashboard-funnel-track>div{background:#5476b8}.step-5 .dashboard-funnel-track>div{background:#388b75}
+.dashboard-l2s-panel{background:#eef7f2;border:1px solid #d6e9dd;border-radius:12px;padding:24px 20px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:9px;color:#3d715b}
+.dashboard-l2s-panel strong{font-size:36px;color:#226348;line-height:1.2;letter-spacing:-1px}.dashboard-l2s-panel span{font-size:12px;line-height:1.6}.dashboard-l2s-panel b{font-size:11px;letter-spacing:.15em}.dashboard-l2s-panel small{font-size:14px;margin-top:12px}
+.dashboard-inventory-row{display:flex;align-items:center;flex-wrap:wrap;gap:20px 30px}.dashboard-inventory-row>div{display:flex;align-items:center;gap:12px}.dashboard-inventory-row>div>span{color:#64748b;font-size:12px}.dashboard-inventory-row .dashboard-count{font-size:18px}.dashboard-inventory-row>button.dashboard-count{font-size:12px;margin-left:auto}
+.dashboard-block-heading{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px}.dashboard-activity-heading{margin-top:28px;border-top:1px solid #e8edf4;padding-top:24px}
+.dashboard-followup-section .dashboard-dimensions{margin-bottom:16px}.dashboard-followup-section .dashboard-table-tools .dashboard-dimensions{margin-bottom:0}.dashboard-section-index{color:#8da7cc;font-size:12px;margin-right:4px}
+.dashboard-reasons-inline{margin-top:24px;padding:20px;background:#f8fafc;border:1px solid #e9edf3;border-radius:10px}.dashboard-reasons-inline .dashboard-help{font-size:12px}.dashboard-reasons-inline .ant-table{background:transparent}.dashboard-reasons-inline .ant-radio-button-wrapper{font-size:12px}
+.dashboard-record-id{display:block;font-size:10px;color:#94a0b1;margin-top:4px}.dashboard-schedule-stats{display:flex;flex-wrap:wrap;gap:40px;margin:22px 0}.dashboard-schedule-stats>div{display:flex;align-items:baseline;gap:12px}.dashboard-schedule-stats span{font-size:12px;color:#6e7c90}.dashboard-schedule-stats strong,.dashboard-schedule-stats .dashboard-count{font-size:24px}.dashboard-schedule-stats small{font-size:12px;color:#8c99aa}.dashboard-schedule-filters{margin-bottom:18px}
+@media(max-width:1100px){.dashboard-funnel-layout{grid-template-columns:1fr}.dashboard-l2s-panel{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-start;padding:14px 20px;gap:16px}.dashboard-l2s-panel small{margin:0}.dashboard-l2s-panel strong{font-size:28px}}
+@media(max-width:760px){.dashboard-questions{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-questions span{display:none}.dashboard-funnel-bars{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.dashboard-funnel-track{height:72px}.dashboard-funnel-label{min-height:48px}.dashboard-funnel-step>.dashboard-count{font-size:25px}.dashboard-funnel-card .ant-card-head-wrapper{flex-wrap:wrap;gap:10px;padding-block:12px}.dashboard-funnel-card .ant-card-head-title{white-space:normal}.dashboard-reasons-inline{padding:14px}.dashboard-inventory-row{gap:12px 20px}.dashboard-block-heading .dashboard-section-note{margin-top:8px}.dashboard-funnel-layout{gap:20px}}
+@media(prefers-reduced-motion:reduce){.dashboard-funnel-track>div{transition:none}}

@@ -133,20 +133,20 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
 
 /** One-time additive migration: preserve existing users, edits, deletes and dates. */
 export function withManagementDemo<T extends DemoState>(state: T, now?: string): T {
-  if (state.demoDatasets?.includes(DATASET)) return withReasonDemo(state)
+  if (state.demoDatasets?.includes(DATASET)) return withDashboard43Demo(withReasonDemo(state))
   const demo = createManagementDemo(now)
   const append = <R,>(existing: R[], additions: R[], id: (row: R) => string) => {
     const ids = new Set(existing.map(id))
     return [...existing, ...additions.filter(row => !ids.has(id(row)))]
   }
-  return withReasonDemo({ ...state,
+  return withDashboard43Demo(withReasonDemo({ ...state,
     students: append(state.students, demo.students, s => s.studentId),
     accounts: append(state.accounts, demo.accounts, a => a.email),
     callRecords: append(state.callRecords, demo.callRecords, c => c.id),
     orders: append(state.orders, demo.orders, o => o.orderId),
     lessons: append(state.lessons, demo.lessons, l => l.id),
     demoDatasets: [...(state.demoDatasets ?? []), DATASET],
-  })
+  }))
 }
 
 /** Enrich only original synthetic events. Existing reasons and customer records are untouched. */
@@ -159,4 +159,24 @@ function withReasonDemo<T extends DemoState>(state: T): T {
       e.eventId.startsWith('management-demo-event-') && !e.reason && demoReasons[e.result]
         ? { ...e, reason: demoReasons[e.result][index % 3] } : e) }
   }), demoDatasets: [...(state.demoDatasets || []), REASON_DATASET] }
+}
+
+/** Independent trial facts for the new cohort metric. Never derived from attendance. */
+function withDashboard43Demo<T extends DemoState>(state: T): T {
+  const marker = 'management-vietnam-43-v1'
+  if (state.demoDatasets?.includes(marker)) return state
+  const lessons = [...state.lessons]
+  const students = state.students.map(student => {
+    if (!/^990000000000000\d{4}$/.test(student.studentId)) return student
+    const index = Number(student.studentId.slice(-4))
+    if (index % 4 === 0) {
+      const id = `management-demo-trial-${index}`
+      if (!lessons.some(l => l.id === id)) lessons.push({id,studentId:student.studentId,courseLabel:'TRIAL-DEMO-01',courseName:'My first English class (Demo)',lessonType:'体验课',status:'已完课',startedAt:dayjs.utc(student.registerTime).add(1,'hour').format('YYYY-MM-DD HH:mm:ss'),completedAt:dayjs.utc(student.registerTime).add(90,'minute').format('YYYY-MM-DD HH:mm:ss')})
+    }
+    const events = [...(student.salesLifecycleEvents || [])]
+    const consultation = events.find(e => e.eventId.startsWith('management-demo-event-') && e.result === '咨询完成')
+    if (consultation && student.status !== '付费' && !events.some(e => e.result === '待支付')) events.push({ ...consultation,eventId:`management-demo-concern-${index}`,node:'sale',result:'待支付',reason:['预算原因','时间不足','其他'][index % 3],description:'演示支付顾虑 / Demo payment concern' })
+    return { ...student, salesLifecycleEvents: events.map(event => event.eventId.startsWith('management-demo-event-') && event.result === '已关闭' && !('closureType' in event) ? { ...event, closureType:'phone' } : event) }
+  })
+  return { ...state,students,lessons,demoDatasets:[...(state.demoDatasets || []),marker] }
 }
