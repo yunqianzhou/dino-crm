@@ -52,8 +52,6 @@ try {
   assert(!matchesOrderFilters5({ ...order, paidTime: '2026-09-20 16:00:00' }, filters))
   assert(!matchesOrderFilters5({ ...order, paidTime: undefined }, filters))
   assert(matchesOrderFilters5(order, { dateField: 'createdTime', from: '2026-09-01', to: '2026-09-01' }))
-  assert(!matchesOrderFilters5(order, { dateField: 'paidTime', currency: 'VND', min: 101 }))
-  assert(matchesOrderFilters5(order, { dateField: 'paidTime', currency: 'VND', min: 100, max: 100 }))
   assert(!matchesOrderFilters5(order, { dateField: 'paidTime', currency: 'USD' }))
   assert(!matchesOrderFilters5(order, { dateField: 'paidTime', cc: 'other' }, target.email))
   assert(matchesOrderFilters5(order, { dateField: 'paidTime', cc: '__unassigned__' }))

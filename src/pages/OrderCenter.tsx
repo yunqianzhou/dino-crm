@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, DatePicker, Input, InputNumber, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Card, DatePicker, Input, Select, Space, Table, Tag, Typography, message } from 'antd'
 import { DownOutlined, UpOutlined, DownloadOutlined, SearchOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useStore } from '../store'
@@ -153,7 +153,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
           (!orderStatus || o.orderStatus === orderStatus) &&
           (!payMethod || o.payMethod === payMethod) &&
           (!countryFilter || countryOf(o.studentId) === countryFilter) &&
-          (!typeFilter || typeOf(o.studentId) === typeFilter)
+          (phase5 || !typeFilter || typeOf(o.studentId) === typeFilter)
         )
       }).sort((a, b) => ORDER_STATUS_PRIORITY[a.orderStatus] - ORDER_STATUS_PRIORITY[b.orderStatus]),
     [phase5, filters5, userMap, orders, dashboardScope, permittedDashboardIds, targetStudentId, keyword, orderStatus, payMethod, countryFilter, typeFilter, lineOf, countryOf, typeOf, couponCodeOf, lineSel, matchLine],
@@ -263,14 +263,12 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
     ...(payMethod ? [{ label: `支付方式：${payMethod}`, clear: () => setPayMethod(undefined) }] : []),
     ...(countryFilter ? [{ label: `国家：${countryFilter}`, clear: () => setCountryFilter(undefined) }] : []),
     ...(lineSel.length ? [{ label: `业务线：${lineSel.join('、')}`, clear: () => setLineSel([]) }] : []),
-    ...(typeFilter ? [{ label: `用户类型：${typeFilter}`, clear: () => setTypeFilter(undefined) }] : []),
     ...(filters5.product ? [{ label: `商品：${filters5.product}`, clear: () => update5({ product: undefined }) }] : []),
     ...(filters5.cc ? [{ label: `CC：${accounts.find(a => a.email === filters5.cc)?.name || (filters5.cc === '__unassigned__' ? '未分配' : filters5.cc)}`, clear: () => update5({ cc: undefined }) }] : []),
-    ...(filters5.currency ? [{ label: `币种：${filters5.currency}`, clear: () => update5({ currency: undefined, min: undefined, max: undefined }) }] : []),
-    ...(filters5.min != null || filters5.max != null ? [{ label: `实付：${filters5.min ?? '不限'} — ${filters5.max ?? '不限'}`, clear: () => update5({ min: undefined, max: undefined }) }] : []),
+    ...(filters5.currency ? [{ label: `币种：${filters5.currency}`, clear: () => update5({ currency: undefined }) }] : []),
     ...(filters5.from || filters5.to ? [{ label: `${{ paidTime: '支付', createdTime: '创建', validUntil: '到期' }[filters5.dateField]}日期：${filters5.from || '不限'} — ${filters5.to || '不限'}`, clear: () => update5({ from: undefined, to: undefined }) }] : []),
   ]
-  const extraCount = Number(!!filters5.cc) + Number(!!filters5.currency) + Number(filters5.min != null || filters5.max != null) + Number(!!typeFilter)
+  const extraCount = Number(!!filters5.cc) + Number(!!filters5.currency)
   const paidAmounts = new Map<string, number>()
   data.filter(order => order.orderStatus === '已支付').forEach(order => paidAmounts.set(order.currency, (paidAmounts.get(order.currency) || 0) + order.paidAmount))
   const phase5Filters = <div className="phase5-orders-filters">
@@ -286,9 +284,7 @@ export default function OrderCenter({ detailsPath, exportPermission = 'orders_ex
     </div>
     {moreFilters && <div className="phase5-filter-grid" style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed #dce2ed' }}>
       <div className="phase5-filter-field"><label>当前 CC</label><CCSelect accounts={accounts.filter(a => a.businessLines.some(matchLine))} owners={scopedOrders.map(order => ownerOf(order) || '')} value={filters5.cc} onChange={cc => update5({ cc })} /></div>
-      <div className="phase5-filter-field"><label>币种</label><Select aria-label="币种" allowClear placeholder="全部币种" value={filters5.currency} onChange={currency => update5({ currency, min: undefined, max: undefined })} options={currencyOptions.map(value => ({ label: value, value }))} /></div>
-      <div className="phase5-filter-field"><label>实际付款金额 {filters5.currency || '· 请先选择币种'}</label><Space.Compact style={{ width: '100%' }}><InputNumber aria-label="最低实付金额" disabled={!filters5.currency} min={0} max={filters5.max ?? undefined} placeholder="最低" value={filters5.min} onChange={min => update5({ min })} /><InputNumber aria-label="最高实付金额" disabled={!filters5.currency} min={filters5.min ?? 0} placeholder="最高" value={filters5.max} onChange={max => update5({ max })} /></Space.Compact></div>
-      <div className="phase5-filter-field"><label>用户类型</label><Select aria-label="用户类型" allowClear placeholder="全部用户类型" value={typeFilter} onChange={setTypeFilter} options={USER_TYPES.map(value => ({ label: value, value }))} /></div>
+      <div className="phase5-filter-field"><label>币种</label><Select aria-label="币种" allowClear placeholder="全部币种" value={filters5.currency} onChange={currency => update5({ currency })} options={currencyOptions.map(value => ({ label: value, value }))} /></div>
     </div>}
     <div className="phase5-filter-footer"><Space><Button type="link" style={{ paddingLeft: 0 }} icon={moreFilters ? <UpOutlined /> : <DownOutlined />} onClick={() => setMoreFilters(!moreFilters)}>{moreFilters ? '收起更多筛选' : '更多筛选'}{extraCount ? ` (${extraCount})` : ''}</Button><Text type="secondary">选择后自动筛选</Text></Space><Space><Button onClick={resetFilters5}>重置筛选</Button>{canExport && <Button icon={<DownloadOutlined />} onClick={exportOrders}>导出筛选结果</Button>}</Space></div>
     {!!activeTags.length && <Space wrap style={{ marginTop: 14 }}>{activeTags.map(tag => <Tag key={tag.label} closable onClose={event => { event.preventDefault(); tag.clear() }}>{tag.label}</Tag>)}</Space>}
