@@ -32,6 +32,6 @@ export default function ABVisualPlanEditor({value,onChange,readOnly=false,target
     </>:<Card className="ab-native-page"><Empty description={`${labels[node]}沿用 App 现有页面，无需配置页面素材。`}/><Button onClick={()=>setFlowOpen(true)}>查看在流程中的位置</Button></Card>}
    </section>
   </div>
-  <Drawer title="流程编排与支付分支" width="94vw" open={flowOpen} onClose={()=>setFlowOpen(false)} footer={<div className="ab-drawer-footer"><Typography.Text type="secondary">修改保留在当前草稿；回到编辑页后保存或提交。</Typography.Text><Button type="primary" onClick={()=>setFlowOpen(false)}>完成编排</Button></div>}>{readOnly&&!value.contents[value.flowId]?.flow&&<Alert type="info" showIcon style={{marginBottom:16}} message="历史版本只保存了页面顺序。以下分支按当前规则演示，不代表历史 App 已执行这些规则。"/>}<ABFlowEditor value={graph} readOnly={readOnly} onChange={flow=>update({[value.flowId]:{...flowContent,flow,steps:flow.nodes.map(n=>n.page)}})}/></Drawer>
+  <Drawer title="流程编排与支付分支" width="94vw" open={flowOpen} onClose={()=>setFlowOpen(false)} footer={<div className="ab-drawer-footer"><Typography.Text type="secondary">修改保留在当前草稿；回到编辑页后保存或提交。</Typography.Text><Button type="primary" onClick={()=>setFlowOpen(false)}>完成编排</Button></div>}>{readOnly&&!value.contents[value.flowId]?.flow&&<Alert type="info" showIcon style={{marginBottom:16}} message="历史版本只保存了页面顺序。以下分支按当前规则演示，不代表历史 App 已执行这些规则。"/>}<ABFlowEditor key={value.flowId} value={graph} readOnly={readOnly} onChange={flow=>update({[value.flowId]:{...flowContent,flow,steps:flow.nodes.map(n=>n.page)}})}/></Drawer>
  </div>
 }
