@@ -26,3 +26,77 @@
 .ab-onboarding-order { flex-wrap:wrap;margin-bottom:10px; }
 .ab-onboarding-order span { display:inline-flex;align-items:center;gap:8px; }
 .ab-onboarding-order .anticon { color:#9baeca; }
+
+/* APP configuration workspace: stable navigation, editing and preview regions. */
+.app-workbench .ab-heading { margin-bottom:12px; }
+.app-workbench .ab-prototype-note { padding:7px 12px;margin-bottom:14px;border-color:#e4e9f2;background:#f8faff;font-size:12px; }
+.app-workbench .ab-edit-meta { margin:12px 0; }
+.app-workbench .ab-step-nav { margin-bottom:18px; }
+.app-workbench .ab-list-intro { margin:12px 0 20px; }
+.app-workbench .ab-list-intro h4 { font-size:18px; }
+.ab-standard-toolbar { display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 16px;background:white;border:1px solid #e4e9f2;border-radius:10px;margin-bottom:16px; }
+.ab-standard-toolbar>div { display:flex;align-items:center;gap:16px;flex-wrap:wrap; }
+.ab-toolbar-label { font-size:13px;font-weight:600;color:#45536b; }
+.ab-standard-switch { display:flex;padding:3px;background:#f1f4f8;border-radius:7px;gap:4px; }
+.ab-standard-switch button { border:0;background:transparent;border-radius:5px;padding:8px 14px;color:#607087;font:inherit;font-size:13px;cursor:pointer; }
+.ab-standard-switch button.is-active { background:white;color:#285bd6;box-shadow:0 1px 4px #18263b18;font-weight:600; }
+.ab-standard-switch button:disabled { cursor:default; }
+.ab-content-layout { display:grid;grid-template-columns:198px minmax(0,1fr);gap:18px;align-items:start; }
+.ab-page-directory { border:1px solid #e4e9f2;border-radius:10px;background:white;padding:14px 8px;position:sticky;top:16px;max-height:calc(100vh - 115px);overflow:auto; }
+.ab-directory-heading { display:flex;align-items:center;justify-content:space-between;padding:0 8px 12px;font-size:13px; }
+.ab-directory-heading span { font-size:11px;color:#8590a3; }
+.ab-directory-secondary { margin-top:12px;padding-top:16px;border-top:1px solid #edf0f5; }
+.ab-nav-page { display:flex;align-items:center;width:100%;gap:7px;padding:10px 8px;margin:2px 0;border:0;border-radius:6px;background:transparent;color:#526079;text-align:left;font:inherit;font-size:13px;cursor:pointer; }
+.ab-nav-page:hover { background:#f5f7fb; }
+.ab-nav-page.is-selected { background:#edf3ff;color:#255bdd;font-weight:600; }
+.ab-nav-index { width:17px;flex-shrink:0;color:#8997ab;font-size:10px; }
+.ab-nav-page>.anticon { margin-left:auto;font-size:11px; }
+.ab-nav-native { margin-left:auto;font-size:10px;color:#939eaf; }
+.ab-nav-error { margin-left:auto;border-radius:10px;background:#fff0ee;color:#d4380d;min-width:19px;text-align:center;font-size:11px; }
+.ab-nav-module { margin:6px 0;padding:8px 0;background:#fafbfe;border:1px solid #edf0f6;border-radius:7px; }
+.ab-nav-module-title { display:flex;justify-content:space-between;gap:8px;padding:2px 8px 6px;font-size:12px;color:#65748c; }
+.ab-nav-module-pages { padding:0 4px; }
+.ab-nav-module-pages .ab-nav-index { width:9px;border-left:1px solid #dde4ef;height:13px;margin-left:7px; }
+.ab-directory-note { font-size:11px;line-height:1.7;color:#8a96a8;padding:8px;margin:4px 0 0; }
+.ab-page-workarea { min-width:0; }
+.ab-content-toolbar { display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:51px;margin-bottom:12px; }
+.ab-content-toolbar h3 { margin:0 0 4px;font-size:16px; }
+.ab-content-toolbar .ant-typography { font-size:12px; }
+.ab-content-workspace .ab-editor-grid { grid-template-columns:minmax(0,1fr) 360px;gap:16px; }
+.ab-content-workspace .ab-fields>.ant-card-body { padding:18px; }
+.ab-content-workspace .ab-fields .ant-form { margin-top:14px; }
+.ab-content-workspace .ab-config-guidance>span { display:none; }
+.ab-content-workspace .ab-preview-panel { padding:16px 12px;gap:14px; }
+.ab-content-workspace .ab-preview-toolbar { flex-wrap:wrap;font-size:13px; }
+.ab-content-workspace .ab-preview-toolbar .ant-select { max-width:165px; }
+.ab-content-workspace .ab-preview-panel>.ant-typography { font-size:11px;line-height:1.6; }
+.ab-content-workspace .ab-two-fields { grid-template-columns:1fr;gap:0; }
+.ab-content-workspace .ab-help { font-size:11px; }
+.ab-paywall-sections { margin-bottom:12px; }
+.ab-page-issues { margin-bottom:12px; }
+.ab-page-issues ul { padding-left:18px;margin:4px 0; }
+.ab-native-page { text-align:center;padding:45px 12px; }
+.ab-drawer-footer { display:flex;align-items:center;justify-content:space-between;gap:16px; }
+.ab-list-status { display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px; }
+.ab-list-status .ant-btn { color:#62718a; }
+.ab-list-status .ant-btn-primary { color:white; }
+.ab-list-count { margin:0 0 12px;color:#8290a4;font-size:12px; }
+.app-workbench .ant-table-thead>tr>th { font-size:12px;background:#f7f9fc;color:#64748b; }
+.app-workbench .ant-table-cell .ant-btn-link { padding:0 5px; }
+.ab-review-section { margin:22px 0 12px;font-size:15px;font-weight:600; }
+.ab-review-checks { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0; }
+.ab-review-check { display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #e6eaf1;border-radius:8px; }
+.ab-review-check p { font-size:12px;color:#8692a4;margin:4px 0 0; }
+.ab-review-check>.anticon { font-size:20px;color:#36a374; }
+.ab-review-check.has-errors>.anticon { color:#da5b49; }
+.ab-group-setup { margin-bottom:14px;background:white; }
+.ab-group-setup .ant-card { border:0; }
+.ab-group-setup .ant-card-body { padding:6px 0 0; }
+.app-workbench .ab-target-live-summary { display:flex;flex-direction:column;gap:16px; }
+.ab-target-live-summary label { display:block;font-size:12px;color:#8a97aa;margin-bottom:5px; }
+.ab-scope-note { font-size:12px;line-height:1.8;color:#7e8a9d; }
+@media(max-width:1300px){.ab-content-layout{grid-template-columns:180px minmax(0,1fr);gap:12px}.ab-content-workspace .ab-editor-grid{grid-template-columns:minmax(0,1fr) 325px}.ab-content-workspace .ab-phone{max-width:100%}.ab-standard-toolbar>div{gap:8px}}
+@media(max-width:1100px){.ab-content-workspace .ab-editor-grid{grid-template-columns:1fr}.ab-content-workspace .ab-sticky-preview{position:static}.ab-standard-toolbar{align-items:flex-start}.ab-standard-toolbar>div{display:block}.ab-toolbar-label{display:block;margin-bottom:8px}}
+@media(max-width:760px){.ab-content-layout{grid-template-columns:1fr}.ab-page-directory{position:static;max-height:270px}.ab-standard-toolbar{flex-wrap:wrap}.ab-standard-switch button{padding:8px}.ab-content-toolbar{flex-wrap:wrap}.ab-review-checks{grid-template-columns:1fr}}
+
+.ab-group-context { margin:0 0 12px;font-size:12px; }

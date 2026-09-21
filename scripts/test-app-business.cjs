@@ -53,5 +53,39 @@ try {
  assert.throws(()=>b.publishOnline(s,badPage,'Editor'),/标题/)
  const historical=b.workspace(s).history.find(h=>h.action==='发布更新').snapshot
  assert.notEqual(historical.value.plan.contents['app.login.slideshow'].details.lists.slides[0].label,'Later online change','Historical snapshots remain immutable')
+ // Version targeting is independent from the content compatibility floor.
+ const range=(lower,upper)=>[{operator:'>=',value:lower},{operator:'<',value:upper}]
+ let rangeStore={schema:3,definitions:[],versions:[],releases:[],experiments:[],audit:[]}
+ const lower={...b.newOnline(),name:'1.8 range'};lower.audience.versions=range('1.8.0','1.9.0')
+ const upper={...b.newOnline(),name:'1.9 range'};upper.audience.versions=range('1.9.0','2.0.0')
+ rangeStore=b.publishOnline(rangeStore,lower,'Test');rangeStore=b.publishOnline(rangeStore,upper,'Test')
+ assert.equal(b.workspace(rangeStore).online.length,2,'Disjoint version ranges may coexist in the same country/device')
+ const released=b.workspace(rangeStore).online.find(p=>p.name==='1.9 range')
+ assert.equal(released.minVersion,'1.8.0','Targeting a newer version must not raise the content compatibility floor')
+ assert.deepEqual(released.audience.versions,upper.audience.versions)
+ assert(rangeStore.releases.filter(r=>released.releaseIds.includes(r.id)).every(r=>JSON.stringify(r.audience.versions)===JSON.stringify(upper.audience.versions)))
+ assert(b.resolvedOnline(rangeStore,released,'1.9.0'))
+ assert.equal(b.resolvedOnline(rangeStore,released,'2.0.0'),undefined,'Exclusive upper bound must apply during resolution')
+ assert.equal(b.resolvedOnline(rangeStore,released,'1.8.9'),undefined)
+ const overlap={...b.newOnline(),name:'Overlapping'};overlap.audience.versions=range('1.8.9','1.9.1')
+ const prior=JSON.stringify(rangeStore);assert.throws(()=>b.publishOnline(rangeStore,overlap,'Test'),/重叠/);assert.equal(JSON.stringify(rangeStore),prior)
+ const eq={...b.newOnline(),name:'Exact 2.0'};eq.audience.versions=[{operator:'=',value:'2.0.0'}]
+ rangeStore=b.publishOnline(rangeStore,eq,'Test')
+ assert(b.resolvedOnline(rangeStore,b.workspace(rangeStore).online.find(p=>p.name==='Exact 2.0'),'2.0.0'))
+ const conflict={...b.newOnline(),name:'Invalid'};conflict.audience.versions=range('1.9.0','1.8.0');assert(b.infoErrors(conflict).some(x=>x.includes('没有交集')))
+ conflict.audience.versions=[{operator:'=',value:'1.7.0'}];assert(b.infoErrors(conflict).some(x=>x.includes('兼容要求')))
+ conflict.audience.versions=[{operator:'>=',value:'1.8'}];assert(b.infoErrors(conflict).length)
+ conflict.audience.versions=[];assert.deepEqual(m.audienceTarget(conflict.audience,conflict.minVersion).versions,[{operator:'>=',value:'1.8.0'}])
+ assert.deepEqual(m.audienceTarget(m.audience(),'2.0.0').versions,[{operator:'>=',value:'2.0.0'}],'Legacy records retain their old minimum scope')
+ const exLower=b.newExperiment(b.workspace(rangeStore).online.find(p=>p.name==='1.8 range'));exLower.value.name='Range A'
+ rangeStore=b.saveVisualExperiment(rangeStore,exLower.value,exLower.visual,'Test',true)
+ rangeStore=b.changeExperimentStatus(rangeStore,rangeStore.experiments[0],'RUNNING','Test')
+ const exUpper=b.newExperiment(released);exUpper.value.name='Range B';assert.deepEqual(b.experimentErrors(rangeStore,exUpper.value,exUpper.visual),[])
+ rangeStore=b.saveVisualExperiment(rangeStore,exUpper.value,exUpper.visual,'Test',true)
+ rangeStore=b.changeExperimentStatus(rangeStore,rangeStore.experiments.find(e=>e.name==='Range B'),'RUNNING','Test')
+ assert.equal(rangeStore.experiments.filter(e=>e.status==='RUNNING').length,2,'Experiments with disjoint version ranges may both run')
+ const competingRange=b.newExperiment(released);competingRange.value.name='Overlapping experiment'
+ assert(b.experimentErrors(rangeStore,competingRange.value,competingRange.visual).some(x=>x.includes('重叠')))
+ assert.deepEqual(b.workspace(rangeStore).history.find(h=>h.snapshot.value.name==='Range B').snapshot.value.audience.versions,upper.audience.versions,'History retains the version conditions')
  console.log('APP business workflow checks passed')
 } finally {rmSync(dir,{recursive:true,force:true})}

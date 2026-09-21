@@ -1,7 +1,7 @@
 import { flowStandard, makeFlow } from './appFlowConfig'
-import { clone, makeId, validVersion, newPlan } from './abTestConfig'
+import { clone, makeId, validVersion, newPlan, versionMatches } from './abTestConfig'
 import type { Plan } from './abTestConfig'
-import { registry, initialContent, getSlot, contentPlan, latestVersion, compatibleVersion, audience, validateAudience, validateContent, saveVersion, validateRelease, activateRelease, saveExperimentDraft, transitionExperiment, validateExperiment, releaseState, compareVersions, statusLabels } from './appConfigModel'
+import { registry, initialContent, getSlot, contentPlan, latestVersion, compatibleVersion, audience, validateAudience, validateContent, saveVersion, validateRelease, activateRelease, saveExperimentDraft, transitionExperiment, validateExperiment, releaseState, compareVersions, statusLabels, versionScopeErrors, audienceTarget } from './appConfigModel'
 import type { AppConfigStore, UnitContent, Audience, AppExperiment, Definition, ConfigVersion } from './appConfigModel'
 
 export type VisualPlan = { flowId:string; contents:Record<string,UnitContent>; minimums?:Record<string,string> }
@@ -17,7 +17,7 @@ export function fullPlan(p:VisualPlan):Plan {return planSlots(p).reduce((base,s)
 export function effectiveContent(p:VisualPlan,id:string):UnitContent {const s=getSlot(id),c=p.contents[id]??initialContent(s);return s.flow?{...c,flow:c.flow??makeFlow(c.steps??[],flowStandard(id))}:c}
 export function planMinimum(p:VisualPlan){return Object.values(p.minimums??{}).sort(compareVersions).slice(-1)[0]}
 export function planErrors(p:VisualPlan):string[]{return planSlots(p).flatMap(s=>validateContent(s,effectiveContent(p,s.id)).map(e=>`${s.page} / ${s.name}：${e}`))}
-export function infoErrors(p:{name:string;audience:Audience;minVersion:string}){return [...(!p.name.trim()?['请填写名称。']:[]),...validateAudience(p.audience),...(!validVersion(p.minVersion)?['请填写有效的最低 App 版本，例如 1.8.0。']:[])]}
+export function infoErrors(p:{name:string;audience:Audience;minVersion:string}){return [...new Set([...(!p.name.trim()?['请填写名称。']:[]),...validateAudience(p.audience),...versionScopeErrors(p.audience,p.minVersion),...(!validVersion(p.minVersion)?['请填写有效的最低 App 版本，例如 1.8.0。']:[])])]}
 export function newOnline():OnlinePlan {return {id:makeId(),name:'',audience:audience(),minVersion:'1.8.0',plan:blankPlan(),status:'DRAFT',releaseIds:[],versionIds:[]}}
 function readBindings(store:AppConfigStore,bindings:{definitionId:string;versionId:string}[],base=blankPlan()) {const p=clone(base);for(const b of bindings){const d=store.definitions.find(x=>x.id===b.definitionId),v=store.versions.find(x=>x.id===b.versionId);if(!d||!v)continue;p.contents[d.slotId]=clone(v.content);p.minimums={...p.minimums,[d.slotId]:v.minVersion};if(getSlot(d.slotId).flow)p.flowId=d.slotId}return p}
 // A view over existing records: grouping does not change any old release or version.
@@ -42,7 +42,7 @@ export function publishOnline(store:BusinessStore,p:OnlinePlan,actor:string):Bus
  let next:BusinessStore={...store,workspace:clone(w),releases:store.releases.map(r=>old?.releaseIds.includes(r.id)?{...r,status:'ENDED'}:r)}
  const saved=addVersions(next,p.plan,p.minVersion,p.name,'DIRECT',actor,old?.versionIds);next=saved.store
  const releaseIds:string[]=[]
- for(const b of saved.bindings){const r={id:makeId(),name:p.name,definitionId:b.definitionId,audience:clone(p.audience),priority:0,startAt:'',endAt:'',status:'DRAFT' as const};const issues=validateRelease(next,r);if(issues.length)throw Error(issues.join('\n'));next=activateRelease(next,r,actor) as BusinessStore;releaseIds.push(r.id)}
+ for(const b of saved.bindings){const r={id:makeId(),name:p.name,definitionId:b.definitionId,audience:{...clone(p.audience),versions:audienceTarget(p.audience,p.minVersion).versions},priority:0,startAt:'',endAt:'',status:'DRAFT' as const};const issues=validateRelease(next,r);if(issues.length)throw Error(issues.join('\n'));next=activateRelease(next,r,actor) as BusinessStore;releaseIds.push(r.id)}
  const value:OnlinePlan={...clone(p),id:old?.id??(w.online.some(x=>x.id===p.id)?makeId():p.id),status:'ACTIVE',releaseIds,versionIds:saved.bindings.map(b=>b.versionId),replaceId:undefined}
  next.workspace={...w,online:[...w.online.filter(x=>x.id!==value.id),value],drafts:w.drafts.filter(x=>x.id!==p.id)}
  return history(next,{kind:'online',value},old?'发布更新':'首次发布',actor)
@@ -64,4 +64,4 @@ export function saveVisualExperiment(store:BusinessStore,e:AppExperiment,v:Exper
 }
 export function changeExperimentStatus(store:BusinessStore,e:AppExperiment,status:AppExperiment['status'],actor:string){const next=transitionExperiment(store,e.id,status,actor) as BusinessStore;return history(next,{kind:'experiment',value:next.experiments.find(x=>x.id===e.id)!,visual:workspace(store).experiments[e.id]},`实验${statusLabels[status]}`,actor)}
 export function relatedTo(store:BusinessStore,p:OnlinePlan){const w=workspace(store);return store.experiments.filter(e=>w.experiments[e.id]?.baseId===p.id||e.groups.some(g=>g.bindings.some(b=>p.versionIds.includes(b.versionId))))}
-export function resolvedOnline(store:BusinessStore,p:OnlinePlan,appVersion=p.minVersion):VisualPlan {const bindings=p.releaseIds.flatMap(id=>{const r=store.releases.find(x=>x.id===id),v=r&&compatibleVersion(store,r.definitionId,appVersion);return v?[{definitionId:r!.definitionId,versionId:v.id}]:[]});return bindings.length?readBindings(store,bindings):clone(p.plan)}
+export function resolvedOnline(store:BusinessStore,p:OnlinePlan,appVersion=p.minVersion):VisualPlan|undefined {if(!versionMatches(appVersion,audienceTarget(p.audience,p.minVersion).versions))return undefined;const bindings=p.releaseIds.flatMap(id=>{const r=store.releases.find(x=>x.id===id),v=r&&compatibleVersion(store,r.definitionId,appVersion);return v?[{definitionId:r!.definitionId,versionId:v.id}]:[]});return bindings.length?readBindings(store,bindings):clone(p.plan)}
