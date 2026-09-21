@@ -2,7 +2,7 @@ import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import type { CallRecord, LessonRecord, Order, SalesAppointment, SalesLifecycleEvent, Student } from './types'
-import { dashboardOwnerIds, inVietnamRange, isDashboardPaidOrder, type DashboardFilters } from './dashboardData'
+import { dashboardOwnerIds, dashboardGroupRows, inVietnamRange, isDashboardPaidOrder, type DashboardFilters, type DashboardGrouping } from './dashboardData'
 import { consultationStage } from './salesLifecycle'
 import { isSalesLead } from './funnel'
 import { resolveUserType } from './userType'
@@ -124,4 +124,22 @@ export function metricGroups(metrics: PeopleMetrics, dimension: 'cc' | 'date', s
   const key = (s: Student) => dimension === 'cc' ? s.salesOwner || '__unassigned__' : dayjs.utc(s.registerTime).utcOffset(420).format('YYYY-MM-DD')
   const values = [...new Set(Object.values(metrics).flat().map(key))].sort((a, b) => dimension === 'date' ? b.localeCompare(a) : a.localeCompare(b))
   return values.map(value => ({ id: value, name: value, metrics: Object.fromEntries(Object.entries(metrics).map(([k, users]) => [k, users.filter(s => key(s) === value)])), secondary }))
+}
+
+export type FollowupComparisonRow = {
+  id: string; value: string; metrics: PeopleMetrics; activityDate?: string; children?: FollowupComparisonRow[]
+}
+/** One row per group, with current workload beside period activity.
+ * Child dates describe activity only: missing snapshot cells mean not applicable, never zero.
+ */
+export function followupComparisonRows(current: PeopleMetrics, activity: PeopleMetrics, daily: { date: string; metrics: PeopleMetrics }[], group: Exclude<DashboardGrouping, 'date' | 'source'>, currentKeys: string[], activityKeys: string[]): FollowupComparisonRow[] {
+  const pick = (metrics: PeopleMetrics, keys: string[]) => Object.fromEntries(keys.map(key => [key, metrics[key] || []]))
+  const combined = { ...pick(current, currentKeys), ...pick(activity, activityKeys) }
+  return dashboardGroupRows(combined, group).map(row => {
+    const children = daily.flatMap(day => {
+      const child = dashboardGroupRows(pick(day.metrics, activityKeys), group).find(item => item.id === row.id)
+      return child ? [{ id: JSON.stringify([row.id, day.date]), value: day.date, activityDate: day.date, metrics: child.metrics }] : []
+    })
+    return { id: row.id, value: row.id, metrics: row.metrics, children: children.length ? children : undefined }
+  })
 }

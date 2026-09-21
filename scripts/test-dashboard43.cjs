@@ -7,7 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard43-tests-'))
 try {
  execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboard43.ts', 'src/dashboardView.ts', 'src/managementDemo.ts', '--outDir',tmp,'--module','commonjs','--moduleResolution','node','--target','ES2020','--esModuleInterop','--skipLibCheck'],{stdio:'inherit'})
  symlinkSync(resolve('node_modules'),join(tmp,'node_modules'),'dir')
- const {cohortFunnel,followupMetrics,reasonEvidence,scheduledAppointments,l2s,scheduledInstant} = require(join(tmp,'dashboard43.js'))
+ const {cohortFunnel,followupMetrics,reasonEvidence,scheduledAppointments,l2s,scheduledInstant,followupComparisonRows} = require(join(tmp,'dashboard43.js'))
  const {dashboardView,dashboardViewRange,dashboardSwitchView} = require(join(tmp,'dashboardView.js'))
  const {withManagementDemo} = require(join(tmp,'managementDemo.js'))
  const filters={mode:'current',start:'2026-09-01',end:'2026-09-01',owner:[],userType:'正式用户'}
@@ -63,6 +63,29 @@ try {
  assert.deepEqual(switched.getAll('cc'),['cc-a','cc-b'])
  assert.equal(switched.get('start'),'')
  assert.equal(dashboardSwitchView(switched,'cohort').get('start'),'2026-09-01')
+ // A single comparison table must preserve current-only and activity-only CCs.
+ const currentOnly=user('waiting',{salesOwner:'cc-current'})
+ const activityOnly=user('active',{salesOwner:'cc-activity'})
+ const mixed=user('mixed',{salesOwner:'cc-mixed'})
+ const comparison=followupComparisonRows(
+  {'待外呼':[currentOnly,mixed]},
+  {called:[activityOnly,mixed]},
+  [{date:'2026-09-03',metrics:{called:[activityOnly,mixed]}},{date:'2026-09-02',metrics:{called:[mixed]}}],
+  'cc',['待外呼'],['called'])
+ assert.equal(comparison.length,3,'union of current and period CCs is kept')
+ const waitingRow=comparison.find(row=>row.value==='cc-current')
+ assert.equal(waitingRow.metrics['待外呼'].length,1)
+ assert.equal(waitingRow.metrics.called.length,0)
+ assert.equal(waitingRow.children,undefined,'no invented activity for a current-only CC')
+ const activeRow=comparison.find(row=>row.value==='cc-activity')
+ assert.equal(activeRow.metrics['待外呼'].length,0)
+ assert.equal(activeRow.metrics.called.length,1)
+ const mixedRow=comparison.find(row=>row.value==='cc-mixed')
+ assert.equal(mixedRow.metrics.called.length,1,'parent count is a distinct-user count across dates')
+ assert.equal(mixedRow.children.length,2)
+ assert.deepEqual(mixedRow.children.map(row=>row.activityDate),['2026-09-03','2026-09-02'])
+ assert(mixedRow.children.every(row=>!Object.hasOwn(row.metrics,'待外呼')),'daily rows never repeat a current snapshot as historical data')
+ assert.equal(followupComparisonRows({'待外呼':[currentOnly,mixed]},{called:[activityOnly,mixed]},[],'age',['待外呼'],['called']).length,1,'alternate dimensions apply to both metric groups together')
  const migrated=withManagementDemo({students:[],accounts:[],orders:[],callRecords:[],lessons:[]},'2026-09-16T08:00:00Z')
  assert(migrated.lessons.some(l=>l.lessonType==='体验课'&&l.status==='已完课'))
  assert.equal(withManagementDemo(migrated),migrated,'one-time migration preserves edits')

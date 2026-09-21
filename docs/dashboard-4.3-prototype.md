@@ -12,3 +12,7 @@ Updated 2026-09-21. Demo data only; no production integration.
 - Existing synthetic fixtures gain separate trial lesson records and payment concern events once. Existing real records, edited reasons, subsequent deletions and unrelated browser storage are preserved.
 
 Validation: `npm run test:dashboard` runs legacy regression checks plus `scripts/test-dashboard43.cjs`; `npm run build` type-checks and builds. Browser checks are recorded separately in the delivery notes; build success alone is not proof of browser interaction verification.
+
+## Unified follow-up comparison tables
+
+Calling and Sales follow-up each use one table and one raw download entry. Two grouped headers distinguish current workload from activity in the selected period. A single grouping control applies to both groups of columns. The default row is current CC; expanding it shows daily activity. Daily rows display a dash for current workload, rather than fabricating historical snapshots. Daily payment amounts/AOV use only payments on that date. Parent and total user counts remain independently deduplicated across dates. Downloads include current snapshot, period users and raw evidence as separate sheets in the same workbook.

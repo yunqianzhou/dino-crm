@@ -137,3 +137,7 @@
 @media(max-width:1100px){.dashboard-funnel-layout{grid-template-columns:1fr}.dashboard-l2s-panel{flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:flex-start;padding:14px 20px;gap:16px}.dashboard-l2s-panel small{margin:0}.dashboard-l2s-panel strong{font-size:28px}}
 @media(max-width:760px){.dashboard-questions{grid-template-columns:repeat(3,minmax(0,1fr))}.dashboard-questions span{display:none}.dashboard-funnel-bars{grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.dashboard-funnel-track{height:72px}.dashboard-funnel-label{min-height:48px}.dashboard-funnel-step>.dashboard-count{font-size:25px}.dashboard-funnel-card .ant-card-head-wrapper{flex-wrap:wrap;gap:10px;padding-block:12px}.dashboard-funnel-card .ant-card-head-title{white-space:normal}.dashboard-reasons-inline{padding:14px}.dashboard-inventory-row{gap:12px 20px}.dashboard-block-heading .dashboard-section-note{margin-top:8px}.dashboard-funnel-layout{gap:20px}}
 @media(prefers-reduced-motion:reduce){.dashboard-funnel-track>div{transition:none}}
+.dashboard-snapshot-heading,.dashboard-period-heading{display:inline-flex;align-items:baseline;flex-wrap:wrap;gap:10px}
+.dashboard-snapshot-heading small,.dashboard-period-heading small{font-size:11px;font-weight:400;color:#7b889b}
+.dashboard-period-heading{color:#315f9d}
+.dashboard-not-applicable{color:#a5adba}

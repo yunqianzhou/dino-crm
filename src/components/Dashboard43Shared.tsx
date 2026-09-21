@@ -8,7 +8,7 @@ import { usePerm } from '../perm'
 import { useStore } from '../store'
 import type { Order, Student } from '../types'
 import { dashboardListScope, dashboardMetricDestination } from '../dashboardNavigation'
-import { dashboardPaymentSummary } from '../dashboardData'
+import { dashboardPaymentSummary, inVietnamRange } from '../dashboardData'
 import { dashboardMoneyValue, dashboardNumberCompare } from '../dashboardSort'
 import { l2s, type PeopleMetrics } from '../dashboard43'
 import DashboardMoneyCell from './DashboardMoneyCell'
@@ -34,22 +34,31 @@ export function useDashboard43() {
  return { text, label, ownerName, open, count, reason, can }
 }
 export const rateText = (value: number | null) => value === null ? '—' : `${Number(value.toFixed(1))}%`
-export type MetricRow43 = { id: string; name: string; metrics: PeopleMetrics; children?: MetricRow43[] }
-export function MetricTable43({ rows, total, keys, firstTitle, context, conversion = false, orders, labels = {} }: { rows: MetricRow43[]; total: PeopleMetrics; keys: readonly string[]; firstTitle: string; context: string; conversion?: boolean; orders?: Order[]; labels?: Record<string,string> }) {
+export type MetricRow43 = { id: string; name: string; metrics: PeopleMetrics; activityDate?: string; scopeName?: string; children?: MetricRow43[] }
+export function MetricTable43({ rows, total, keys, firstTitle, context, conversion = false, orders, labels = {}, currentKeys }: { rows: MetricRow43[]; total: PeopleMetrics; keys: readonly string[]; firstTitle: string; context: string; conversion?: boolean; orders?: Order[]; labels?: Record<string,string>; currentKeys?: readonly string[] }) {
  const { text, label, count } = useDashboard43()
  const [sortBy, setSortBy] = useState<'amount' | 'averagePerOrder'>('amount')
  const [currency, setCurrency] = useState('VND')
  const currencies = dashboardPaymentSummary(orders || []).map(s => s.currency)
  const selectedCurrency = currencies.includes(currency) ? currency : currencies[0] || 'VND'
- const rowOrders = (metrics: PeopleMetrics) => { const ids = new Set((metrics.leads || metrics.paid || []).map(s => s.studentId)); return (orders || []).filter(o => ids.has(o.studentId)) }
+ const rowOrders = (metrics: PeopleMetrics, date?: string) => { const ids = new Set((metrics.leads || metrics.paid || []).map(s => s.studentId)); return (orders || []).filter(o => ids.has(o.studentId) && (!date || inVietnamRange(o.paidTime,date,date))) }
  const metricLabel = (key:string) => labels[key] || label(key)
- const numeric = (metrics: PeopleMetrics, key: string, name = '') => count(metrics[key] || [], `${context} · ${name} · ${metricLabel(key)}`, key)
+ const numeric = (metrics: PeopleMetrics, key: string, name = '', date?: string) => date && currentKeys?.includes(key) ? <span className="dashboard-not-applicable" title={text('当前快照不按历史日期重复展示','Current snapshot is not repeated for historical dates')}>—</span> : count(metrics[key] || [], `${currentKeys?.includes(key) ? text('当前待处理 · 截至当前','Current workload · as of now') : date ? text('活动日期','Activity date') + ': ' + date : context} · ${name} · ${metricLabel(key)}`, key)
  const moneyTitle = <div className="dashboard-money-header"><span>{text('实付金额 / AOV','Amount paid / AOV')}</span><div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}><Select aria-label={text('金额排序依据','Money sort metric')} size="small" value={sortBy} onChange={setSortBy} options={[{ value:'amount', label:text('按金额','By revenue') },{value:'averagePerOrder',label:text('按 AOV','By AOV')}]} />{currencies.length > 1 && <Select size="small" aria-label={text('排序币种','Sort currency')} value={selectedCurrency} onChange={setCurrency} options={currencies.map(value => ({ value, label:value }))} />}</div></div>
+ const metricColumns = (selectedKeys: readonly string[]) => selectedKeys.map(key => ({
+  title:metricLabel(key), key, width:135,
+  sorter:(a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(a.activityDate && currentKeys?.includes(key) ? null : a.metrics[key]?.length || 0,b.activityDate && currentKeys?.includes(key) ? null : b.metrics[key]?.length || 0,order),
+  render:(_:unknown,row:MetricRow43) => numeric(row.metrics,key,row.scopeName || row.name,row.activityDate),
+ }))
+ const moneyColumns = orders ? [{title:moneyTitle,key:'money',width:210,sorter:(a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(dashboardMoneyValue(rowOrders(a.metrics,a.activityDate),selectedCurrency,sortBy),dashboardMoneyValue(rowOrders(b.metrics,b.activityDate),selectedCurrency,sortBy),order),render:(_:unknown,row:MetricRow43) => <DashboardMoneyCell orders={rowOrders(row.metrics,row.activityDate)} />}] : []
  return <Table<MetricRow43> rowKey="id" size="middle" sticky={{ offsetHeader: 94 }} dataSource={rows} pagination={rows.length > 12 ? { pageSize:12,showSizeChanger:false } : false} scroll={{x:190 + keys.length * 135 + (conversion ? 135 : 0) + (orders ? 210 : 0)}} locale={{emptyText:<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={text('当前范围暂无数据','No data in this scope')} />}} columns={[
   {title:firstTitle,dataIndex:'name',fixed:'left',width:190},
-  ...keys.map(key => ({title:metricLabel(key),key,width:135,sorter:(a:MetricRow43,b:MetricRow43) => (a.metrics[key]?.length || 0)-(b.metrics[key]?.length || 0),render:(_:unknown,row:MetricRow43) => numeric(row.metrics,key,row.name)})),
+  ...(currentKeys ? [
+   {title:<span className="dashboard-snapshot-heading">{text('当前待处理','Current workload')}<small>{text('截至当前','As of now')}</small></span>,key:'current',children:metricColumns(currentKeys)},
+   {title:<span className="dashboard-period-heading">{text('所选期间','Selected period')}<small>{context}</small></span>,key:'period',children:[...metricColumns(keys.filter(key=>!currentKeys.includes(key))),...moneyColumns]},
+  ] : metricColumns(keys)),
   ...(conversion ? [{title:'L2S',key:'l2s',width:130,sorter:(a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(l2s(a.metrics),l2s(b.metrics),order),render:(_:unknown,row:MetricRow43) => rateText(l2s(row.metrics))}] : []),
-  ...(orders ? [{title:moneyTitle,key:'money',width:210,sorter:(a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(dashboardMoneyValue(rowOrders(a.metrics),selectedCurrency,sortBy),dashboardMoneyValue(rowOrders(b.metrics),selectedCurrency,sortBy),order),render:(_:unknown,row:MetricRow43) => <DashboardMoneyCell orders={rowOrders(row.metrics)} />}]:[]),
+  ...(!currentKeys ? moneyColumns : []),
  ]} summary={() => <Table.Summary fixed="top"><Table.Summary.Row><Table.Summary.Cell index={0}>{text('合计（去重）','Total (unique users)')}</Table.Summary.Cell>{keys.map((key,i) => <Table.Summary.Cell index={i+1} key={key}>{numeric(total,key)}</Table.Summary.Cell>)}{conversion && <Table.Summary.Cell index={keys.length+1}>{rateText(l2s(total))}</Table.Summary.Cell>}{orders && <Table.Summary.Cell index={keys.length+1+(conversion?1:0)}><DashboardMoneyCell orders={rowOrders(total)} /></Table.Summary.Cell>}</Table.Summary.Row></Table.Summary>} />
 }
 export type ExportSheet43 = { name: string; headers: string[]; rows: unknown[][] }
