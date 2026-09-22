@@ -136,7 +136,6 @@ export default function AppLayout() {
   ].filter(item => visible(item.key))
 
   const NAV = [
-    ...phase5Nav,
     ...topNav,
     ...salesNav,
     ...systemNav,
@@ -156,6 +155,7 @@ export default function AppLayout() {
       : []),
     ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: dashboardPhaseLabel(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
     ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: appABPhaseLabel(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
+    ...phase5Nav,
   ]
 
   const TITLES: Record<string, string> = {
