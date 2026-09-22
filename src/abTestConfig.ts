@@ -3,14 +3,14 @@ import type { PageDetails } from './abPageConfig'
 export type DevicePlatform = 'ios_app' | 'ios_pad' | 'android_app' | 'android_pad'
 export type Platform = 'iOS' | 'Android' | DevicePlatform
 export const devicePlatforms: {value:DevicePlatform;label:string}[] = [{value:'ios_app',label:'iOS 手机'},{value:'ios_pad',label:'iOS Pad'},{value:'android_app',label:'Android 手机'},{value:'android_pad',label:'Android Pad'}]
-export const platformLabel=(value:string)=>devicePlatforms.find(p=>p.value===value)?.label??(value==='iOS'?'iOS（旧配置，未区分设备）':value==='Android'?'Android（旧配置，未区分设备）':value)
+export const platformLabel=(value:string)=>devicePlatforms.find(p=>p.value===value)?.label??(value==='iOS'?'iOS':value==='Android'?'Android':value)
 export const expandPlatforms=(values:Platform[])=>[...new Set(values.flatMap(p=>p==='iOS'?['ios_app','ios_pad']:p==='Android'?['android_app','android_pad']:[p]))]
 export const platformOverlap=(a:Platform[],b:Platform[])=>expandPlatforms(a).some(p=>expandPlatforms(b).includes(p))
 export type VersionOperator = '>' | '>=' | '=' | '<' | '<='
 export type VersionCondition = { operator: VersionOperator; value: string }
 export type Target = { countries: string[]; platforms: Platform[]; versions: VersionCondition[] }
 export type PageCopy = { title: string; body: string; button: string; animation: 'static' | 'breathe' | 'shake' }
-export type Plan = { template: string; copy: Record<string, PageCopy>; translations: Record<string, Record<string, PageCopy>>; pages?: Record<string, PageDetails>; pageTranslations?: Record<string, Record<string, Record<string, string>>> }
+export type Plan = { baseLanguage?:string; template: string; copy: Record<string, PageCopy>; translations: Record<string, Record<string, PageCopy>>; pages?: Record<string, PageDetails>; pageTranslations?: Record<string, Record<string, Record<string, string>>> }
 export type OnlineConfig = { id: string; name: string; target: Target; plan: Plan; status: 'draft' | 'published' | 'retired'; revision: number; replacesId?: string; source?: string; updatedAt: string }
 export type Variant = { id: string; name: string; weight: number; control: boolean; plan: Plan }
 export type Experiment = { id: string; name: string; target: Target; traffic: number; variants: Variant[]; startMode: 'now' | 'scheduled'; startAt: string; endAt: string; status: 'draft' | 'enabled' | 'closed'; closedAt?: string; base: { id: string; name: string; revision: number; plan: Plan }; updatedAt: string }
@@ -27,10 +27,10 @@ export const countries = [
 export const languages = [{ value: 'zh', label: '中文（基础文案）' }, { value: 'en', label: 'English' }, { value: 'ar', label: 'العربية' }, { value: 'ko', label: '한국어' }, { value: 'vi', label: 'Tiếng Việt' }, { value: 'ms', label: 'Bahasa Melayu' }]
 export const templates = [
   { id: 'register-first', name: '先注册，再体验', badge: '方案 01', desc: '先建立账号，再完成资料与课程体验。', nodes: ['auth', 'name', 'age', 'level', 'goal', 'teacher', 'lesson', 'report', 'plan', 'paywall', 'home'] },
-  { id: 'experience-first', name: '先体验，支付后注册', badge: '方案 02', desc: '游客先体验课程，购买页结束后衔接注册。', nodes: ['value', 'name', 'age', 'level', 'goal', 'teacher', 'lesson', 'report', 'plan', 'paywall', 'auth', 'home'] },
-  { id: 'double-paywall', name: '课前和课后各一次购买页', badge: '方案 03', desc: '两处购买页独立配置，点击购买时先登录。', nodes: ['value', 'name', 'age', 'level', 'goal', 'plan', 'paywall-before', 'teacher', 'lesson', 'report', 'paywall-after', 'auth', 'home'] },
+  { id: 'experience-first', name: '先体验，支付后注册', badge: '方案 02', desc: '游客先体验课程，购买后须完成注册登录；最终关闭后可进入首页。', nodes: ['value', 'name', 'age', 'level', 'goal', 'teacher', 'lesson', 'report', 'plan', 'paywall', 'home'] },
+  { id: 'double-paywall', name: '课前和课后各一次购买页', badge: '方案 03', desc: '两处购买页独立配置，购买成功后须完成注册登录。', nodes: ['value', 'name', 'age', 'level', 'goal', 'plan', 'paywall-before', 'teacher', 'lesson', 'report', 'paywall-after', 'home'] },
 ]
-export const labels: Record<string, string> = { value: '首启价值页', auth: '注册登录', name: '孩子称呼', age: '孩子年龄', level: '英语水平', goal: '学习目标', teacher: '选老师', lesson: '体验课', report: '完课报告', plan: '学习计划', paywall: '主购买页', 'paywall-before': '课前购买页', 'paywall-after': '课后购买页', home: '首页', 'retention-promo': '挽留支付 · Promo', 'retention-regular': '挽留支付 · 普通' }
+export const labels: Record<string, string> = { value: '首启价值页', auth: '前置注册登录', 'auth-after':'后置注册登录', name: '孩子称呼', age: '孩子年龄', level: '英语水平', goal: '学习目标', teacher: '选老师', lesson: '体验课', report: '完课报告', plan: '学习计划', paywall: '主购买页', 'paywall-before': '课前购买页', 'paywall-after': '课后购买页', home: '首页', 'retention-promo': '挽留支付 · Promo', 'retention-regular': '挽留支付 · 普通' }
 const defaults: Record<string, Omit<PageCopy, 'animation'>> = {
   value: { title: '让孩子自信开口说英语', body: '和 Dino 一起，在有趣的互动中开启英语学习之旅。', button: '我是新用户' },
   auth: { title: '开启孩子的英语成长之旅', body: '每一次开口，都是成长的一小步。', button: '继续注册 / 登录' },

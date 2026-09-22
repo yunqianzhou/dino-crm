@@ -31,7 +31,7 @@ export function defaultPageDetails(node: string, copy?: PageCopy): PageDetails {
  return d
 }
 export function pageDetails(plan: Plan, node: string): PageDetails { return plan.pages?.[node] ?? defaultPageDetails(node, plan.copy[node]) }
-export function previewVariables(text: string, nickname: string, level: string): string { return text.split('{nickname}').join(nickname).split('{昵称}').join(nickname).split('{当前定级}').join(level) }
+export function previewVariables(text: string, nickname: string, level: string): string { return text.split('{nickname}').join(nickname).split('{昵称}').join(nickname).split('{当前定级}').join(level).split('{level}').join(level) }
 export function validAssetSource(src: string): boolean { return /^asset:[\w-]+$/.test(src) || /^https:\/\//i.test(src) && (() => { try { const u = new URL(src); return Boolean(u.hostname) && !u.username && !u.password } catch { return false } })() }
 export function demoProducts(target: Target) {
  const countries = target.countries.includes('*') ? ['SA', 'MY', 'US'] : target.countries

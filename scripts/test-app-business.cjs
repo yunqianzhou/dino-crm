@@ -7,6 +7,7 @@ const dir=mkdtempSync(join(tmpdir(),'app-business-'))
 try {
  execFileSync(resolve('node_modules/.bin/tsc'),['src/appBusinessConfig.ts','--outDir',dir,'--module','commonjs','--moduleResolution','node','--target','ES2020','--skipLibCheck'],{stdio:'inherit'})
  const b=require(join(dir,'appBusinessConfig.js')),m=require(join(dir,'appConfigModel.js')),old=require(join(dir,'abTestConfig.js'))
+ function translate(plan){for(const slot of b.planSlots(plan)){const c=plan.contents[slot.id];if(!c)continue;for(const [key,text]of m.changedTexts(slot,c)){for(const lang of m.translationLanguages){c.pageTranslations??={};c.pageTranslations[lang]??={};c.pageTranslations[lang][slot.node]??={};c.pageTranslations[lang][slot.node][key]=`${lang}: ${text}`;}c.translationSource={...c.translationSource,[key]:text};}}}
  let s=m.seedAppStore(),base=b.workspace(s).online[0]
  assert.equal(b.workspace(s).online.length,1,'Group existing page releases into one business plan')
  assert.equal(base.releaseIds.length,4)
@@ -18,6 +19,7 @@ try {
  assert.equal(s.releases.filter(r=>r.status==='ACTIVE').length,4,'Saving a draft must not affect live content')
  assert.notEqual(JSON.stringify(b.workspace(s).drafts[0].plan),JSON.stringify(base.plan))
  assert.deepEqual(JSON.parse(original).versions,s.versions,'Drafts must not publish implicit config versions')
+ translate(draft.plan)
  s=b.publishOnline(s,draft,'Editor')
  base=b.workspace(s).online[0]
  assert.equal(b.workspace(s).drafts.length,0)
@@ -37,6 +39,7 @@ try {
  const before=s.versions.filter(v=>expVersions.includes(v.id))
  const edit={...old.clone(base),status:'DRAFT',replaceId:base.id}
  edit.plan.contents['app.login.slideshow'].details.lists.slides[0].label='Later online change'
+ translate(edit.plan)
  s=b.publishOnline(s,edit,'Editor')
  assert.equal(JSON.stringify(s.experiments[0].groups),fixed,'Online updates cannot change fixed experiment bindings')
  assert.deepEqual(s.versions.filter(v=>expVersions.includes(v.id)),before)
@@ -50,7 +53,7 @@ try {
  assert.throws(()=>b.publishOnline(s,duplicate,'Editor'),/重叠/)
  assert.equal(JSON.stringify(s),saved,'Failed publication must not partially publish')
  const badPage=old.clone(edit);badPage.plan.contents['app.login.slideshow'].details.lists.slides[0].label=''
- assert.throws(()=>b.publishOnline(s,badPage,'Editor'),/标题/)
+ assert.deepEqual(b.planErrors(badPage.plan),[],'Clearing a permitted title hides it')
  const historical=b.workspace(s).history.find(h=>h.action==='发布更新').snapshot
  assert.notEqual(historical.value.plan.contents['app.login.slideshow'].details.lists.slides[0].label,'Later online change','Historical snapshots remain immutable')
  // Version targeting is independent from the content compatibility floor.

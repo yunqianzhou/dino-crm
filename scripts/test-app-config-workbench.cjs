@@ -22,12 +22,12 @@ try {
  assert.equal(v2.content.details.lists.slides[0].label,'New title')
  assert.notEqual(v1.content.details.lists.slides[0].label,'New title')
  assert.equal(v2.protocol.config.items[0].title_i18n_key.startsWith(`${first.id}.v2.`),true)
- assert.equal(v2.protocol.dictionary.zh[v2.protocol.config.items[0].title_i18n_key],'New title')
+ assert.equal(v2.protocol.dictionary.en[v2.protocol.config.items[0].title_i18n_key],'New title')
  assert.throws(()=>m.saveVersion(s,{...first,kind:'EXPERIMENT'},changed,'1.8.0','X',''),/不可修改/)
  const demoDef={...old.clone(first),id:old.makeId(),name:'Experiment copy',kind:'EXPERIMENT'}
  s=m.saveVersion(s,demoDef,old.clone(v1.content),'1.8.0','X','Experimental version')
  const expVersion=m.latestVersion(s,demoDef.id)
- const exp={id:old.makeId(),name:'Binding test',audience:m.audience(),minVersion:'1.8.0',status:'DRAFT',groups:[{id:'a',name:'A',weight:5000,control:true,bindings:[]},{id:'b',name:'B',weight:5000,control:false,bindings:[{definitionId:demoDef.id,versionId:expVersion.id}]}],startedAt:'',endedAt:'',salt:'test'}
+ const exp={traffic:2000,scheduledStartAt:new Date().toISOString(),scheduledEndAt:new Date(Date.now()+86400000).toISOString(),testPages:['auth'],id:old.makeId(),name:'Binding test',audience:m.audience(),minVersion:'1.8.0',status:'DRAFT',groups:[{id:'a',name:'A',weight:5000,control:true,bindings:[{definitionId:demoDef.id,versionId:expVersion.id}]},{id:'b',name:'B',weight:5000,control:false,bindings:[{definitionId:demoDef.id,versionId:expVersion.id}]}],startedAt:'',endedAt:'',salt:'test'}
  assert.deepEqual(m.validateExperiment(s,exp),[])
  s=m.saveExperimentDraft(s,exp,'X')
  assert.equal(m.relatedExperiments(s,demoDef.id).length,1)
@@ -64,7 +64,7 @@ try {
  const wire=m.serializeContent(flow,flowContent,'flow').config
  assert(wire.steps.some(x=>x.page_sub_key==='app.onboarding.name'))
  assert.equal(wire.steps.filter(x=>x.page_key==='app.paywall_main').length,2)
- flowContent.steps[0]='home';assert(m.validateContent(flow,flowContent).length)
+ flowContent.flow.nodes[0].page='home';assert(m.validateContent(flow,flowContent).length)
  const guide=m.getSlot('app.onboarding.name.dino_guide'),guideContent=m.initialContent(guide)
  guideContent.details.settings.showGuide=false
  const guideWire=m.serializeContent(guide,guideContent,'guide').config
