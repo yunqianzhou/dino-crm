@@ -9,7 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test:dashboard": "node scripts/test-dashboard.cjs",
-    "test:ab-config": "node scripts/test-ab-config.cjs && node scripts/test-app-config-workbench.cjs && node scripts/test-app-business.cjs && node scripts/test-app-flow.cjs"
+    "test:ab-config": "node scripts/test-ab-config.cjs && node scripts/test-app-config-workbench.cjs && node scripts/test-app-business.cjs && node scripts/test-app-flow.cjs && node scripts/test-app-trial-lesson.cjs"
   },
   "dependencies": {
     "@ant-design/icons": "^5.5.1",

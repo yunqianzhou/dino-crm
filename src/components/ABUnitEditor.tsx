@@ -1,3 +1,4 @@
+import ABTrialLessonEditor from './ABTrialLessonEditor'
 import { useState } from 'react'
 import { Alert, Select, Space, Typography } from 'antd'
 import { contentPlan, extractContent, defaultMembers } from '../appConfigModel'
@@ -11,6 +12,7 @@ import ABFlowEditor from './ABFlowEditor'
 import { makeFlow, flowStandard } from '../appFlowConfig'
 export default function ABUnitEditor({slot,content,onChange,readOnly=false,target}:{slot:Slot;content:UnitContent;onChange:(c:UnitContent)=>void;readOnly?:boolean;target:Target}){
  const [language,setLanguage]=useState(content.baseLanguage??'zh')
+ if(slot.section==='lesson')return <ABTrialLessonEditor content={content} target={target} readOnly={readOnly} onChange={onChange}/>
  if(slot.flow&&readOnly&&!content.flow)return <><Alert type="info" message="历史版本仅保存页面顺序，未包含支付分支配置。"/><ol>{(content.steps??[]).map((page,i)=><li key={`${i}-${page}`}>{labels[page]??page}</li>)}</ol></>
  if(slot.flow)return <ABFlowEditor value={content.flow??makeFlow(content.steps??[],flowStandard(slot.id))} readOnly={readOnly} onChange={flow=>onChange({...content,flow,steps:flow.nodes.map(n=>n.page)})}/>
  const translated=content.pageTranslations?.[language]?.[slot.node]??{}
