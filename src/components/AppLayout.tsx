@@ -81,7 +81,7 @@ export default function AppLayout() {
   const phase2Label = (text: string) => phaseLabel(text, t('app.phase2'), 'orange')
   const phase3Label = (text: string) => phaseLabel(text, t('app.phase3'), 'purple')
   const phase4Label = (text: string) => phaseLabel(text, '四期', 'cyan')
-  const dashboardPhaseLabel = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 4.3' : '4.3期', 'green')
+  const dashboardPhaseLabel = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'geekblue')
 
   const appABPhaseLabel = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'geekblue')
 

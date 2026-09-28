@@ -66,7 +66,7 @@ try {
   const edited = { ...demo.students[0], name: 'Existing user edit' }
   const existing = { students: [edited, user('existing')], accounts: [], orders: [], callRecords: [], lessons: [] }
   const migrated = withManagementDemo(existing, '2026-09-16T08:00:00Z')
-  assert.equal(migrated.students.length, 205)
+  assert.equal(migrated.students.length, 229)
   assert.equal(migrated.students[0].name, 'Existing user edit')
   assert(migrated.students.some(s => s.studentId === 'existing'))
   assert.equal(withManagementDemo(migrated, '2026-10-16T08:00:00Z'), migrated, 'reload must not replace dates or edits')
@@ -132,7 +132,7 @@ try {
   assert.equal(dashboardReasonRows([crmNoShow], [], [], { ...filters, mode: 'period' }, 'noShow')[0].users.length, 1)
   const oldDemo = { ...demo, students: demo.students.map(s => ({ ...s, salesLifecycleEvents: s.salesLifecycleEvents?.map(e => ({ ...e, reason: undefined })) })) }
   const enriched = withManagementDemo(oldDemo)
-  assert.equal(enriched.students.length, oldDemo.students.length)
+  assert.equal(enriched.students.length, oldDemo.students.length + 24)
   assert(enriched.students.flatMap(s => s.salesLifecycleEvents || []).some(e => e.reason))
   assert.equal(withManagementDemo(enriched), enriched)
   // Payment evidence comes from orders, independent of the profile flag and funnel history.

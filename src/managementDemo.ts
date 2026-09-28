@@ -133,6 +133,10 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
 
 /** One-time additive migration: preserve existing users, edits, deletes and dates. */
 export function withManagementDemo<T extends DemoState>(state: T, now?: string): T {
+  return withDashboard5OutcomeDemo(withBaseManagementDemo(state, now), now)
+}
+
+function withBaseManagementDemo<T extends DemoState>(state: T, now?: string): T {
   if (state.demoDatasets?.includes(DATASET)) return withDashboard43Demo(withReasonDemo(state))
   const demo = createManagementDemo(now)
   const append = <R,>(existing: R[], additions: R[], id: (row: R) => string) => {
@@ -147,6 +151,68 @@ export function withManagementDemo<T extends DemoState>(state: T, now?: string):
     lessons: append(state.lessons, demo.lessons, l => l.id),
     demoDatasets: [...(state.demoDatasets ?? []), DATASET],
   }))
+}
+
+/** Add explicit v5 outcomes once, including reasons and coherent call/appointment history. */
+function withDashboard5OutcomeDemo<T extends DemoState>(state: T, now = dayjs.utc().toISOString()): T {
+  const marker = 'management-vietnam-outcomes-v5-v1'
+  if (state.demoDatasets?.includes(marker)) return state
+  const base = dayjs.utc(now).startOf('day')
+  const fmt = (date: dayjs.Dayjs) => date.format('YYYY-MM-DD HH:mm:ss')
+  const owners = state.accounts.filter(a => /^management-demo-cc-\d+$/.test(a.id) && a.status === '启用')
+  const reasons = {
+    rejected: ['无需求', '无需求', '无需求', '家长拒绝接听电话', '家长拒绝接听电话', '家长拒绝接听电话', '号码错误', '号码错误', '稍后回电', '稍后回电', '低于4岁', '超过13岁／成人'],
+    closed: ['费用高', '费用高', '费用高', '费用高', '课程不适合孩子', '课程不适合孩子', '课程不适合孩子', '设备问题', '设备问题', '支付方式问题', '孩子不喜欢', '其他：家庭安排调整（演示）'],
+  }
+  const students: Student[] = []
+  const calls: CallRecord[] = []
+  for (const stage of ['rejected', 'closed'] as const) reasons[stage].forEach((reason, i) => {
+    const id = `management-v5-${stage}-${String(i + 1).padStart(2, '0')}`
+    // Do not overwrite an existing fixture that has been edited or reactivated.
+    if (state.students.some(s => s.studentId === id)) return
+    const owner = owners.length ? owners[(i + (stage === 'closed' ? 2 : 0)) % owners.length] : undefined
+    const reportedBy = owner?.email || '系统 / System'
+    const result = stage === 'rejected' ? '已拒绝' : '已关闭'
+    const ended = base.subtract(1 + i % 6, 'day').add(5 + i % 3, 'hour')
+    const registered = ended.subtract(3, 'day')
+    const called = registered.add(1, 'day')
+    const booked = called.add(1, 'hour')
+    const attended = ended.subtract(1, 'hour')
+    const appointmentId = `${id}-appointment`
+    const note = `五期演示：${stage === 'rejected' ? '已拒绝' : '已结束'} · ${reason} / Synthetic demo`
+    const student: Student = {
+      studentId: id, name: `演示 · ${stage === 'rejected' ? '已拒绝' : '已结束'} ${String(i + 1).padStart(2, '0')}`,
+      userType: '正式用户', loginMethod: 'AppID', account: `${id}@example.invalid`,
+      phone: `+840009${stage === 'rejected' ? '1' : '2'}${String(i + 1).padStart(3, '0')}`,
+      countryCode: '+84', businessLine: '越南', country: '越南', registerChannel: '演示 / Demo', channelCode: '',
+      registerTime: fmt(registered), status: '未付费-未体验', paymentStatusStr: '未付费', ageGroup: '6-8', courseLevel: 'L1',
+      salesOwner: owner?.email, salesProgress: owner ? '跟进中' : '待领取', purchaseIntention: '无意向',
+      salesLifecycleStatus: stage === 'closed' ? '已关闭' : '进行中', salesOutcome5: { stage, reason },
+      salesUpdatedAt: fmt(ended), salesLatestNote: note, salesAppointments: [], salesLifecycleEvents: [],
+      salesHistory: [{ progress: owner ? '跟进中' : '待领取', note, time: fmt(ended), owner: reportedBy }],
+    }
+    const call: CallRecord = { id: `${id}-call`, studentId: id, customer: student.name, phone: student.phone!, businessLine: '越南',
+      result: reason === '号码错误' ? '无人接听' : '已接通', duration: reason === '号码错误' ? '—' : '02:15',
+      note: '五期模拟通话 / Synthetic phase 5 call', agent: reportedBy, time: fmt(called) }
+    const event = (node: SalesLifecycleEvent['node'], eventResult: string, at: dayjs.Dayjs, reason?: string, appointmentId?: string) => {
+      student.salesLifecycleEvents!.unshift({ eventId: `${id}-event-${student.salesLifecycleEvents!.length}`, node, result: eventResult,
+        occurredAt: fmt(at), reportedAt: fmt(at), reportedBy, source: 'CC手动', reason, appointmentId, description: '五期演示 / Synthetic phase 5 demo' })
+    }
+    event('outbound', call.result, called)
+    if (stage === 'closed') {
+      student.salesAppointments = [{ appointmentId, scheduledStartAt: attended.utcOffset(420).format('YYYY-MM-DD HH:mm:ss'),
+        timezone: 'Asia/Ho_Chi_Minh', appointmentStatus: '已预约', attendanceStatus: '已出勤', consultationStatus: '已完成',
+        createdAt: fmt(booked), createdBy: reportedBy, updatedAt: fmt(ended), updatedBy: reportedBy, note: '五期演示咨询 / Synthetic consultation' }]
+      event('appointment', '已预约', booked, undefined, appointmentId)
+      event('attendance', '已出勤', attended, undefined, appointmentId)
+      event('consultation', '咨询完成', ended.subtract(15, 'minute'), undefined, appointmentId)
+    }
+    event('lead', result, ended, reason)
+    students.push(student)
+    if (!state.callRecords.some(c => c.id === call.id)) calls.push(call)
+  })
+  return { ...state, students: [...state.students, ...students], callRecords: [...state.callRecords, ...calls],
+    demoDatasets: [...(state.demoDatasets || []), marker] }
 }
 
 /** Enrich only original synthetic events. Existing reasons and customer records are untouched. */

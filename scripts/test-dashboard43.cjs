@@ -148,6 +148,26 @@ try {
  assert.equal(datePaid[0].children[0].activityDate,'2026-09-03','payment date remains attached when grouping date then CC')
  assert.equal(datePaid[0].children[0].metrics.paid[0].studentId,'mixed')
  const migrated=withManagementDemo({students:[],accounts:[],orders:[],callRecords:[],lessons:[]},'2026-09-16T08:00:00Z')
+ const outcomeDemo=migrated.students.filter(s=>s.studentId.startsWith('management-v5-'))
+ assert.equal(outcomeDemo.length,24,'add 12 rejected and 12 closed synthetic users')
+ const demoMetrics=followupMetrics(outcomeDemo,migrated.callRecords,[],[],reasonFilters).current
+ assert.equal(demoMetrics['已拒绝'].length,12)
+ assert.equal(demoMetrics['已关闭'].length,12)
+ for (const stage of ['已拒绝','已关闭']) {
+  assert.equal(outcomeReasonGroups(demoMetrics[stage]).length,6,'six distinct reasons per outcome for distribution demos')
+  assert.equal(outcomeReasonGroups(demoMetrics[stage]).reduce((n,row)=>n+row.users.length,0),12)
+ }
+ assert(outcomeDemo.every(s=>s.account.endsWith('@example.invalid')&&s.salesOwner&&s.salesLatestNote.includes('演示')))
+ assert(demoMetrics['已拒绝'].every(s=>s.salesAppointments.length===0),'rejection stays before booking')
+ assert(demoMetrics['已关闭'].every(s=>s.salesAppointments.length===1&&s.salesAppointments[0].consultationStatus==='已完成'),'closure demos include completed consultation evidence')
+ assert(outcomeDemo.every(s=>s.salesLifecycleEvents[0].reason===s.salesOutcome5.reason),'latest event and current reason agree')
+ assert(outcomeDemo.every(s=>s.salesLifecycleEvents.every(e=>e.reportedAt>=s.registerTime&&e.reportedAt<'2026-09-16 08:00:00')),'demo history follows registration and is not in the future')
+ const afterOutcomeDelete={...migrated,students:migrated.students.filter(s=>s.studentId!==outcomeDemo[0].studentId)}
+ assert.equal(withManagementDemo(afterOutcomeDelete),afterOutcomeDelete,'do not recreate deleted outcome fixtures')
+ const legacyState={...migrated,students:migrated.students.filter(s=>!s.studentId.startsWith('management-v5-')),callRecords:migrated.callRecords.filter(c=>!c.id.startsWith('management-v5-')),demoDatasets:migrated.demoDatasets.filter(d=>d!=='management-vietnam-outcomes-v5-v1')}
+ const upgraded=withManagementDemo(legacyState,'2026-09-16T08:00:00Z')
+ assert.equal(upgraded.students.length,legacyState.students.length+24,'existing saved sessions receive the new demo once')
+ assert(legacyState.students.every((s,i)=>upgraded.students[i]===s),'existing users and edits are preserved')
  assert(migrated.lessons.some(l=>l.lessonType==='体验课'&&l.status==='已完课'))
  assert.equal(withManagementDemo(migrated),migrated,'one-time migration preserves edits')
  const deleted={...migrated,lessons:[]}
