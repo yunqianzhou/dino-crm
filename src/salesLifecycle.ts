@@ -25,6 +25,11 @@ export function followStage5(student: Student, calls: CallRecord[] = []) {
   return consultationStage(student, calls)
 }
 
+export function followReason5(student: Student) {
+  return student.salesOutcome5?.reason || (student.salesLifecycleStatus === '已关闭'
+    ? student.salesLifecycleEvents?.find(e => e.result === '已关闭')?.reason : undefined)
+}
+
 // P0 暂无会议状态自动回传：预约存在且尚未人工标记结果时，始终保持“已预约”。
 export function consultationStage(student: Student, callRecords: CallRecord[] = []) {
   if (student.salesLifecycleStatus === '已关闭') return '已关闭'

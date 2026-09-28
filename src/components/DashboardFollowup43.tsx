@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import DashboardOutcomeReasons43 from './DashboardOutcomeReasons43'
 import { Card, Radio, Space } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
@@ -58,8 +59,9 @@ export default function DashboardFollowup43(props:Props) {
     {exportSection(section)}
    </div>
    <MetricTable43 key={`${section}-${currentGroup}`} rows={comparisonRows(currentKeys,activityKeys)} total={{...metrics.current,...metrics.activity}} keys={[...currentKeys,...activityKeys]} currentKeys={currentKeys} labels={section==='followup'?followupLabels:undefined} firstTitle={`${groupLabel(currentGroup)} → ${section==='followup'?text('支付日期','Payment date'):text('活动日期','Activity date')}`} context={rangeLabel} orders={section==='followup'?dashboardPaymentOrders(orders,selected,filters):undefined}/>
-   {section==='calls'&&<p className="dashboard-help dashboard-bottom-note">{text('展开查看每日活动；日期行的“—”表示不重复展示当前状态。期间合计按用户去重，不等于每日人数相加。','Expand for daily activity. A dash on date rows means current status is not repeated. Period totals deduplicate users across days.')}</p>}
-   {section==='followup'&&<p className="dashboard-help dashboard-bottom-note">{text('当前状态包含已拒绝和已结束，沿用销售中心五期口径；已结束对应 Closed（已关闭）。重新激活后移出对应数量，活动日期不影响当前状态。已支付、金额 / AOV 按所选期间的支付日期统计。','Current states include Rejected and Closed, using Sales Center v5 rules. Reactivated leads leave these counts; activity dates do not affect current states. Paid users and amount / AOV use payment dates in the selected period.')}</p>}
+   {section==='calls'&&<p className="dashboard-help dashboard-bottom-note">{text('已拒绝按当前状态统计；展开查看每日活动，日期行的“—”表示不重复展示当前状态。期间合计按用户去重，不等于每日人数相加。','Rejected counts the current state. Expand for daily activity. A dash on date rows means current status is not repeated. Period totals deduplicate users across days.')}</p>}
+   {section==='followup'&&<p className="dashboard-help dashboard-bottom-note">{text('已结束沿用销售中心五期 Closed（已关闭）口径。重新激活后移出对应数量，活动日期不影响当前状态。已支付、金额 / AOV 按所选期间的支付日期统计。','Closed uses Sales Center v5 rules. Reactivated leads leave these counts; activity dates do not affect current states. Paid users and amount / AOV use payment dates in the selected period.')}</p>}
+   <DashboardOutcomeReasons43 users={metrics.current[section==='calls'?'已拒绝':'已关闭'] || []} metric={section==='calls'?'已拒绝':'已关闭'}/>
   </Card>
  }
  const [inventoryOpen,setInventoryOpen] = useState(false)

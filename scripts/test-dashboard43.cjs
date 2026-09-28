@@ -7,7 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard43-tests-'))
 try {
  execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboard43.ts', 'src/dashboardView.ts', 'src/managementDemo.ts', '--outDir',tmp,'--module','commonjs','--moduleResolution','node','--target','ES2020','--esModuleInterop','--skipLibCheck'],{stdio:'inherit'})
  symlinkSync(resolve('node_modules'),join(tmp,'node_modules'),'dir')
- const {cohortFunnel,followupMetrics,reasonEvidence,scheduledAppointments,l2s,scheduledInstant,followupComparisonRows} = require(join(tmp,'dashboard43.js'))
+ const {cohortFunnel,followupMetrics,reasonEvidence,scheduledAppointments,l2s,scheduledInstant,followupComparisonRows,outcomeReasonGroups,CURRENT_CALL_KEYS,CURRENT_FOLLOW_KEYS} = require(join(tmp,'dashboard43.js'))
  const {dashboardView,dashboardViewRange,dashboardSwitchView} = require(join(tmp,'dashboardView.js'))
  const {withManagementDemo} = require(join(tmp,'managementDemo.js'))
  const filters={mode:'current',start:'2026-09-01',end:'2026-09-01',owner:[],userType:'正式用户'}
@@ -65,6 +65,25 @@ try {
  assert.equal(outcomeGroups.find(r=>r.value==='cc-a').metrics['已拒绝'].length,1)
  assert.equal(outcomeGroups.find(r=>r.value==='cc-b').metrics['已关闭'].length,1)
  assert.equal(followupMetrics([],[],[],[],reasonFilters).current['已拒绝'].length,0)
+ assert(CURRENT_CALL_KEYS.includes('已拒绝') && !CURRENT_FOLLOW_KEYS.includes('已拒绝'),'rejection belongs to the calling module only')
+ assert(CURRENT_FOLLOW_KEYS.includes('已关闭') && !CURRENT_CALL_KEYS.includes('已关闭'),'closure belongs to the follow-up module only')
+ const reasonUsers=[
+  closed5,
+  user('closed-other-1',{salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'其他：搬家'}}),
+  user('closed-other-2',{salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'其他：没时间'}}),
+  user('closed-missing',{salesLifecycleStatus:'已关闭'}),
+  user('closed-legacy',{salesLifecycleStatus:'已关闭',salesLifecycleEvents:[event('latest','lead','已关闭',{reason:'费用高'}),event('old','lead','已关闭',{reason:'设备问题'})]}),
+  user('closed-current',{salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'费用高'},salesLifecycleEvents:[event('old','lead','已关闭',{reason:'设备问题'})]}),
+ ]
+ const reasonGroups=outcomeReasonGroups([...reasonUsers,closed5])
+ assert.equal(reasonGroups.reduce((n,g)=>n+g.users.length,0),reasonUsers.length,'each user has one reason, duplicates cannot inflate counts')
+ assert.equal(reasonGroups.find(g=>g.reason==='费用高').users.length,3,'use current outcome first, with Sales Center legacy fallback')
+ assert.equal(reasonGroups.find(g=>g.reason==='其他').users.length,2,'different Other notes share one distribution category')
+ assert.equal(reasonGroups.find(g=>g.reason==='__unknown__').users.length,1,'missing reason stays in the denominator')
+ assert.equal(reasonGroups.find(g=>g.reason==='费用高').share,50)
+ assert(Math.abs(reasonGroups.reduce((n,g)=>n+g.share,0)-100)<1e-9)
+ assert.deepEqual(outcomeReasonGroups([]),[],'empty distribution has no invalid percentage')
+ assert.deepEqual(outcomeReasonGroups(ownerOutcomes['已拒绝']).map(g=>g.reason),['无需求'],'reason distribution uses the exact CC-filtered status population')
  assert.equal(reasonEvidence([closed,rejected,consultationClosed],[],[],[],reasonFilters,'closedUnknown',false).length,1)
  assert.equal(reasonEvidence([closed,rejected,consultationClosed],[],[],[],reasonFilters,'rejected',true).length,1)
  assert.equal(reasonEvidence([closed,rejected,consultationClosed],[],[],[],reasonFilters,'closedAfter',false).length,1)

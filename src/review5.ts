@@ -52,11 +52,7 @@ export const CLOSED_REASONS5 = [
   ['App 故障／卡顿', 'App bug/lagging'], ['观望需求', 'Window demands'], ['只想上试听课', 'Just want to take the trial class'], ['其他', 'Others'],
 ] as const
 export const FOLLOW_STAGES5 = [...CONSULTATION_STAGES.filter(s => s !== '已关闭'), 'Rejected', 'Closed']
-export { followStage5 } from './salesLifecycle'
-export function followReason5(student: Student) {
-  return student.salesOutcome5?.reason || (student.salesLifecycleStatus === '已关闭'
-    ? student.salesLifecycleEvents?.find(e => e.result === '已关闭')?.reason : undefined)
-}
+export { followStage5, followReason5 } from './salesLifecycle'
 export function appointmentMatches5(student: Student, filter?: string, from?: string, to?: string) {
   const appointment = currentAppointment(student)
   if (filter === 'none' && appointment) return false
