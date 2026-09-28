@@ -27,7 +27,18 @@ export function withPhase5Members<T extends { accounts: Account[] }>(state: T): 
 export type AssignmentResult = { id: string; name: string; status: '成功' | '跳过' | '失败'; reason: string }
 export type AssignmentRequest = {
   records: Student[]; target: string; actor: string; source: '用户中心五期' | '销售中心五期'
-  scope: string[] | null; permitted: boolean; seeAllOwners: boolean; reason: string; now?: string
+  scope: string[] | null; permitted: boolean; seeAllOwners: boolean; reason: string; now?: string; batch?: boolean
+}
+
+export function batchAssignmentError(state: Pick<AppState, 'students' | 'channels'>, records: Student[]) {
+  if (!records.length) return '请选择需要分配的线索'
+  const current = new Map(state.students.map(student => [student.studentId, student]))
+  const beforeLines = new Set(records.map(student => businessLineOf(state.channels, student)))
+  const latest = records.map(student => current.get(student.studentId)).filter((student): student is Student => !!student)
+  const latestLines = new Set(latest.map(student => businessLineOf(state.channels, student)))
+  if (beforeLines.size > 1 || latestLines.size > 1) return '批量分配仅支持同一业务线，请筛选单一业务线后重新选择'
+  if (latest.some(student => !beforeLines.has(businessLineOf(state.channels, student)))) return '所选线索的业务线已变化，请刷新后重新选择'
+  return undefined
 }
 
 export function assignLeads(state: AppState, request: AssignmentRequest): { state: AppState; results: AssignmentResult[] } {
@@ -35,6 +46,12 @@ export function assignLeads(state: AppState, request: AssignmentRequest): { stat
   const target = state.accounts.find(account => account.email === request.target)
   const snapshot = new Map(request.records.map(record => [record.studentId, record]))
   const current = new Map(state.students.map(record => [record.studentId, record]))
+  if (request.source === '销售中心五期' && (request.batch || snapshot.size > 1)) {
+    const error = batchAssignmentError(state, request.records)
+    if (error) return { state, results: [...snapshot.values()].map(student => ({
+      id: student.studentId, name: student.localName || student.name, status: '失败', reason: error,
+    })) }
+  }
   const results: AssignmentResult[] = []
   const changed = new Map<string, Student>()
   for (const [id, before] of snapshot) {

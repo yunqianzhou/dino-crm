@@ -3,7 +3,7 @@ import SalesTimeFilter5 from '../components/SalesTimeFilter5'
 import MembershipModal5 from '../components/MembershipModal5'
 import { changeSalesPresence5, defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
 import LeadAssignmentModal from '../components/LeadAssignmentModal'
-import { assignLeads, canReceiveLead, isSalesMember } from '../phase5'
+import { assignLeads, batchAssignmentError, canReceiveLead, isSalesMember } from '../phase5'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -1113,8 +1113,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   )
 
   const batchBar = phase5 && canBatchAssign && <div className="phase5-batch-bar">
-    <Space><strong>已选择 {selectedIds.length} 条线索</strong><Text type="secondary">支持跨页勾选；切换筛选或页签后清空</Text></Space>
-    <Space><Button type="text" disabled={!selectedIds.length} onClick={() => setSelectedIds([])}>清空选择</Button><Button type="primary" icon={<SwapOutlined />} disabled={!selectedIds.length} onClick={() => setBatchRecords((tab === 'pool' ? poolData : followData).filter(student => selectedIds.includes(student.studentId)))}>批量分配</Button></Space>
+    <Space><strong>已选择 {selectedIds.length} 条线索</strong><Text type="secondary">仅支持同一业务线；支持跨页勾选，切换筛选或页签后清空</Text></Space>
+    <Space><Button type="text" disabled={!selectedIds.length} onClick={() => setSelectedIds([])}>清空选择</Button><Button type="primary" icon={<SwapOutlined />} disabled={!selectedIds.length} onClick={() => {
+      const records = (tab === 'pool' ? poolData : followData).filter(student => selectedIds.includes(student.studentId))
+      const error = batchAssignmentError({ students, channels }, records)
+      if (error) { message.warning(error); return }
+      setBatchRecords(records)
+    }}>批量分配</Button></Space>
   </div>
 
   return (

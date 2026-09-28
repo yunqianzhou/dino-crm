@@ -7,7 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-phase5-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/phase5.ts', 'src/phase5Orders.ts', 'src/review5.ts', 'src/salesReporting.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
-  const { assignLeads, canReceiveLead, withPhase5Members } = require(join(tmp, 'phase5.js'))
+  const { assignLeads, batchAssignmentError, canReceiveLead, withPhase5Members } = require(join(tmp, 'phase5.js'))
   const { matchesOrderFilters5, orderCreatedTime, orderTime5 } = require(join(tmp, 'phase5Orders.js'))
   const { changeSalesTimeKind5, changeSalesPresence5, defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
   const { matchesLocalDateRange } = require(join(tmp, 'salesReporting.js'))
@@ -25,9 +25,9 @@ try {
   assert.equal(marked.accounts[1].isSalesMember, false, 'never guess real sales membership from page access')
   const lead = { studentId: 'one', name: 'One', phone: '12345678', businessLine: '越南', status: '未付费-未体验', salesOwner: 'old@test.invalid', salesProgress: '暂不跟进', salesLatestNote: '用户下周有时间', salesHistory: [{ note: 'old history' }], salesAppointments: [{ appointmentId: 'original' }], salesLifecycleEvents: [{ eventId: 'original' }] }
   const state = { students: [lead, { ...lead, studentId: 'same', salesOwner: target.email }, { ...lead, studentId: 'paid', status: '付费' }, { ...lead, studentId: 'foreign', businessLine: '韩国' }], accounts: [target], roles, channels: [], lessons: [], logs: [] }
-  const request = { records: [...state.students, state.students[0]], target: target.email, actor: 'manager', source: '销售中心五期', scope: ['越南'], permitted: true, seeAllOwners: true, reason: '轮岗', now: '2026-09-20 09:00:00' }
+  const request = { records: [...state.students.slice(0, 3), state.students[0]], target: target.email, actor: 'manager', source: '销售中心五期', scope: ['越南'], permitted: true, seeAllOwners: true, reason: '轮岗', now: '2026-09-20 09:00:00' }
   const result = assignLeads(state, request)
-  assert.deepEqual(result.results.map(r => r.status), ['成功', '跳过', '失败', '失败'])
+  assert.deepEqual(result.results.map(r => r.status), ['成功', '跳过', '失败'])
   assert.equal(result.state.students[0].salesOwner, target.email)
   assert.equal(result.state.students[0].ccName, target.name)
   assert.equal(result.state.students[0].salesProgress, '暂不跟进')
@@ -47,6 +47,23 @@ try {
   assert.equal(transferredUsers.state.students[2].status, '付费', 'ownership transfer must not change paid status')
   assert.deepEqual(transferredUsers.state.students[2].salesAppointments, lead.salesAppointments)
   assert.deepEqual(transferredUsers.state.students[2].salesLifecycleEvents, lead.salesLifecycleEvents)
+  const allLineState = {...state, accounts:[{...target,businessLines:['越南','韩国']}]}
+  const mixedRequest = {...request, batch:true, scope:null, records:[lead,state.students[3]]}
+  assert(batchAssignmentError(allLineState,mixedRequest.records))
+  const mixed = assignLeads(allLineState,mixedRequest)
+  assert.deepEqual(mixed.results.map(r => r.status),['失败','失败'], 'mixed business lines are rejected even if target can receive both')
+  assert.strictEqual(mixed.state,allLineState, 'mixed selection must not update any owner, history, timer, or audit log')
+  assert.equal(batchAssignmentError(state,[lead,state.students[1]]),undefined)
+  assert.deepEqual(assignLeads(state,{...request,batch:true,records:[lead,state.students[1]]}).results.map(r=>r.status),['成功','跳过'])
+  assert.equal(assignLeads(state,{...request,records:[state.students[3]]}).results[0].status,'失败', 'single cross-scope record still fails permission validation')
+  const before = [lead,{...lead,studentId:'second'}]
+  const changedLineState = {...allLineState,students:[before[0],{...before[1],businessLine:'韩国'}]}
+  assert.strictEqual(assignLeads(changedLineState,{...mixedRequest,records:before}).state,changedLineState, 'recheck current business lines on submission')
+  const movedAllState = {...allLineState,students:before.map(s=>({...s,businessLine:'韩国'}))}
+  assert.strictEqual(assignLeads(movedAllState,{...mixedRequest,records:before}).state,movedAllState, 'do not silently assign after every selected lead moves to another line')
+  assert.equal(batchAssignmentError(state,[{...lead,country:'马来西亚'},{...lead,studentId:'same',country:'马来'}])?.includes('变化'),true)
+  const malaysiaState = {...state,students:[{...lead,country:'马来西亚'},{...lead,studentId:'same',country:'马来'}]}
+  assert.equal(batchAssignmentError(malaysiaState,malaysiaState.students),undefined, 'country aliases resolve to the same business line')
   const perms = {usersV2:'view', salesV3:'view', salesV3_config:'operate'}
   assert(canTransferUser5(key => perms[key] || 'none', target))
   for (const key of ['usersV2', 'salesV3', 'salesV3_config']) assert(!canTransferUser5(k => k === key ? 'none' : perms[k] || 'none', target), `${key} required`)
