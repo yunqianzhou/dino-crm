@@ -24,6 +24,7 @@ import {
   EditOutlined,
   PlusOutlined,
   SafetyOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { addLog, disableAccountAndReallocate, setState, uid, useStore } from '../store'
@@ -293,6 +294,21 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
     })),
   ]
   // ---------- 成员账号 ----------
+  const emptyAccountFilters = { keyword: '', roleId: undefined as string | undefined, status: undefined as Account['status'] | undefined }
+  const [accountDraft, setAccountDraft] = useState(emptyAccountFilters)
+  const [accountFilters, setAccountFilters] = useState(emptyAccountFilters)
+  const [accountPage, setAccountPage] = useState(1)
+  const [accountPageSize, setAccountPageSize] = useState(10)
+  const filteredAccounts = useMemo(() => {
+    const keyword = accountFilters.keyword.trim().toLocaleLowerCase()
+    return accounts.filter(a =>
+      (!keyword || a.email.toLocaleLowerCase().includes(keyword) || a.name.toLocaleLowerCase().includes(keyword)) &&
+      (!accountFilters.roleId || a.roleId === accountFilters.roleId) &&
+      (!accountFilters.status || a.status === accountFilters.status),
+    )
+  }, [accounts, accountFilters])
+  const searchAccounts = () => { setAccountFilters({ ...accountDraft }); setAccountPage(1) }
+  const resetAccountFilters = () => { setAccountDraft(emptyAccountFilters); setAccountFilters(emptyAccountFilters); setAccountPage(1) }
   const [accEditing, setAccEditing] = useState<Account | null>(null)
   const [accOpen, setAccOpen] = useState(false)
   const [form] = Form.useForm()
@@ -572,22 +588,28 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
             label: t('sys.tab.accounts'),
             children: (
               <div>
-                {canEditAcc && (
-                  <div style={{ marginBottom: 12, textAlign: 'right' }}>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openAcc()}>
-                      {t('sys.acc.add')}
-                    </Button>
-                  </div>
-                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                  <Space wrap size={12}>
+                    <Input allowClear prefix={<SearchOutlined style={{ color: '#9ca3af' }} />} style={{ width: 300, maxWidth: '100%' }} aria-label={lang === 'en' ? 'Search email or nickname' : '按邮箱 / 昵称搜索'} placeholder={lang === 'en' ? 'Search email / nickname' : '按邮箱 / 昵称搜索'} value={accountDraft.keyword} onChange={e => setAccountDraft(prev => ({ ...prev, keyword: e.target.value }))} onPressEnter={searchAccounts} />
+                    <Select allowClear showSearch optionFilterProp="label" style={{ width: 200 }} aria-label={lang === 'en' ? 'Filter by role' : '筛选角色'} placeholder={lang === 'en' ? 'All roles' : '全部角色'} value={accountDraft.roleId} onChange={roleId => setAccountDraft(prev => ({ ...prev, roleId }))} options={roles.map(role => ({ value: role.id, label: role.name }))} />
+                    <Select allowClear style={{ width: 160 }} aria-label={lang === 'en' ? 'Filter by status' : '筛选状态'} placeholder={lang === 'en' ? 'All statuses' : '全部状态'} value={accountDraft.status} onChange={status => setAccountDraft(prev => ({ ...prev, status }))} options={(['启用', '停用'] as const).map(status => ({ value: status, label: lang === 'en' ? (status === '启用' ? 'Enabled' : 'Disabled') : status }))} />
+                    <Button type="primary" icon={<SearchOutlined />} onClick={searchAccounts}>{lang === 'en' ? 'Search' : '搜索'}</Button>
+                    <Button onClick={resetAccountFilters}>{lang === 'en' ? 'Reset' : '重置'}</Button>
+                  </Space>
+                  {canAddAcc && <Button type="primary" icon={<PlusOutlined />} onClick={() => openAcc()}>{t('sys.acc.add')}</Button>}
+                </div>
                 <Table
                   rowKey="id"
                   columns={accColumns}
-                  dataSource={accounts}
+                  dataSource={filteredAccounts}
+                  locale={{ emptyText: lang === 'en' ? 'No matching members. Try different filters.' : '暂无匹配成员，请调整搜索条件' }}
                   scroll={{ x: 1200 }}
                   pagination={{
                     showTotal: (n) => t('common.total', { n }),
                     showSizeChanger: true,
-                    defaultPageSize: 10,
+                    current: Math.min(accountPage, Math.max(1, Math.ceil(filteredAccounts.length / accountPageSize))),
+                    pageSize: accountPageSize,
+                    onChange: (page, pageSize) => { setAccountPage(pageSize === accountPageSize ? page : 1); setAccountPageSize(pageSize) },
                     pageSizeOptions: ['10', '20', '50', '100']
                   }}
                 />
