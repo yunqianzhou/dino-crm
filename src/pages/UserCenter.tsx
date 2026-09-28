@@ -495,7 +495,7 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
   return (
     <Card className="page-card" bordered={false} title={<span className="section-title">{phase5 ? '用户列表' : t('user.titleV2')}</span>}>
       {phase3 && <DashboardLinkContext />}
-      {!dashboardScope && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={phase5 ? (en ? 'Authorized members can change the current CC for both paid and unpaid users. Both centers share the updated owner.' : '有销售中心及分配与掉库设置权限的成员，可调整已付费和未付费用户的 CC 归属；两个中心同步更新。') : t('user.funnelTip')} />}
+      {!phase5 && !dashboardScope && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={t('user.funnelTip')} />}
       <Space wrap style={{ marginBottom: 16 }}>
         <Input
           allowClear
