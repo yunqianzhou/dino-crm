@@ -342,7 +342,7 @@ try {
   assert.deepEqual(JSON.parse(JSON.stringify(clicked)), clicked, 'list scope survives browser history serialization')
   // Every people metric shares the routing rule across cards, rows and question tabs.
   for (const metric of [...COHORT_METRICS, ...Object.keys(demoCurrent), ...Object.keys(demoPeriod), 'assigned', 'unassigned', 'noShow', 'incomplete', 'paused', 'closed', '已拒绝']) {
-    assert.deepEqual(dashboardMetricDestination(metric), metric === 'paid' ? { path: '/users-v2', module: 'usersV2' } : { path: ['已拒绝', '已关闭'].includes(metric) ? '/sales-v5' : '/sales-v3', module: 'salesV3' })
+    assert.deepEqual(dashboardMetricDestination(metric), metric === 'paid' ? { path: '/users-v2', module: 'usersV2' } : { path: ['已拒绝', '已关闭', '暂不跟进'].includes(metric) ? '/sales-v5' : '/sales-v3', module: 'salesV3' })
   }
   const historicalSelection = dashboardListScope('Registered cohort', [a, b, pool, paid])
   assert.deepEqual(dashboardSalesRows(rows, historicalSelection, null, true, '').map(s => s.studentId), ['a', 'b', 'pool', 'paid'], 'sales drilldown preserves paid and unassigned cohort members without duplicates')

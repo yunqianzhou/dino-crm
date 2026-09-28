@@ -3,7 +3,7 @@ import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import type { CallRecord, LessonRecord, Order, SalesAppointment, SalesLifecycleEvent, Student } from './types'
 import { dashboardOwnerIds, dashboardGroupRows, inVietnamRange, isDashboardPaidOrder, type DashboardFilters, type DashboardGrouping } from './dashboardData'
-import { followStage5, followReason5 } from './salesLifecycle'
+import { currentAppointment, followStage5, followReason5 } from './salesLifecycle'
 import { isSalesLead } from './funnel'
 import { resolveUserType } from './userType'
 dayjs.extend(utc)
@@ -32,6 +32,7 @@ export function cohortFunnel(population: Student[], calls: CallRecord[], lessons
   }
 }
 export const l2s = (metrics: PeopleMetrics) => metrics.leads.length ? metrics.paid.length / metrics.leads.length * 100 : null
+export const CURRENT_INVENTORY_KEYS = ['total', 'assigned', 'unassigned', '已拒绝', '已关闭', '暂不跟进']
 export const CURRENT_CALL_KEYS = ['待外呼', '未接通待跟进', '已拒绝']
 export const CURRENT_FOLLOW_KEYS = ['已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '已关闭']
 export const ACTIVITY_CALL_KEYS = ['called', 'connected']
@@ -60,7 +61,7 @@ export function followupMetrics(population: Student[], calls: CallRecord[], less
   const rows = scopedPeople(population, filters)
   const paidIds = new Set(orders.filter(isDashboardPaidOrder).map(o => o.studentId))
   const currentRows = rows.filter(s => isSalesLead(s, lessons) && !paidIds.has(s.studentId))
-  const current: PeopleMetrics = Object.fromEntries(['total', 'assigned', 'unassigned', ...CURRENT_CALL_KEYS, ...CURRENT_FOLLOW_KEYS, '已关闭'].map(k => [k, []]))
+  const current: PeopleMetrics = Object.fromEntries([...CURRENT_INVENTORY_KEYS, ...CURRENT_CALL_KEYS, ...CURRENT_FOLLOW_KEYS].map(k => [k, []]))
   current.total = currentRows
   current.assigned = currentRows.filter(s => s.salesOwner)
   current.unassigned = currentRows.filter(s => !s.salesOwner)
@@ -139,6 +140,22 @@ export function metricGroups(metrics: PeopleMetrics, dimension: 'cc' | 'date', s
 
 export type FollowupComparisonRow = {
   id: string; value: string; metrics: PeopleMetrics; activityDate?: string; children?: FollowupComparisonRow[]
+}
+/** One current appointment per user keeps all status and payment totals additive. */
+export function followupAppointmentDate(student: Student) {
+  const appointment = currentAppointment(student)
+  if (!appointment) return '__unbooked__'
+  const instant = scheduledInstant(appointment)
+  return instant ? instant.utcOffset(420).format('YYYY-MM-DD') : '__unknown_date__'
+}
+export function appointmentFollowupRows(current: PeopleMetrics, activity: PeopleMetrics, primary: 'cc' | 'date', secondary = true): FollowupComparisonRow[] {
+  const metrics = Object.fromEntries([...CURRENT_FOLLOW_KEYS, ...ACTIVITY_FOLLOW_KEYS].map(key => [key, uniquePeople((key === 'paid' ? activity : current)[key] || [])]))
+  const groupRows = (source: PeopleMetrics, dimension: 'cc' | 'date', parent = ''): FollowupComparisonRow[] => {
+    const groupOf = (s: Student) => dimension === 'cc' ? s.salesOwner || '__unassigned__' : followupAppointmentDate(s)
+    const values = [...new Set(Object.values(source).flat().map(groupOf))].sort((a,b) => dimension === 'cc' ? a.localeCompare(b) : Number(a.startsWith('__')) - Number(b.startsWith('__')) || b.localeCompare(a))
+    return values.map(value => ({id:JSON.stringify([parent,dimension,value]),value,metrics:Object.fromEntries(Object.entries(source).map(([key,users])=>[key,users.filter(s=>groupOf(s)===value)]))}))
+  }
+  return groupRows(metrics, primary).map(row => ({...row,children:secondary ? groupRows(row.metrics,primary === 'cc' ? 'date' : 'cc',row.id) : undefined}))
 }
 /** One row per group, with current workload beside period activity.
  * Child dates describe activity only: missing snapshot cells mean not applicable, never zero.

@@ -13,7 +13,7 @@ export function matchesDashboardScope(scope: DashboardListScope | undefined, stu
 export function dashboardMetricDestination(metric: string) {
   return metric === 'paid'
     ? { path: '/users-v2', module: 'usersV2' as const }
-    : { path: ['已拒绝', '已关闭'].includes(metric) ? '/sales-v5' : '/sales-v3', module: 'salesV3' as const }
+    : { path: ['已拒绝', '已关闭', '暂不跟进'].includes(metric) ? '/sales-v5' : '/sales-v3', module: 'salesV3' as const }
 }
 
 /** Historical cohorts may include paid users and unassigned leads; retain that exact set. */

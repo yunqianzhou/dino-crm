@@ -7,7 +7,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard43-tests-'))
 try {
  execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboard43.ts', 'src/dashboardView.ts', 'src/managementDemo.ts', '--outDir',tmp,'--module','commonjs','--moduleResolution','node','--target','ES2020','--esModuleInterop','--skipLibCheck'],{stdio:'inherit'})
  symlinkSync(resolve('node_modules'),join(tmp,'node_modules'),'dir')
- const {cohortFunnel,followupMetrics,reasonEvidence,scheduledAppointments,l2s,scheduledInstant,followupComparisonRows,outcomeReasonGroups,CURRENT_CALL_KEYS,CURRENT_FOLLOW_KEYS} = require(join(tmp,'dashboard43.js'))
+ const {cohortFunnel,followupMetrics,reasonEvidence,scheduledAppointments,l2s,scheduledInstant,followupComparisonRows,appointmentFollowupRows,followupAppointmentDate,outcomeReasonGroups,CURRENT_CALL_KEYS,CURRENT_FOLLOW_KEYS} = require(join(tmp,'dashboard43.js'))
  const {dashboardView,dashboardViewRange,dashboardSwitchView} = require(join(tmp,'dashboardView.js'))
  const {withManagementDemo} = require(join(tmp,'managementDemo.js'))
  const filters={mode:'current',start:'2026-09-01',end:'2026-09-01',owner:[],userType:'正式用户'}
@@ -42,6 +42,39 @@ try {
  const rejected=user('reject',{salesLifecycleStatus:'已关闭',salesLifecycleEvents:[event('r','lead','已关闭',{closureType:'phone',reason:'暂无需求'})]})
  const consultationClosed=user('after',{salesLifecycleStatus:'已关闭',salesLifecycleEvents:[event('cc','lead','已关闭',{closureType:'consultation',reason:'费用高'})]})
  const reasonFilters={...filters,start:'',end:''}
+ const paused=user('paused-current',{salesOwner:'cc-a',salesProgress:'暂不跟进'})
+ const pauseUsers=[paused,paused,user('paused-unassigned',{salesProgress:'暂不跟进'}),
+  user('pause-resumed',{salesProgress:'跟进中',salesLifecycleEvents:[event('old-pause','lead','暂不跟进')]}),
+  user('pause-rejected',{salesProgress:'暂不跟进',salesOutcome5:{stage:'rejected'}}),
+  user('pause-closed',{salesProgress:'暂不跟进',salesLifecycleStatus:'已关闭'}),
+  user('pause-test',{userType:'测试用户',salesProgress:'暂不跟进'}),
+  user('pause-paid',{status:'付费',salesProgress:'暂不跟进'}),
+  user('pause-order',{salesProgress:'暂不跟进'})]
+ const pauseOrders=[{orderId:'pause-paid-order',studentId:'pause-order',orderStatus:'已支付',paidAmount:100,paidTime:'2026-09-06T00:00:00Z'}]
+ const pauseMetrics=followupMetrics(pauseUsers,[],[],pauseOrders,reasonFilters).current
+ assert.deepEqual(pauseMetrics['暂不跟进'].map(s=>s.studentId),['paused-current','paused-unassigned'],'paused counts only current eligible leads, deduplicated, respecting terminal-stage precedence')
+ assert.deepEqual(followupMetrics(pauseUsers,[],[],pauseOrders,filters).current,pauseMetrics,'paused inventory ignores activity dates')
+ assert.deepEqual(followupMetrics(pauseUsers,[],[],pauseOrders,{...filters,owner:['cc-a']}).current['暂不跟进'],[paused],'paused inventory obeys current CC filtering')
+ assert.equal(pauseMetrics.total.length,pauseMetrics.assigned.length+pauseMetrics.unassigned.length,'paused is a subset, not an extra lead total')
+ assert.deepEqual(followupMetrics([],[],[],[],filters).current['暂不跟进'],[],'empty inventory includes a zero paused count')
+ const appointmentA=user('appointment-a',{salesOwner:'cc-a',salesAppointments:[booking('new',{scheduledStartAt:'2026-09-04T18:00:00Z'}),booking('old',{appointmentStatus:'已改期'})]})
+ const appointmentB=user('appointment-b',{salesOwner:'cc-b',salesAppointments:[booking('b',{scheduledStartAt:'2026-09-05 14:00:00'})]})
+ const appointmentMissing=user('appointment-missing',{salesAppointments:[booking('missing',{scheduledStartAt:''})]})
+ const cancelledOnly=user('cancelled-only',{salesAppointments:[booking('cancelled',{appointmentStatus:'已取消'})]})
+ assert.equal(followupAppointmentDate(appointmentA),'2026-09-05','scheduled start crosses the UTC+7 day, not booking creation or payment date')
+ assert.equal(followupAppointmentDate(appointmentMissing),'__unknown_date__')
+ assert.equal(followupAppointmentDate(cancelledOnly),'__unbooked__','cancelled appointments do not provide a current appointment date')
+ const appointmentCurrent={'已预约':[appointmentA,appointmentB,appointmentMissing],'已接通待预约':[cancelledOnly]}
+ const appointmentActivity={paid:[appointmentA,appointmentA,appointmentB]}
+ for(const primary of ['date','cc'])for(const secondary of [false,true]){
+  const groups=appointmentFollowupRows(appointmentCurrent,appointmentActivity,primary,secondary)
+  assert.equal(groups.reduce((n,r)=>n+r.metrics['已预约'].length,0),3,'appointment grouping includes every current user exactly once')
+  assert.equal(groups.reduce((n,r)=>n+r.metrics.paid.length,0),2,'payments are grouped by users without duplicating paid users')
+  for(const row of groups){assert.equal(row.activityDate,undefined,'appointment rows must not apply the daily-payment filter or hide current statuses');if(secondary)for(const key of [...CURRENT_FOLLOW_KEYS,'paid'])assert.equal(row.children.reduce((n,c)=>n+c.metrics[key].length,0),row.metrics[key].length);else assert.equal(row.children,undefined)}
+ }
+ const appointmentDates=appointmentFollowupRows(appointmentCurrent,appointmentActivity,'date')
+ assert.deepEqual(appointmentDates.find(r=>r.value==='2026-09-05').metrics.paid.map(s=>s.studentId),['appointment-a','appointment-b'])
+ assert.equal(appointmentDates.find(r=>r.value==='__unbooked__').metrics['已接通待预约'].length,1,'unbooked leads remain visible')
  // Current outcomes share Sales Center v5 state precedence; historical events
  // alone must not retain a reactivated lead in a terminal status.
  const rejected5=user('rejected5',{salesOwner:'cc-a',salesOutcome5:{stage:'rejected',reason:'无需求'}})
