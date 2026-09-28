@@ -9,7 +9,7 @@ try {
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
   const { assignLeads, canReceiveLead, withPhase5Members } = require(join(tmp, 'phase5.js'))
   const { matchesOrderFilters5, orderCreatedTime, orderTime5 } = require(join(tmp, 'phase5Orders.js'))
-  const { outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
+  const { defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
   const { matchesLocalDateRange } = require(join(tmp, 'salesReporting.js'))
   const dayjs = require('dayjs')
   const target = { id: 'cc', name: '真实销售', email: 'cc@test.invalid', roleId: 'sales', isSalesMember: true, status: '启用', businessLines: ['越南'] }
@@ -81,6 +81,32 @@ try {
   assert.equal(followStage5({...booked,salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'费用高'}}),'Closed')
   assert.equal(followStage5(booked),'已预约', 'trial facts are not required for existing appointment flow')
   assert.equal(followReason5({...booked,salesOutcome5:{stage:'closed',reason:'费用高'}}),'费用高')
+  const timeQuery = defaultSalesTime5()
+  const noBooking = {...booked,salesAppointments:[],salesUpdatedAt:undefined}
+  assert(matchesSalesTime5(noBooking,timeQuery), 'empty default range must not filter users without a follow-up')
+  const appointmentQuery = {...timeQuery,kind:'appointment'}
+  assert(matchesSalesTime5(booked,appointmentQuery))
+  assert(!matchesSalesTime5(noBooking,appointmentQuery), 'appointment type requires a sales booking even without dates')
+  assert(!matchesSalesTime5({...booked,salesAppointments:[{...booking,appointmentStatus:'已取消'}]},appointmentQuery))
+  assert(matchesSalesTime5(noBooking,{...timeQuery,noAppointment:true}))
+  assert(!matchesSalesTime5(booked,{...timeQuery,noAppointment:true}))
+  const dayRange = [dayjs('2026-09-30'),dayjs('2026-09-30')]
+  assert(matchesSalesTime5(booked,{...appointmentQuery,range:dayRange}), 'appointment dates use the stored local date')
+  assert(!matchesSalesTime5(booked,{...appointmentQuery,range:range}))
+  const timed = {...noBooking,registerTime:'2026-09-29 17:00:00',salesUpdatedAt:'2026-09-28 00:00:00',landingCallbackAt:'2026-09-30 16:59:59'}
+  assert(matchesSalesTime5(timed,{...timeQuery,kind:'register',range:dayRange}))
+  assert(!matchesSalesTime5(timed,{...timeQuery,range:dayRange}), 'follow-up dates are independent from registration dates')
+  const callbackQuery = {...timeQuery,kind:'callback'}
+  assert(!matchesSalesTime5(noBooking,callbackQuery), 'callback type requires a provided valid callback')
+  assert(!matchesSalesTime5({...timed,landingCallbackAt:'invalid'},callbackQuery))
+  assert(matchesSalesTime5(timed,{...callbackQuery,range:dayRange}), 'callback date uses the user timezone')
+  assert(!matchesSalesTime5({...timed,landingCallbackAt:'2026-09-30 17:00:00'},{...callbackQuery,range:dayRange}))
+  const clock = dayjs.utc('2026-09-30 12:00:00')
+  assert(matchesSalesTime5({...timed,landingCallbackAt:'2026-09-30 12:00:00'},{...callbackQuery,callback:'due'},clock))
+  assert(!matchesSalesTime5({...timed,landingCallbackAt:'2026-09-30 12:00:00'},{...callbackQuery,callback:'upcoming'},clock))
+  assert(matchesSalesTime5({...timed,landingCallbackAt:'2026-10-01 12:00:00'},{...callbackQuery,callback:'upcoming'},clock))
+  assert(!matchesSalesTime5({...timed,landingCallbackAt:'2026-10-01 12:00:01'},{...callbackQuery,callback:'upcoming'},clock))
+  assert(matchesSalesTime5(timed,{...callbackQuery,noAppointment:true}), 'no sales booking can combine with a scheduled callback')
   const beforeBooking = {...booked,salesAppointments:[],salesLifecycleEvents:[]}
   assert.equal(outcomeAction5(beforeBooking),'reject')
   assert(outcomeAllowed5(beforeBooking,'reject','家长拒绝接听电话'))

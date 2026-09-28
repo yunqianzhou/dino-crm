@@ -1,6 +1,7 @@
 import CCSelect from '../components/CCSelect'
+import SalesTimeFilter5 from '../components/SalesTimeFilter5'
 import MembershipModal5 from '../components/MembershipModal5'
-import { outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, appointmentMatches5, followReason5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
+import { defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, followReason5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
 import LeadAssignmentModal from '../components/LeadAssignmentModal'
 import { assignLeads, canReceiveLead, isSalesMember } from '../phase5'
 import { useEffect, useMemo, useState } from 'react'
@@ -148,14 +149,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const [callDateRange, setCallDateRange] = useState<any>(null)
   const [consultationStageFilter, setConsultationStageFilter] = useState<string[]>([])
   const [landingCallbackFilter, setLandingCallbackFilter] = useState<string | undefined>()
-  const [appointmentFilter5, setAppointmentFilter5] = useState<string>()
-  const [appointmentRange5, setAppointmentRange5] = useState<any>(null)
+  const [salesTime5, setSalesTime5] = useState(defaultSalesTime5)
   const [addingMembership, setAddingMembership] = useState<Student | null>(null)
   const [pages, setPages] = useState<Record<string, { current: number; pageSize: number }>>({})
   const [sorts, setSorts] = useState<Record<string, { field?: string; order?: string }>>({})
   useEffect(() => {
     setPages((prev) => ({ ...prev, pool: { ...prev.pool, current: 1, pageSize: prev.pool?.pageSize || 10 }, follow: { ...prev.follow, current: 1, pageSize: prev.follow?.pageSize || 10 } }))
-  }, [keyword, lineSel, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, landingCallbackFilter, appointmentFilter5, appointmentRange5])
+  }, [keyword, lineSel, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, landingCallbackFilter, salesTime5])
   useEffect(() => { setPages((prev) => ({ ...prev, follow: { current: 1, pageSize: prev.follow?.pageSize || 10 } })) }, [consultationStageFilter])
   useEffect(() => { setPages((prev) => ({ ...prev, calls: { current: 1, pageSize: prev.calls?.pageSize || 10 } })) }, [keyword, lineSel, callResultFilter, callAgentFilter, callDateRange])
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     setSorts((prev) => ({ ...prev, [key]: { field: sorter.field, order: sorter.order } }))
   }
 
-  const selectionScope = JSON.stringify([account?.id, actor, tab, lineSel, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, appointmentFilter5, appointmentRange5, canBatchAssign])
+  const selectionScope = JSON.stringify([account?.id, actor, tab, lineSel, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, salesTime5, canBatchAssign])
   useEffect(() => { setSelectedIds([]); setBatchRecords(null) }, [selectionScope])
   const batchSelection = canBatchAssign ? { selectedRowKeys: selectedIds, preserveSelectedRowKeys: true, onChange: (keys: React.Key[]) => setSelectedIds(keys), columnWidth: 48 } : undefined
   const ccAccounts = accounts.filter(item => item.businessLines.some(matchLine) || (item.businessLines.length === 0 && isSalesMember(item) && roles.find(role => role.id === item.roleId)?.dataScope === 'all'))
@@ -287,20 +287,21 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       sourceAppMatches &&
       (phase5 || !userTypeFilter.length || userTypeFilter.includes(resolveUserType(s))) &&
       (!phase5 || !userStatusFilter.length || userStatusFilter.includes(resolveUserStatus(s, lessons))) &&
-      matchesLocalDateRange(s.registerTime, registerDateRange, s.country || s.businessLine) &&
-      matchesLocalDateRange(s.salesUpdatedAt, followDateRange, s.country || s.businessLine) &&
-      matchesCallback(s.landingCallbackAt, landingCallbackFilter)
+      (phase5 ? matchesSalesTime5(s, salesTime5) :
+        matchesLocalDateRange(s.registerTime, registerDateRange, s.country || s.businessLine) &&
+        matchesLocalDateRange(s.salesUpdatedAt, followDateRange, s.country || s.businessLine) &&
+        matchesCallback(s.landingCallbackAt, landingCallbackFilter))
     )
   }
 
   const poolData = useMemo(
     () => poolAll.filter(matchesLeadFilters),
-    [phase5, lessons, poolAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, landingCallbackFilter, channels],
+    [phase5, lessons, poolAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, landingCallbackFilter, salesTime5, channels],
   )
 
   const followData = useMemo(
-    () => followAll.filter(matchesLeadFilters).filter(s => !phase5 || appointmentMatches5(s, appointmentFilter5, appointmentRange5?.[0]?.format('YYYY-MM-DD'), appointmentRange5?.[1]?.format('YYYY-MM-DD'))).filter((s) => consultationStageFilter.length === 0 || ((phase5 || s.businessLine === '越南') && consultationStageFilter.includes(stageOf(s)))),
-    [phase5, lessons, tab, appointmentFilter5, appointmentRange5, followAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
+    () => followAll.filter(matchesLeadFilters).filter((s) => consultationStageFilter.length === 0 || ((phase5 || s.businessLine === '越南') && consultationStageFilter.includes(stageOf(s)))),
+    [phase5, lessons, tab, salesTime5, followAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -1027,8 +1028,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     setFollowDateRange(null)
     setConsultationStageFilter([])
     setLandingCallbackFilter(undefined)
-    setAppointmentFilter5(undefined)
-    setAppointmentRange5(null)
+    setSalesTime5(defaultSalesTime5())
   }
 
   // 下载当前标签页、当前筛选范围内的数据，避免用户还需手动复刻页面筛选条件。
@@ -1086,21 +1086,17 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
         {seeAllOwners && (phase5 ? <Select className="sales-filter-control" aria-label="CC" allowClear showSearch optionFilterProp="label" placeholder="CC" popupMatchSelectWidth={360} value={ownerFilter} onChange={setOwnerFilter} options={ccAccounts.filter(a => a.status === '启用' && isSalesMember(a)).map(a => ({label: `${a.name} (${a.email})`, value: a.email}))} /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />)}
         {tab === 'follow' && (phase5 || showVietnamStageFilter) && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={(phase5 ? FOLLOW_STAGES5 : CONSULTATION_STAGES).map((value) => ({ label: stageLabel(value), value }))} />}
         {phase5 && <Select className="sales-filter-control" aria-label={t('user.col.status')} mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.status')} value={userStatusFilter} onChange={setUserStatusFilter} options={USER_STATUSES.map(value => ({ label: t(`enum.status.${value}`), value }))} />}
-        {phase5 && tab === 'follow' && <>
-          <Select className="sales-filter-control" aria-label={text('销售预约', 'Sales appointment')} allowClear placeholder={text('销售预约', 'Sales appointment')} value={appointmentFilter5} onChange={setAppointmentFilter5}
-            options={[{value:'booked',label:text('有销售预约', 'Has a sales appointment')},{value:'none',label:text('无销售预约', 'No sales appointment')}]} />
-          <DatePicker.RangePicker className="sales-filter-date" aria-label={text('销售预约日期范围', 'Sales appointment dates')} value={appointmentRange5} onChange={setAppointmentRange5}
-            placeholder={[text('预约开始日期', 'Appointment from'),text('预约结束日期', 'Appointment to')]} />
-        </>}
-        <Select className="sales-filter-control" allowClear placeholder={text('预约外呼', 'Callback')} value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: text('已填写预约外呼', 'Callback provided'), value: 'filled' }, { label: text('待外呼（已到时间）', 'Callback due'), value: 'due' }, { label: text('即将外呼（24小时内）', 'Callback within 24 hours'), value: 'upcoming' }]} />
+        {!phase5 && <Select className="sales-filter-control" allowClear placeholder={text('预约外呼', 'Callback')} value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: text('已填写预约外呼', 'Callback provided'), value: 'filled' }, { label: text('待外呼（已到时间）', 'Callback due'), value: 'due' }, { label: text('即将外呼（24小时内）', 'Callback within 24 hours'), value: 'upcoming' }]} />}
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={text('购买意向', 'Purchase intent')} value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value, i) => ({ label: t(['sales.purchaseIntention.yes', 'sales.purchaseIntention.no', 'sales.purchaseIntention.none'][i]), value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.courseLevel')} value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
         {!phase5 && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.userType')} value={userTypeFilter} onChange={setUserTypeFilter} options={['正式用户', '测试用户'].map((value) => ({ label: t(`enum.userType.${value}`), value }))} />}
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.ageGroup')} value={ageGroupFilter} onChange={setAgeGroupFilter} options={ageGroupOptions.map((value) => ({ label: value, value }))} />
         <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.channelSourceLp')} value={sourceLpFilter} onChange={setSourceLpFilter} options={sourceLpOptions.map((value) => ({ label: value, value }))} />
         <Cascader className="sales-filter-control" allowClear changeOnSelect placeholder={t('user.col.channelSourceApp')} value={sourceAppFilter} onChange={(value) => setSourceAppFilter(value as string[] | undefined)} options={sourceAppOptions} />
+        {phase5 ? <SalesTimeFilter5 value={salesTime5} onChange={setSalesTime5} /> : <>
         <DatePicker.RangePicker className="sales-filter-date" value={registerDateRange} onChange={setRegisterDateRange} allowClear placeholder={[text('注册开始日期', 'Registered from'), text('注册结束日期', 'Registered to')]} />
         <DatePicker.RangePicker className="sales-filter-date" value={followDateRange} onChange={setFollowDateRange} allowClear placeholder={[text('最后跟进开始日期', 'Follow-up from'), text('最后跟进结束日期', 'Follow-up to')]} />
+        </>}
       </>}
       <div className="sales-filter-actions">
         {tab !== 'calls' && tab !== 'summary' && <Button type="link" onClick={resetLeadFilters}>{text('重置筛选', 'Reset filters')}</Button>}
