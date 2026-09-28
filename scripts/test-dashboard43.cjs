@@ -128,6 +128,25 @@ try {
  assert.deepEqual(mixedRow.children.map(row=>row.activityDate),['2026-09-03','2026-09-02'])
  assert(mixedRow.children.every(row=>!Object.hasOwn(row.metrics,'待外呼')),'daily rows never repeat a current snapshot as historical data')
  assert.equal(followupComparisonRows({'待外呼':[currentOnly,mixed]},{called:[activityOnly,mixed]},[],'age',['待外呼'],['called']).length,1,'alternate dimensions apply to both metric groups together')
+ const hierarchyCurrent={'待外呼':[currentOnly,mixed]}
+ const hierarchyActivity={called:[activityOnly,mixed]}
+ const hierarchyDaily=[{date:'2026-09-03',metrics:{called:[activityOnly,mixed]}},{date:'2026-09-02',metrics:{called:[mixed]}},{date:'2026-09-01',metrics:{paid:[activityOnly]}}]
+ const dateFirst=followupComparisonRows(hierarchyCurrent,hierarchyActivity,hierarchyDaily,'date',['待外呼'],['called'])
+ assert.deepEqual(dateFirst.map(row=>row.value),['2026-09-03','2026-09-02'],'date-first excludes days with no relevant activity')
+ assert.equal(dateFirst[0].metrics.called.length,2)
+ assert.equal(dateFirst[0].children.length,2,'each date expands into current CCs')
+ assert.equal(dateFirst[1].children[0].value,'cc-mixed')
+ assert(dateFirst.every(row=>row.activityDate===row.value&&!Object.hasOwn(row.metrics,'待外呼')),'date parents never invent historical current states')
+ assert(dateFirst.flatMap(row=>row.children).every(row=>row.activityDate&&!Object.hasOwn(row.metrics,'待外呼')),'CC children retain their parent date for drilldown and payment amounts')
+ for (const group of ['cc','date']) {
+  const flat=followupComparisonRows(hierarchyCurrent,hierarchyActivity,hierarchyDaily,group,['待外呼'],['called'],false)
+  assert(flat.every(row=>!row.children),'no subgroup removes expansion')
+ }
+ const ccOnly=followupComparisonRows(hierarchyCurrent,hierarchyActivity,hierarchyDaily,'cc',['待外呼'],['called'],false)
+ assert.equal(ccOnly.find(row=>row.value==='cc-current').metrics['待外呼'].length,1,'CC grouping preserves current-only owners')
+ const datePaid=followupComparisonRows({}, {paid:[mixed]}, [{date:'2026-09-03',metrics:{paid:[mixed]}}], 'date', ['已关闭'], ['paid'])
+ assert.equal(datePaid[0].children[0].activityDate,'2026-09-03','payment date remains attached when grouping date then CC')
+ assert.equal(datePaid[0].children[0].metrics.paid[0].studentId,'mixed')
  const migrated=withManagementDemo({students:[],accounts:[],orders:[],callRecords:[],lessons:[]},'2026-09-16T08:00:00Z')
  assert(migrated.lessons.some(l=>l.lessonType==='体验课'&&l.status==='已完课'))
  assert.equal(withManagementDemo(migrated),migrated,'one-time migration preserves edits')

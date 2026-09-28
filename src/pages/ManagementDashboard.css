@@ -143,3 +143,5 @@
 .dashboard-not-applicable{color:#a5adba}
 
 .dashboard-reason-share{display:flex;align-items:center;gap:12px}.dashboard-reason-share .ant-progress{flex:1;min-width:60px;max-width:260px;margin:0}.dashboard-reason-share>span{min-width:48px;text-align:right;color:#64748b;font-variant-numeric:tabular-nums}
+
+.dashboard-followup-section .dashboard-table-tools .dashboard-hierarchy-controls{margin-bottom:0}

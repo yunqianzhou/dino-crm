@@ -143,14 +143,22 @@ export type FollowupComparisonRow = {
 /** One row per group, with current workload beside period activity.
  * Child dates describe activity only: missing snapshot cells mean not applicable, never zero.
  */
-export function followupComparisonRows(current: PeopleMetrics, activity: PeopleMetrics, daily: { date: string; metrics: PeopleMetrics }[], group: Exclude<DashboardGrouping, 'date' | 'source'>, currentKeys: string[], activityKeys: string[]): FollowupComparisonRow[] {
+export function followupComparisonRows(current: PeopleMetrics, activity: PeopleMetrics, daily: { date: string; metrics: PeopleMetrics }[], group: Exclude<DashboardGrouping, 'source'>, currentKeys: string[], activityKeys: string[], secondary = true): FollowupComparisonRow[] {
   const pick = (metrics: PeopleMetrics, keys: string[]) => Object.fromEntries(keys.map(key => [key, metrics[key] || []]))
+  if (group === 'date') return daily.flatMap(day => {
+    const metrics = pick(day.metrics, activityKeys)
+    if (!Object.values(metrics).some(users => users.length)) return []
+    const children = secondary ? dashboardGroupRows(metrics, 'cc').map(row => ({
+      id: JSON.stringify([day.date, row.id]), value: row.id, activityDate: day.date, metrics: row.metrics,
+    })) : undefined
+    return [{ id: day.date, value: day.date, activityDate: day.date, metrics, children }]
+  })
   const combined = { ...pick(current, currentKeys), ...pick(activity, activityKeys) }
   return dashboardGroupRows(combined, group).map(row => {
-    const children = daily.flatMap(day => {
+    const children = secondary ? daily.flatMap(day => {
       const child = dashboardGroupRows(pick(day.metrics, activityKeys), group).find(item => item.id === row.id)
       return child ? [{ id: JSON.stringify([row.id, day.date]), value: day.date, activityDate: day.date, metrics: child.metrics }] : []
-    })
+    }) : []
     return { id: row.id, value: row.id, metrics: row.metrics, children: children.length ? children : undefined }
   })
 }
