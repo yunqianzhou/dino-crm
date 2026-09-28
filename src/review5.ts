@@ -42,7 +42,7 @@ export function addMembership5(state: AppState, request: {
 }
 
 export const REJECTED_REASONS5 = [
-  ['号码错误', 'Wrong number'], ['无需求', 'No demand'], ['稍后回电', 'Call back later'],
+  ['家长拒绝接听电话', 'Parent declined the call'], ['号码错误', 'Wrong number'], ['无需求', 'No demand'], ['稍后回电', 'Call back later'],
   ['低于4岁', 'Under 4 years old'], ['超过13岁／成人', 'Above 13/Adults'],
 ] as const
 export const CLOSED_REASONS5 = [
@@ -69,4 +69,18 @@ export function appointmentMatches5(student: Student, filter?: string, from?: st
   // Appointment strings are stored in the appointment's local timezone.
   const date = appointment.scheduledStartAt.slice(0, 10)
   return (!from || date >= from) && (!to || date <= to)
+}
+
+// Once a sales appointment has been booked, cancellation or no-show does not
+// move the lead back to the pre-appointment rejection stage.
+export function outcomeAction5(student?: Student | null): 'reject' | 'close' {
+  return student?.salesAppointments?.length || student?.salesLifecycleEvents?.some(e => e.node === 'appointment' && ['已预约', '已改期'].includes(e.result)) ? 'close' : 'reject'
+}
+export function outcomeAllowed5(student: Student, action: string, reason: string) {
+  return action === outcomeAction5(student) && (action === 'reject' ? REJECTED_REASONS5 : CLOSED_REASONS5).some(item => item[0] === reason)
+}
+export function outcomeReasonLabel5(reason: string | undefined, t: (key: string) => string) {
+  if (!reason) return '—'
+  const match = [...REJECTED_REASONS5, ...CLOSED_REASONS5].find(item => reason === item[0] || reason.startsWith(`${item[0]}：`))
+  return match ? t(`sales.outcome.reason.${match[0]}`) + reason.slice(match[0].length) : reason
 }

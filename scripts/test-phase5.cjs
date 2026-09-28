@@ -9,7 +9,7 @@ try {
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
   const { assignLeads, canReceiveLead, withPhase5Members } = require(join(tmp, 'phase5.js'))
   const { matchesOrderFilters5, orderCreatedTime, orderTime5 } = require(join(tmp, 'phase5Orders.js'))
-  const { canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
+  const { outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
   const { matchesLocalDateRange } = require(join(tmp, 'salesReporting.js'))
   const dayjs = require('dayjs')
   const target = { id: 'cc', name: '真实销售', email: 'cc@test.invalid', roleId: 'sales', isSalesMember: true, status: '启用', businessLines: ['越南'] }
@@ -81,7 +81,22 @@ try {
   assert.equal(followStage5({...booked,salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'费用高'}}),'Closed')
   assert.equal(followStage5(booked),'已预约', 'trial facts are not required for existing appointment flow')
   assert.equal(followReason5({...booked,salesOutcome5:{stage:'closed',reason:'费用高'}}),'费用高')
-  assert.equal(REJECTED_REASONS5.length,5)
+  const beforeBooking = {...booked,salesAppointments:[],salesLifecycleEvents:[]}
+  assert.equal(outcomeAction5(beforeBooking),'reject')
+  assert(outcomeAllowed5(beforeBooking,'reject','家长拒绝接听电话'))
+  assert(!outcomeAllowed5(beforeBooking,'close','费用高'), 'cannot close before a booking')
+  assert(!outcomeAllowed5(beforeBooking,'reject','费用高'), 'closure reasons are not rejection reasons')
+  for (const appointment of [booking, {...booking,appointmentStatus:'已取消'}, {...booking,appointmentStatus:'已改期'}, {...booking,attendanceStatus:'No Show'}, {...booking,attendanceStatus:'已出勤',consultationStatus:'已完成'}]) {
+    const student = {...booked,salesAppointments:[appointment]}
+    assert.equal(outcomeAction5(student),'close')
+    assert(outcomeAllowed5(student,'close','费用高'))
+    assert(!outcomeAllowed5(student,'reject','号码错误'), 'booked leads can only close, including cancelled/no-show bookings')
+    assert(!outcomeAllowed5(student,'close','家长拒绝接听电话'), 'rejection reasons cannot close a lead')
+  }
+  assert.equal(outcomeAction5({...beforeBooking,salesLifecycleEvents:[{node:'appointment',result:'已预约'}]}),'close', 'historical booking event is sufficient')
+  assert.equal(outcomeAction5({...beforeBooking,landingCallbackAt:'2026-09-30 10:00:00'}),'reject', 'landing callback is not a sales appointment')
+  assert.equal(outcomeReasonLabel5('其他：用户补充', key => key === 'sales.outcome.reason.其他' ? 'Others' : key),'Others：用户补充')
+  assert.equal(REJECTED_REASONS5.length,6)
   assert.equal(CLOSED_REASONS5.length,11)
   assert.equal(assignLeads({ ...state, accounts: [{ ...target, status: '停用' }] }, request).results[0].status, '失败')
   const pool = { ...lead, studentId: 'pool', salesOwner: undefined, salesProgress: '待领取' }

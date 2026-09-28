@@ -14,7 +14,7 @@ import { openReplayVideo, reportKind, resolveUserStatus, studentLessons, TRIAL_R
 import { appChannelSourceText, lineLabel, lpChannelSourceText } from '../channel'
 import LocalTime from '../components/LocalTime'
 import { CONSULTATION_STAGE_COLOR, consultationStage } from '../salesLifecycle'
-import { followReason5, followStage5 } from '../review5'
+import { outcomeReasonLabel5, followReason5, followStage5 } from '../review5'
 
 const { Text } = Typography
 
@@ -148,7 +148,7 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
           <Descriptions.Item label={text('用户ID', 'User ID')}>{student.studentId}</Descriptions.Item>
           <Descriptions.Item label={text('学生姓名', 'Student name')}>{student.localName || student.name}</Descriptions.Item>
           {variant === 'sales' && <Descriptions.Item label={text('购买意向', 'Purchase intent')}>{student.purchaseIntention || <Text type="secondary">—</Text>}</Descriptions.Item>}
-          {vietnamFollowStage && <Descriptions.Item label={t('sales.consultation.currentStage')}><Tag color={CONSULTATION_STAGE_COLOR[vietnamFollowStage]}>{['Rejected', 'Closed'].includes(vietnamFollowStage) ? vietnamFollowStage : t(`sales.consultation.stage.${vietnamFollowStage}`)}</Tag></Descriptions.Item>}
+          {vietnamFollowStage && <Descriptions.Item label={t('sales.consultation.currentStage')}><Tag color={CONSULTATION_STAGE_COLOR[vietnamFollowStage]}>{['Rejected', 'Closed'].includes(vietnamFollowStage) ? t(`sales.outcome.${vietnamFollowStage}`) : t(`sales.consultation.stage.${vietnamFollowStage}`)}</Tag></Descriptions.Item>}
           <Descriptions.Item label={t('user.col.status')}>
             {(() => {
               const status = currentUserStatus!
@@ -174,7 +174,7 @@ export default function UserDetail({ backPath = '/users-v2', backText, variant =
             <Descriptions.Item label={text('领取人', 'Owner')}>{student.salesOwner || <Text type="secondary">—</Text>}</Descriptions.Item>
           </>}
           <Descriptions.Item label="CC">{(phase5 ? accounts.find(a => a.email === student.salesOwner)?.name || student.salesOwner || student.ccName : student.ccName) || <Text type="secondary">—</Text>}</Descriptions.Item>
-          {phase5 && followReason5(student) && <Descriptions.Item label={text('跟进原因', 'Follow-up reason')}>{followReason5(student)}</Descriptions.Item>}
+          {phase5 && followReason5(student) && <Descriptions.Item label={t('sales.outcome.reasonLabel')}>{outcomeReasonLabel5(followReason5(student), t)}</Descriptions.Item>}
           <Descriptions.Item label={text('是否预约外呼', 'Callback requested')}>{student.landingCallbackAt && dayjs.utc(student.landingCallbackAt).isValid() ? <Tag color="blue">{text('已填写', 'Provided')}</Tag> : <Text type="secondary">{text('未填写', 'Not provided')}</Text>}</Descriptions.Item>
           <Descriptions.Item label={text('预约外呼时间', 'Callback time')}><LocalTime time={student.landingCallbackAt} country={student.country || student.businessLine} /></Descriptions.Item>
           <Descriptions.Item label={text('英语学习程度', 'English level')}>{student.landingEnglishLevel || <Text type="secondary">—</Text>}</Descriptions.Item>

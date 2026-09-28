@@ -2694,6 +2694,86 @@ const tr: Dict = {
   'enum.method.谷歌邮箱': 'Google e-postası', 'enum.method.手机号': 'Telefon', 'enum.gender.男': 'Erkek', 'enum.gender.女': 'Kadın', 'enum.gender.其他': 'Diğer', 'enum.couponType.满减券': 'Eşik indirimi',
 }
 
+// Phase 5 outcomes follow appointment history and the active UI language.
+Object.assign(zh, {
+  "sales.outcome.Rejected": "已拒绝",
+  "sales.outcome.Closed": "已关闭",
+  "sales.outcome.rejectHint": "预约前家长拒绝继续沟通或接听电话，请选择拒绝原因。",
+  "sales.outcome.closeHint": "已有预约，家长不再推进购买，请选择关闭原因；不要求已完成试听课。",
+  "sales.outcome.invalid": "预约状态已变化或原因不匹配，请重新打开跟进窗口。",
+  "sales.outcome.confirm": "将记录该阶段及原因，保留预约和历史记录；可重新激活继续跟进。",
+  "sales.outcome.reasonLabel": "跟进原因",
+  "sales.outcome.reason.家长拒绝接听电话": "家长拒绝接听电话",
+  "sales.outcome.reason.号码错误": "号码错误",
+  "sales.outcome.reason.无需求": "无需求",
+  "sales.outcome.reason.稍后回电": "稍后回电",
+  "sales.outcome.reason.低于4岁": "低于4岁",
+  "sales.outcome.reason.超过13岁／成人": "超过13岁／成人",
+  "sales.outcome.reason.课程不适合孩子": "课程不适合孩子",
+  "sales.outcome.reason.孩子不喜欢": "孩子不喜欢",
+  "sales.outcome.reason.家长不喜欢": "家长不喜欢",
+  "sales.outcome.reason.费用高": "费用高",
+  "sales.outcome.reason.设备问题": "设备问题",
+  "sales.outcome.reason.支付方式问题": "支付方式问题",
+  "sales.outcome.reason.不信任品牌": "不信任品牌",
+  "sales.outcome.reason.App 故障／卡顿": "App 故障／卡顿",
+  "sales.outcome.reason.观望需求": "观望需求",
+  "sales.outcome.reason.只想上试听课": "只想上试听课",
+  "sales.outcome.reason.其他": "其他"
+})
+Object.assign(en, {
+  "sales.outcome.Rejected": "Rejected",
+  "sales.outcome.Closed": "Closed",
+  "sales.outcome.rejectHint": "Before any appointment, the parent declined further contact or the call. Select a rejection reason.",
+  "sales.outcome.closeHint": "After an appointment was booked, the parent chose not to proceed with a purchase. Select a closure reason; trial completion is not required.",
+  "sales.outcome.invalid": "Appointment history changed or the reason does not match. Reopen the follow-up window.",
+  "sales.outcome.confirm": "Record this stage and reason, preserving appointments and history. Reactivate to resume follow-up.",
+  "sales.outcome.reasonLabel": "Follow-up reason",
+  "sales.outcome.reason.家长拒绝接听电话": "Parent declined the call",
+  "sales.outcome.reason.号码错误": "Wrong number",
+  "sales.outcome.reason.无需求": "No demand",
+  "sales.outcome.reason.稍后回电": "Call back later",
+  "sales.outcome.reason.低于4岁": "Under 4 years old",
+  "sales.outcome.reason.超过13岁／成人": "Above 13/Adults",
+  "sales.outcome.reason.课程不适合孩子": "Course is unsuitable to kids",
+  "sales.outcome.reason.孩子不喜欢": "Kids don't like",
+  "sales.outcome.reason.家长不喜欢": "Parent's don't like",
+  "sales.outcome.reason.费用高": "High fee",
+  "sales.outcome.reason.设备问题": "Device",
+  "sales.outcome.reason.支付方式问题": "Payment method",
+  "sales.outcome.reason.不信任品牌": "Not trust branding",
+  "sales.outcome.reason.App 故障／卡顿": "App bug/lagging",
+  "sales.outcome.reason.观望需求": "Window demands",
+  "sales.outcome.reason.只想上试听课": "Just want to take the trial class",
+  "sales.outcome.reason.其他": "Others"
+})
+Object.assign(ko, {
+  "sales.outcome.Rejected": "거절됨",
+  "sales.outcome.Closed": "종료됨",
+  "sales.outcome.rejectHint": "예약 전에 학부모가 추가 상담 또는 통화를 거절했습니다. 거절 사유를 선택하세요.",
+  "sales.outcome.closeHint": "예약 후 학부모가 구매를 진행하지 않기로 했습니다. 종료 사유를 선택하세요. 체험 수업 완료는 필수가 아닙니다.",
+  "sales.outcome.invalid": "예약 이력이 변경되었거나 사유가 맞지 않습니다. 후속 관리 창을 다시 여세요.",
+  "sales.outcome.confirm": "예약과 이력을 유지하고 단계와 사유를 기록합니다. 다시 활성화하여 후속 관리를 재개할 수 있습니다.",
+  "sales.outcome.reasonLabel": "후속 관리 사유",
+  "sales.outcome.reason.家长拒绝接听电话": "학부모가 통화 거절",
+  "sales.outcome.reason.号码错误": "잘못된 전화번호",
+  "sales.outcome.reason.无需求": "수요 없음",
+  "sales.outcome.reason.稍后回电": "나중에 다시 전화",
+  "sales.outcome.reason.低于4岁": "4세 미만",
+  "sales.outcome.reason.超过13岁／成人": "13세 초과 / 성인",
+  "sales.outcome.reason.课程不适合孩子": "아이에게 맞지 않는 수업",
+  "sales.outcome.reason.孩子不喜欢": "아이가 좋아하지 않음",
+  "sales.outcome.reason.家长不喜欢": "학부모가 좋아하지 않음",
+  "sales.outcome.reason.费用高": "높은 비용",
+  "sales.outcome.reason.设备问题": "기기 문제",
+  "sales.outcome.reason.支付方式问题": "결제 수단 문제",
+  "sales.outcome.reason.不信任品牌": "브랜드를 신뢰하지 않음",
+  "sales.outcome.reason.App 故障／卡顿": "앱 오류 / 지연",
+  "sales.outcome.reason.观望需求": "추후 결정 희망",
+  "sales.outcome.reason.只想上试听课": "체험 수업만 원함",
+  "sales.outcome.reason.其他": "기타"
+})
+
 const DICTS: Record<Lang, Dict> = { zh, zhTW, en, ko, ja, ar, id, de, es, fr, hi, it, nl, pl, pt, ru, th, vi, tr }
 
 function format(str: string, vars?: Record<string, string | number>) {
