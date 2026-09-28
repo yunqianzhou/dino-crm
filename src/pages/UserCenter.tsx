@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Dropdown,
+  DatePicker,
   Form,
   Input,
   InputNumber,
@@ -27,7 +28,10 @@ import { usePerm } from '../perm'
 import { hasPhoneLogin, resolveUserType } from '../userType'
 import { resolveUserStatus } from '../lessons'
 import LeadAssignmentModal from '../components/LeadAssignmentModal'
-import { isSalesLead, inUserCenter } from '../funnel'
+import { inUserCenter } from '../funnel'
+import { canTransferUser5, ccFilterAccounts5 } from '../review5'
+import { matchesLocalDateRange } from '../salesReporting'
+import MembershipModal5 from '../components/MembershipModal5'
 import { useLineScope } from '../useLineScope'
 import { appChannelSourceText, businessLineOf, lineLabel, lpChannelSourceText, registerChannelText } from '../channel'
 import LineFilter from '../components/LineFilter'
@@ -61,14 +65,19 @@ const USER_TYPE_COLOR: Record<UserType, string> = {
 }
 
 export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?: boolean; phase5?: boolean }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
+  const en = lang === 'en'
   const students = useStore((s) => s.students)
   const channels = useStore((s) => s.channels)
   const lessons = useStore((s) => s.lessons ?? [])
   const { can, actor, account, allowedLines } = usePerm()
   const accounts = useStore(s => s.accounts)
+  const roles = useStore(s => s.roles)
+  const [ccFilter, setCCFilter] = useState<string>()
+  const [registerRange, setRegisterRange] = useState<any>(null)
+  const [page5, setPage5] = useState(1)
   const [reassigning, setReassigning] = useState<Student | null>(null)
-  const canReassign = phase5 && account?.status !== '停用' && can('usersV2') !== 'none' && can('salesV3_config') === 'operate'
+  const canReassign = phase5 && canTransferUser5(can, account)
   const ccLabel = (student: Student) => accounts.find(a => a.email === student.salesOwner)?.name || student.salesOwner || student.ccName || '—'
   const dashboardContext = useDashboardContext()
   const dashboardScope = phase3 ? dashboardContext.dashboardScope : undefined
@@ -105,11 +114,19 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
     [students],
   )
 
+  const ccAccounts = ccFilterAccounts5(accounts, roles, matchLine, lineOptions)
+  useEffect(() => {
+    if (ccFilter && !ccAccounts.some(a => a.email === ccFilter)) setCCFilter(undefined)
+  }, [ccFilter, ccAccounts.map(a => a.email).join('|')])
+  useEffect(() => { setPage5(1) }, [ccFilter, registerRange, keyword, lineSel, statusFilter, typeFilter, countryFilter])
+
   const data = useMemo(
     () =>
       students.filter((s) => {
         // 分流规则：未付费-未体验且有手机号的用户进入「销售中心」，其余展示在此
         if (dashboardScope ? !matchesDashboardScope(dashboardScope, s.studentId) || !permittedDashboardIds?.has(s.studentId) : !phase5 && !inUserCenter(s, lessons)) return false
+        if (phase5 && ccFilter && s.salesOwner !== ccFilter) return false
+        if (phase5 && !matchesLocalDateRange(s.registerTime, registerRange, s.country || s.businessLine)) return false
         const kw = keyword.trim().toLowerCase()
         const matchKw =
           !kw ||
@@ -123,7 +140,7 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
         const bl = businessLineOf(channels, s)
         return matchKw && matchLine(bl) && matchStatus && matchType && matchCountry
       }),
-    [phase5, students, channels, lessons, keyword, lineSel, statusFilter, typeFilter, countryFilter, matchLine, dashboardScope, permittedDashboardIds],
+    [phase5, ccFilter, registerRange, students, channels, lessons, keyword, lineSel, statusFilter, typeFilter, countryFilter, matchLine, dashboardScope, permittedDashboardIds],
   )
 
   const phoneLocked = editing ? hasPhoneLogin(editing) : false
@@ -460,7 +477,7 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
           trigger={['click']}
           menu={{
             items: [
-              ...(canReassign ? [{ key: 'reassign', label: '重新分配线索', disabled: !isSalesLead(r, lessons), onClick: () => setReassigning(r) }] : []),
+              ...(canReassign ? [{ key: 'reassign', label: en ? 'Change CC owner' : '调整 CC 归属', onClick: () => setReassigning(r) }] : []),
               ...(canEdit ? [
                 { key: 'edit', icon: <EditOutlined />, label: t('user.editInfo'), onClick: () => openEdit(r) },
                 { key: 'membership', icon: <PlusCircleOutlined />, label: t('user.addMembership'), onClick: () => openAddMembership(r) },
@@ -478,7 +495,7 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
   return (
     <Card className="page-card" bordered={false} title={<span className="section-title">{phase5 ? '用户列表' : t('user.titleV2')}</span>}>
       {phase3 && <DashboardLinkContext />}
-      {!dashboardScope && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={phase5 ? '统一查看注册用户。符合销售线索条件的未付费用户，可在操作菜单中重新分配 CC。' : t('user.funnelTip')} />}
+      {!dashboardScope && <Alert type="info" showIcon style={{ marginBottom: 16 }} message={phase5 ? (en ? 'Authorized members can change the current CC for both paid and unpaid users. Both centers share the updated owner.' : '有销售中心及分配与掉库设置权限的成员，可调整已付费和未付费用户的 CC 归属；两个中心同步更新。') : t('user.funnelTip')} />}
       <Space wrap style={{ marginBottom: 16 }}>
         <Input
           allowClear
@@ -513,6 +530,11 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
           onChange={setStatusFilter}
           options={USER_STATUSES.map((l) => ({ label: t(`enum.status.${l}`), value: l }))}
         />
+        {phase5 && <DatePicker.RangePicker aria-label={en ? 'Registration date range' : '注册时间段'} value={registerRange} onChange={setRegisterRange}
+          placeholder={en ? ['Registered from', 'Registered to'] : ['注册开始日期', '注册结束日期']} />}
+        {phase5 && ccAccounts.length > 0 && <Select style={{ width: 240 }} popupMatchSelectWidth={360} aria-label="CC" placeholder="CC" allowClear showSearch optionFilterProp="label"
+          value={ccFilter} onChange={setCCFilter} options={ccAccounts.map(a => ({ label: `${a.name} (${a.email})`, value: a.email }))} />}
+        {phase5 && <Button onClick={() => { setKeyword(''); setLineSel([]); setCountryFilter(undefined); setTypeFilter(undefined); setStatusFilter(undefined); setCCFilter(undefined); setRegisterRange(null); setPage5(1) }}>{en ? 'Reset filters' : '重置筛选'}</Button>}
         {canExport && <Button icon={<DownloadOutlined />} onClick={exportUsers}>导出列表</Button>}
       </Space>
 
@@ -521,7 +543,7 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
           columns={phase3 ? phase3Columns : columns}
           dataSource={data}
           scroll={{ x: phase3 ? 3050 : 3250 }}
-          pagination={{ showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
+          pagination={{ ...(phase5 ? { current: page5, onChange: setPage5 } : {}), showTotal: (n) => t('common.total', { n }), showSizeChanger: true }}
       />
 
       {reassigning && <LeadAssignmentModal records={[reassigning]} onClose={() => setReassigning(null)} />}
@@ -603,8 +625,9 @@ export default function UserCenter({ phase3 = false, phase5 = false }: { phase3?
         />
       </Modal>
 
+      {phase5 && addingMembership && <MembershipModal5 student={addingMembership} source="users" permitted={canEdit} onClose={() => setAddingMembership(null)} />}
       <Modal
-        open={!!addingMembership}
+        open={!phase5 && !!addingMembership}
         title={t('user.addMembership.title')}
         onCancel={() => setAddingMembership(null)}
         onOk={addMembership}

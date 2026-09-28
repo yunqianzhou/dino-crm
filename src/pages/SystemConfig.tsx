@@ -87,7 +87,7 @@ const EMPTY_PERMS = (): Record<ModuleKey, PermLevel> =>
 
 type RoleModal = { mode: 'create' } | { mode: 'edit'; role: Role } | null
 
-export default function SystemConfig() {
+export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
   const { t, lang } = useI18n()
   const { can, actor } = usePerm()
   const canEditRoles = can('system') === 'operate' || can('system_role_edit') === 'operate'
@@ -293,6 +293,11 @@ export default function SystemConfig() {
 
   const openAcc = (a?: Account) => {
     setAccEditing(a ?? null)
+    setAccOpen(true)
+  }
+  const populateAcc = (open: boolean) => {
+    if (!open) return
+    const a = accEditing
     form.resetFields()
     if (a) {
       form.setFieldsValue({
@@ -306,7 +311,6 @@ export default function SystemConfig() {
     } else {
       form.setFieldsValue({ status: true })
     }
-    setAccOpen(true)
   }
   const submitAcc = async () => {
     const v = await form.validateFields()
@@ -401,7 +405,7 @@ export default function SystemConfig() {
   const accColumns: ColumnsType<Account> = [
     { title: t('sys.acc.col.name'), dataIndex: 'name', width: 140 },
     { title: t('sys.acc.col.email'), dataIndex: 'email', width: 220 },
-    { title: '销售成员', key: 'salesMember', width: 110, render: (_: unknown, account: Account) => account.isSalesMember ? <Tag color="blue">销售</Tag> : <Text type="secondary">—</Text> },
+    { title: phase5 ? (lang === 'en' ? 'Frontline sales (CC)' : '一线销售（CC）') : '销售成员', key: 'salesMember', width: 140, render: (_: unknown, account: Account) => account.isSalesMember ? <Tag color="blue">{phase5 ? 'CC' : '销售'}</Tag> : <Text type="secondary">—</Text> },
     {
       title: t('sys.acc.col.role'),
       dataIndex: 'roleId',
@@ -493,12 +497,12 @@ export default function SystemConfig() {
       title={
         <span className="section-title">
           <SafetyOutlined style={{ marginRight: 8 }} />
-          {t('sys.title')}
+          {t('sys.title')}{phase5 ? (lang === 'en' ? ' · Phase 5' : ' · 五期') : ''}
         </span>
       }
     >
       <div style={{ marginBottom: 12 }}>
-        <Text type="secondary">{t('sys.intro')}</Text>
+        <Text type="secondary">{phase5 ? (lang === 'en' ? 'Roles control permissions. Mark frontline sales (CC) in member accounts; CCs may add up to 3 membership days per operation in both centers.' : '角色管理操作权限；在成员账号中标记一线销售（CC）。CC 在用户中心和销售中心每次添加会员时长均最多 3 天。') : t('sys.intro')}</Text>
       </div>
 
       <Tabs
@@ -712,6 +716,7 @@ export default function SystemConfig() {
       {/* 新增 / 编辑成员 */}
       <Modal
         open={accOpen}
+        afterOpenChange={populateAcc}
         title={accEditing ? t('sys.acc.edit') : t('sys.acc.add')}
         onCancel={() => setAccOpen(false)}
         onOk={submitAcc}
@@ -766,7 +771,7 @@ export default function SystemConfig() {
               options={lines.map((l) => ({ label: l, value: l }))}
             />
           </Form.Item>
-          <Form.Item name="isSalesMember" label="销售成员" valuePropName="checked" extra="开启后纳入五期 CC 筛选的在职销售列表；接收分配还需启用账号、销售操作权限及对应业务线权限。"><Switch checkedChildren="是" unCheckedChildren="否" /></Form.Item>
+          <Form.Item name="isSalesMember" label={phase5 ? (lang === 'en' ? 'Frontline sales (CC)' : '是否为一线销售（CC）') : '销售成员'} valuePropName="checked" extra={phase5 ? (lang === 'en' ? 'Identifies a CC without granting permissions. Enabled CCs appear in business-line CC filters; membership extensions are limited to 3 days per operation. Assignment also requires sales operation and business-line access.' : '仅标识 CC 身份，不自动增加权限。启用的 CC 纳入对应业务线筛选；每次添加会员上限 3 天。承接分配仍需销售操作及业务线权限。') : '开启后纳入五期 CC 筛选的在职销售列表；接收分配还需启用账号、销售操作权限及对应业务线权限。'}><Switch checkedChildren={lang === 'en' ? 'Yes' : '是'} unCheckedChildren={lang === 'en' ? 'No' : '否'} /></Form.Item>
           <Form.Item name="status" label={t('sys.acc.col.status')} valuePropName="checked">
             <Switch
               checkedChildren={t('sys.status.enabled')}

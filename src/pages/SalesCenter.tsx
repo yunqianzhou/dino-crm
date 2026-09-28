@@ -1,6 +1,8 @@
 import CCSelect from '../components/CCSelect'
+import MembershipModal5 from '../components/MembershipModal5'
+import { appointmentMatches5, followReason5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
 import LeadAssignmentModal from '../components/LeadAssignmentModal'
-import { isSalesMember } from '../phase5'
+import { assignLeads, canReceiveLead, isSalesMember } from '../phase5'
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
@@ -43,6 +45,7 @@ import { useLineScope } from '../useLineScope'
 import { businessLineOf, lineLabel, lpChannelSourceText, appChannelSourceText } from '../channel'
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
+import { tzOf } from '../time'
 import { CONSULTATION_STAGE_COLOR, CONSULTATION_STAGES, consultationStage, currentAppointment } from '../salesLifecycle'
 import { downloadXlsx } from '../export'
 import { callSeconds, matchesCallback, matchesLocalDateRange, reportTime, validCallback } from '../salesReporting'
@@ -95,6 +98,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const channels = useStore((s) => s.channels)
   const lessons = useStore((s) => s.lessons ?? [])
   const callRecords = useStore((s) => s.callRecords ?? [])
+  const stageOf = (student: Student) => phase5 ? followStage5(student, callRecords) : consultationStage(student, callRecords)
+  const stageLabel = (stage: string) => stage === 'Rejected' ? text('已拒绝（Rejected）', 'Rejected') : stage === 'Closed' ? text('已关闭（Closed）', 'Closed') : t(`sales.consultation.stage.${stage}`)
   const salesSettings = useStore((s) => s.salesSettings)
   const accounts = useStore((s) => s.accounts)
   const roles = useStore((s) => s.roles)
@@ -119,8 +124,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
 
   // 可被分配的销售：启用状态、非系统管理员、且角色具备销售模块「操作」权限
   const salesAccounts = useMemo(
-    () => accounts.filter((a) => a.status === '启用' && a.roleId !== 'role_admin' && roles.find((r) => r.id === a.roleId)?.perms.sales === 'operate' && a.businessLines.some(matchLine)),
-    [accounts, roles, matchLine, lineSel],
+    () => accounts.filter((a) => phase5
+      ? [...new Set(students.map(s => businessLineOf(channels, s)))].some(line => matchLine(line) && canReceiveLead(a, roles, line))
+      : a.status === '启用' && a.roleId !== 'role_admin' && roles.find((r) => r.id === a.roleId)?.perms.sales === 'operate' && a.businessLines.some(matchLine)),
+    [phase5, accounts, roles, matchLine, lineSel, students, channels],
   )
 
   const [tab, setTab] = useState(dashboardQuery.get('tab') === 'pool' ? 'pool' : 'follow')
@@ -140,11 +147,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const [callDateRange, setCallDateRange] = useState<any>(null)
   const [consultationStageFilter, setConsultationStageFilter] = useState<string[]>([])
   const [landingCallbackFilter, setLandingCallbackFilter] = useState<string | undefined>()
+  const [appointmentFilter5, setAppointmentFilter5] = useState<string>()
+  const [appointmentRange5, setAppointmentRange5] = useState<any>(null)
+  const [outcomeReasonFilter5, setOutcomeReasonFilter5] = useState<string>()
+  const [addingMembership, setAddingMembership] = useState<Student | null>(null)
   const [pages, setPages] = useState<Record<string, { current: number; pageSize: number }>>({})
   const [sorts, setSorts] = useState<Record<string, { field?: string; order?: string }>>({})
   useEffect(() => {
     setPages((prev) => ({ ...prev, pool: { ...prev.pool, current: 1, pageSize: prev.pool?.pageSize || 10 }, follow: { ...prev.follow, current: 1, pageSize: prev.follow?.pageSize || 10 } }))
-  }, [keyword, lineSel, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter])
+  }, [keyword, lineSel, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter, appointmentFilter5, appointmentRange5, outcomeReasonFilter5])
   useEffect(() => { setPages((prev) => ({ ...prev, follow: { current: 1, pageSize: prev.follow?.pageSize || 10 } })) }, [consultationStageFilter])
   useEffect(() => { setPages((prev) => ({ ...prev, calls: { current: 1, pageSize: prev.calls?.pageSize || 10 } })) }, [keyword, lineSel, callResultFilter, callAgentFilter, callDateRange])
   useEffect(() => {
@@ -158,7 +169,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     setSorts((prev) => ({ ...prev, [key]: { field: sorter.field, order: sorter.order } }))
   }
 
-  const selectionScope = JSON.stringify([account?.id, actor, tab, lineSel, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, canBatchAssign])
+  const selectionScope = JSON.stringify([account?.id, actor, tab, lineSel, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, appointmentFilter5, appointmentRange5, outcomeReasonFilter5, canBatchAssign])
   useEffect(() => { setSelectedIds([]); setBatchRecords(null) }, [selectionScope])
   const batchSelection = canBatchAssign ? { selectedRowKeys: selectedIds, preserveSelectedRowKeys: true, onChange: (keys: React.Key[]) => setSelectedIds(keys), columnWidth: 48 } : undefined
   const ccAccounts = accounts.filter(item => item.businessLines.some(matchLine) || (item.businessLines.length === 0 && isSalesMember(item) && roles.find(role => role.id === item.roleId)?.dataScope === 'all'))
@@ -207,8 +218,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const showVietnamStageFilter = filterOptions(lineOptions).includes('越南') && (lineSel.length === 0 || lineSel.includes('越南'))
 
   useEffect(() => {
-    if (!showVietnamStageFilter && consultationStageFilter.length) setConsultationStageFilter([])
-  }, [showVietnamStageFilter, consultationStageFilter])
+    if (!phase5 && !showVietnamStageFilter && consultationStageFilter.length) setConsultationStageFilter([])
+  }, [phase5, showVietnamStageFilter, consultationStageFilter])
 
   const leadText = (s: Student) =>
     `${s.phone ?? ''} ${s.studentId} ${s.localName ?? s.name} ${s.country ?? ''}`.toLowerCase()
@@ -287,8 +298,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   )
 
   const followData = useMemo(
-    () => followAll.filter(matchesLeadFilters).filter((s) => consultationStageFilter.length === 0 || (s.businessLine === '越南' && consultationStageFilter.includes(consultationStage(s, callRecords)))),
-    [followAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
+    () => followAll.filter(matchesLeadFilters).filter(s => !phase5 || (appointmentMatches5(s, appointmentFilter5, appointmentRange5?.[0]?.format('YYYY-MM-DD'), appointmentRange5?.[1]?.format('YYYY-MM-DD')) && (!outcomeReasonFilter5 || followReason5(s) === outcomeReasonFilter5 || followReason5(s)?.startsWith(`${outcomeReasonFilter5}：`)))).filter((s) => consultationStageFilter.length === 0 || ((phase5 || s.businessLine === '越南') && consultationStageFilter.includes(stageOf(s)))),
+    [phase5, tab, appointmentFilter5, appointmentRange5, outcomeReasonFilter5, followAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -396,7 +407,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     form.setFieldsValue({
       note: '',
       purchaseIntention: s.purchaseIntention || '未填写',
-      lifecycleAction: 'continue',
+      lifecycleAction: phase5 && (s.salesOutcome5?.stage === 'rejected' || s.salesLifecycleStatus === '已关闭') ? 'reactivate' : 'continue',
       scheduledStartAt: undefined,
       meetingLink: '',
       reason: '',
@@ -412,7 +423,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     const action = v.lifecycleAction as string | undefined
     const actionLabel: Record<string, string> = {
       continue: '继续跟进', pause: '暂不跟进', create: '新建预约', reschedule: '已改期', cancel: '已取消预约', attended: '已出勤',
-      noShow: '未出勤', completed: '咨询完成', incomplete: '咨询未完成', close: '已关闭', reactivate: '已重新激活',
+      noShow: '未出勤', completed: '咨询完成', incomplete: '咨询未完成', reject: '已拒绝（Rejected）', close: '已关闭', reactivate: '已重新激活',
     }
     // 业务发生时间暂不由销售手动填写，事件发生时间与本次保存时间保持一致。
     const occurredAt = now
@@ -430,9 +441,9 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
                 appointments = appointments.map((item) => item.appointmentId === current.appointmentId ? { ...item, appointmentStatus: '已改期' as const, reason, updatedBy: actor, updatedAt: now } : item)
               }
               const appointmentId = uid('sa_')
-              appointments = [{ appointmentId, scheduledStartAt: v.scheduledStartAt.format('YYYY-MM-DD HH:mm:ss'), timezone: 'Asia/Ho_Chi_Minh', meetingLink: v.meetingLink, appointmentStatus: '已预约', attendanceStatus: '待标记', consultationStatus: '待标记', note, createdBy: actor, createdAt: now }, ...appointments]
+              appointments = [{ appointmentId, scheduledStartAt: v.scheduledStartAt.format('YYYY-MM-DD HH:mm:ss'), timezone: phase5 ? tzOf(x.country || x.businessLine) : 'Asia/Ho_Chi_Minh', meetingLink: v.meetingLink, appointmentStatus: '已预约', attendanceStatus: '待标记', consultationStatus: '待标记', note, createdBy: actor, createdAt: now }, ...appointments]
               event = { eventId: uid('sle_'), node: 'appointment' as SalesLifecycleNode, result: action === 'reschedule' ? '已改期' : '已预约', reason, description: note, appointmentId, occurredAt, reportedAt: now, reportedBy: actor, source: 'CC手动' as const }
-            } else if (action === 'close' || action === 'reactivate') {
+            } else if (action === 'close' || action === 'reject' || action === 'reactivate') {
               event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason, description: note, occurredAt, reportedAt: now, reportedBy: actor, source: 'CC手动' as const }
             } else if (current) {
               appointments = appointments.map((item) => {
@@ -451,6 +462,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
             purchaseIntention: v.purchaseIntention,
             salesProgress: currentProgress,
             salesLifecycleStatus: action === 'close' ? '已关闭' : action === 'reactivate' ? '进行中' : x.salesLifecycleStatus,
+            ...(phase5 ? { salesOutcome5: action === 'reject' || action === 'close' ? { stage: action === 'reject' ? 'rejected' as const : 'closed' as const, reason } : action === 'reactivate' || action === 'continue' ? undefined : x.salesOutcome5 } : {}),
             salesAppointments: appointments,
             salesLifecycleEvents: event ? [event, ...(x.salesLifecycleEvents ?? [])] : x.salesLifecycleEvents,
             salesLatestNote: historyNote,
@@ -470,15 +482,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     const action = v.lifecycleAction as string | undefined
     const activeAppointment = editing?.salesAppointments?.find((item) => item.appointmentStatus === '已预约' && item.attendanceStatus === '待标记' && item.consultationStatus === '待标记')
     const currentStage = editing ? consultationStage(editing, callRecords) : undefined
-    if (editing?.businessLine === '越南' && editing.salesLifecycleStatus === '已关闭' && action !== 'reactivate') {
+    if ((phase5 || editing?.businessLine === '越南') && (editing?.salesLifecycleStatus === '已关闭' || (phase5 && editing?.salesOutcome5?.stage === 'rejected')) && action !== 'reactivate') {
       message.warning(t('sales.consultation.guard.closed'))
       return
     }
-    if (editing?.businessLine === '越南' && editing.salesProgress === '暂不跟进' && !['continue', 'close'].includes(action || '')) {
+    if (editing?.businessLine === '越南' && editing.salesProgress === '暂不跟进' && !(phase5 ? ['continue', 'close', 'reject'] : ['continue', 'close']).includes(action || '')) {
       message.warning(t('sales.consultation.guard.paused'))
       return
     }
-    if (editing?.businessLine === '越南' && activeAppointment && ['pause', 'close'].includes(action || '')) {
+    if (editing?.businessLine === '越南' && activeAppointment && (phase5 ? ['pause'] : ['pause', 'close']).includes(action || '')) {
       message.warning(t('sales.consultation.guard.activeAppointment'))
       return
     }
@@ -486,18 +498,24 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       message.warning(t('sales.consultation.guard.paymentPending'))
       return
     }
-    const immutableActions = ['reschedule', 'cancel', 'attended', 'noShow', 'completed', 'incomplete', 'close']
+    if (phase5 && ['reject', 'close'].includes(action || '') && !(action === 'reject' ? REJECTED_REASONS5 : CLOSED_REASONS5).some(reason => reason[0] === v.reason)) {
+      message.error(text('请选择该阶段对应的原因', 'Select a reason for this stage'))
+      return
+    }
+    const immutableActions = ['reschedule', 'cancel', 'attended', 'noShow', 'completed', 'incomplete', 'close', 'reject']
     if (!immutableActions.includes(action || '')) {
       persistFollow(v)
       return
     }
-    const content = action === 'close'
+    const content = phase5 && ['reject', 'close'].includes(action || '')
+      ? text('将记录该阶段及原因。已有预约和历史记录保留，可通过重新激活继续跟进。', 'Record this stage and reason. Existing appointments and history are retained; reactivate to resume follow-up.')
+      : action === 'close'
       ? t('sales.consultation.confirm.close')
       : ['cancel', 'noShow', 'completed', 'incomplete'].includes(action || '')
         ? t('sales.consultation.confirm.endAppointment')
         : t('sales.consultation.confirm.immutable')
     Modal.confirm({
-      title: t('sales.consultation.confirm.title', { action: t(`sales.consultation.action.${action}`) }),
+      title: t('sales.consultation.confirm.title', { action: action === 'reject' ? 'Rejected' : t(`sales.consultation.action.${action}`) }),
       content,
       okText: t('common.confirm'),
       cancelText: t('common.cancel'),
@@ -565,6 +583,20 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     if (!reassigning) return
     if (!reassignTo) {
       message.warning(t('sales.reassign.required'))
+      return
+    }
+    if (phase5) {
+      let resultMessage = ''
+      let failed = false
+      setState(state => {
+        const result = assignLeads(state, { records: [reassigning], target: reassignTo, actor, source: '销售中心五期', scope: allowedLines(), permitted: canReassign && can('salesV3') !== 'none' && account?.status !== '停用', seeAllOwners, reason: '' })
+        failed = result.results[0]?.status === '失败'
+        resultMessage = result.results[0]?.reason || ''
+        return result.state
+      })
+      if (failed) { message.error(resultMessage); return }
+      message.success(resultMessage)
+      setReassigning(null)
       return
     }
     const target = salesAccounts.find((a) => a.email === reassignTo)
@@ -686,13 +718,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       width: 245,
       render: (_: unknown, s) => {
         if (dashboardScope && !isSalesLead(s, lessons)) return <Text type="secondary">—</Text>
-        const stage = consultationStage(s, callRecords)
-        if (s.businessLine !== '越南') return <Text type="secondary">—</Text>
+        const stage = stageOf(s)
+        if (!phase5 && s.businessLine !== '越南') return <Text type="secondary">—</Text>
         const appointment = stage === '已预约' ? currentAppointment(s) : undefined
         const appointmentTimezone = appointment?.timezone || 'Asia/Ho_Chi_Minh'
         return <Space direction="vertical" size={2}>
-          <Tag color={CONSULTATION_STAGE_COLOR[stage]}>{t(`sales.consultation.stage.${stage}`)}</Tag>
-          {appointment && <span data-testid="follow-appointment-time">
+          <Tag color={stage === 'Rejected' ? 'red' : CONSULTATION_STAGE_COLOR[stage]}>{stageLabel(stage)}</Tag>
+          {!phase5 && appointment && <span data-testid="follow-appointment-time">
             <span style={{ display: 'block', whiteSpace: 'nowrap' }}>{appointment.scheduledStartAt}</span>
             <Text type="secondary" style={{ fontSize: 12 }}>
               {appointmentTimezone} · UTC{dayjs.tz(appointment.scheduledStartAt, appointmentTimezone).format('Z')}
@@ -827,6 +859,17 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const followColumns: ColumnsType<Student> = [
     ...userColumns.filter((column) => column.key !== 'callCount'),
     ...consultationColumns,
+    ...(phase5 ? [
+      { title: text('跟进原因', 'Follow-up reason'), key: 'followReason5', width: 220, render: (_: unknown, s: Student) => {
+        const reason = followReason5(s)
+        const matched = [...REJECTED_REASONS5, ...CLOSED_REASONS5].find(item => item[0] === reason)
+        return lang === 'en' && matched ? matched[1] : reason || '—'
+      } },
+      { title: text('销售预约时间', 'Sales appointment time'), key: 'appointmentTime5', width: 240, render: (_: unknown, s: Student) => {
+        const appointment = currentAppointment(s)
+        return appointment ? <div><div>{appointment.scheduledStartAt}</div><Text type="secondary" style={{ fontSize: 12 }}>{appointment.timezone}</Text></div> : '—'
+      } },
+    ] : []),
     {
       title: t('sales.col.latestNote'),
       dataIndex: 'salesLatestNote',
@@ -867,6 +910,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
                         ? [{ key: 'trialReport', label: t('lesson.col.report'), onClick: () => window.open(TRIAL_REPORT_URL, '_blank', 'noopener,noreferrer') }]
                         : []),
                       ...(canEdit ? [
+                        ...(phase5 ? [{ key: 'membership', label: text('添加会员时长', 'Add membership days'), onClick: () => setAddingMembership(r) }] : []),
                         { key: 'drop', danger: true, icon: <RollbackOutlined />, label: t('sales.dropToPool'), onClick: () => openDrop(r) },
                         { key: 'trialLevel', label: text('修改试听课等级', 'Change trial level'), onClick: () => openTrialLevel(r) },
                       ] : []),
@@ -977,6 +1021,9 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     setFollowDateRange(null)
     setConsultationStageFilter([])
     setLandingCallbackFilter(undefined)
+    setAppointmentFilter5(undefined)
+    setAppointmentRange5(null)
+    setOutcomeReasonFilter5(undefined)
   }
 
   // 下载当前标签页、当前筛选范围内的数据，避免用户还需手动复刻页面筛选条件。
@@ -1001,10 +1048,11 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       const headers = (tab === 'pool' ? poolColumns : followColumns).filter((column) => column.key !== 'op').map((column) => String(column.title))
       downloadXlsx(filename, headers, leads.map((s) => {
         const country = s.country || s.businessLine
-        const stage = s.businessLine === '越南' ? consultationStage(s, callRecords) : '—'
+        const stage = phase5 || s.businessLine === '越南' ? stageOf(s) : '—'
         const appointment = stage === '已预约' ? currentAppointment(s) : undefined
-        const stageText = appointment ? `${stage} · ${appointment.scheduledStartAt} ${appointment.timezone}` : stage
-        return [s.studentId, s.localName || s.name, s.purchaseIntention || '未填写', resolveUserStatus(s, lessons), resolveUserType(s), s.ageGroup || '—', s.courseLevel || '—', s.account, lpChannelSourceText(channels, s), s.channelCode || '—', appChannelSourceText(s), lineLabel(s), validCallback(s.landingCallbackAt) ? `已填写 · ${reportTime(s.landingCallbackAt, country)}` : '未填写', reportTime(s.registerTime, country), accounts.find((a) => a.email === s.salesOwner)?.name || s.salesOwner || '—', ...(tab === 'pool' && isLeader ? [leadCallCounts.get(s.studentId) || '未外呼'] : []), ...(tab === 'follow' ? [stageText, s.salesLatestNote || '—', reportTime(s.salesUpdatedAt, country)] : [])]
+        const stageText = !phase5 && appointment ? `${stage} · ${appointment.scheduledStartAt} ${appointment.timezone}` : stage
+        const displayedAppointment = currentAppointment(s)
+        return [s.studentId, s.localName || s.name, s.purchaseIntention || '未填写', resolveUserStatus(s, lessons), resolveUserType(s), s.ageGroup || '—', s.courseLevel || '—', s.account, lpChannelSourceText(channels, s), s.channelCode || '—', appChannelSourceText(s), lineLabel(s), validCallback(s.landingCallbackAt) ? `已填写 · ${reportTime(s.landingCallbackAt, country)}` : '未填写', reportTime(s.registerTime, country), accounts.find((a) => a.email === s.salesOwner)?.name || s.salesOwner || '—', ...(tab === 'pool' && isLeader ? [leadCallCounts.get(s.studentId) || '未外呼'] : []), ...(tab === 'follow' ? [stageText, ...(phase5 ? [followReason5(s) || '—', displayedAppointment ? `${displayedAppointment.scheduledStartAt} ${displayedAppointment.timezone}` : '—'] : []), s.salesLatestNote || '—', reportTime(s.salesUpdatedAt, country)] : [])]
       }))
     }
     message.success('数据下载已开始')
@@ -1030,8 +1078,16 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
           <DatePicker.RangePicker className="sales-filter-date" value={callDateRange} onChange={setCallDateRange} allowClear placeholder={[t('pkg.startTime'), t('pkg.endTime')]} />
         </>
       ) : <>
-        {seeAllOwners && (phase5 ? <CCSelect className="sales-filter-control" accounts={ccAccounts} owners={salesLeads.map(student => student.salesOwner || '')} value={ownerFilter} onChange={setOwnerFilter} /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />)}
-        {tab === 'follow' && showVietnamStageFilter && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={CONSULTATION_STAGES.map((value) => ({ label: t(`sales.consultation.stage.${value}`), value }))} />}
+        {seeAllOwners && (phase5 ? <Select className="sales-filter-control" aria-label="CC" allowClear showSearch optionFilterProp="label" placeholder="CC" popupMatchSelectWidth={360} value={ownerFilter} onChange={setOwnerFilter} options={ccAccounts.filter(a => a.status === '启用' && isSalesMember(a)).map(a => ({label: `${a.name} (${a.email})`, value: a.email}))} /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />)}
+        {tab === 'follow' && (phase5 || showVietnamStageFilter) && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={(phase5 ? FOLLOW_STAGES5 : CONSULTATION_STAGES).map((value) => ({ label: stageLabel(value), value }))} />}
+        {phase5 && tab === 'follow' && <>
+          <Select className="sales-filter-control" aria-label={text('跟进原因', 'Follow-up reason')} allowClear showSearch optionFilterProp="label" placeholder={text('跟进原因', 'Follow-up reason')}
+            value={outcomeReasonFilter5} onChange={setOutcomeReasonFilter5} options={[...REJECTED_REASONS5, ...CLOSED_REASONS5].map(([zh, en]) => ({value: zh, label: text(zh, en)}))} />
+          <Select className="sales-filter-control" aria-label={text('销售预约', 'Sales appointment')} allowClear placeholder={text('销售预约', 'Sales appointment')} value={appointmentFilter5} onChange={setAppointmentFilter5}
+            options={[{value:'booked',label:text('有销售预约', 'Has a sales appointment')},{value:'none',label:text('无销售预约', 'No sales appointment')}]} />
+          <DatePicker.RangePicker className="sales-filter-date" aria-label={text('销售预约日期范围', 'Sales appointment dates')} value={appointmentRange5} onChange={setAppointmentRange5}
+            placeholder={[text('预约开始日期', 'Appointment from'),text('预约结束日期', 'Appointment to')]} />
+        </>}
         <Select className="sales-filter-control" allowClear placeholder={text('预约外呼', 'Callback')} value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: text('已填写预约外呼', 'Callback provided'), value: 'filled' }, { label: text('待外呼（已到时间）', 'Callback due'), value: 'due' }, { label: text('即将外呼（24小时内）', 'Callback within 24 hours'), value: 'upcoming' }]} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={text('购买意向', 'Purchase intent')} value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value, i) => ({ label: t(['sales.purchaseIntention.yes', 'sales.purchaseIntention.no', 'sales.purchaseIntention.none'][i]), value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.courseLevel')} value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />
@@ -1191,13 +1247,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
 
       <Modal_Follow
         t={t}
+        phase5={phase5}
         editing={editing}
         form={form}
         hasConnectedCall={editing ? callRecords.some((item) => item.studentId === editing.studentId && item.result === '已接通') : false}
-        currentStage={editing ? consultationStage(editing, callRecords) : undefined}
+        currentStage={editing ? stageOf(editing) : undefined}
         onCancel={() => setEditing(null)}
         onOk={saveFollow}
       />
+      {addingMembership && <MembershipModal5 student={addingMembership} source="sales" permitted={canEdit && can('salesV3') !== 'none'} onClose={() => setAddingMembership(null)} />}
 
       <Modal_Dial t={t} dialing={dialing} onCancel={() => setDialing(null)} onSave={saveCall} />
       <Modal_Consultation student={consulting} paid={consulting ? isPaidStudent(consulting) : false} hasConnectedCall={consulting ? callRecords.some((item) => item.studentId === consulting.studentId && item.result === '已接通') : false} onCancel={() => setConsulting(null)} onSave={saveConsultation} />
@@ -1225,7 +1283,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
           value={reassignTo}
           onChange={setReassignTo}
           options={salesAccounts
-            .filter((a) => a.email !== reassigning?.salesOwner)
+            .filter((a) => a.email !== reassigning?.salesOwner && (!phase5 || !reassigning || canReceiveLead(a, roles, businessLineOf(channels, reassigning))))
             .map((a) => ({ label: `${a.name}（${a.email}）`, value: a.email }))}
         />
       </Modal>
@@ -1450,6 +1508,7 @@ function Modal_Dial({
 // 更新跟进弹窗
 function Modal_Follow({
   t,
+  phase5 = false,
   editing,
   form,
   hasConnectedCall,
@@ -1462,16 +1521,18 @@ function Modal_Follow({
   form: ReturnType<typeof Form.useForm>[0]
   hasConnectedCall: boolean
   currentStage?: string
+  phase5?: boolean
   onCancel: () => void
   onOk: () => void
 }) {
+  const { lang } = useI18n()
   const history: SalesFollowLog[] = editing?.salesHistory ?? []
   // No Show、已完课等属于上一场预约的结束结果，后续应新建一场预约，不能继续推进旧预约。
   const activeAppointment = editing?.salesAppointments?.find((item) => item.appointmentStatus === '已预约' && item.attendanceStatus === '待标记' && item.consultationStatus === '待标记')
   const lifecycleAction = Form.useWatch('lifecycleAction', form)
   const reasonValue = Form.useWatch('reason', form)
-  const isVietnamLead = editing?.businessLine === '越南'
-  const isClosed = editing?.salesLifecycleStatus === '已关闭'
+  const isVietnamLead = phase5 || editing?.businessLine === '越南'
+  const isClosed = editing?.salesLifecycleStatus === '已关闭' || (phase5 && editing?.salesOutcome5?.stage === 'rejected')
   const isPaused = editing?.salesProgress === '暂不跟进'
   const appointmentHistory = editing?.salesAppointments ?? []
   const reasonOptions: Record<string, string[]> = {
@@ -1480,18 +1541,20 @@ function Modal_Follow({
     cancel: ['客户主动取消', '时间冲突', '重复预约', '其他'],
     noShow: ['客户未到会', '无法联系', '会议技术问题', '其他'],
     incomplete: ['中途离开', '时间不足', '会议异常', '其他'],
-    close: ['明确拒绝', '号码无效', '重复 Lead', '要求不联系', '其他'],
+    reject: REJECTED_REASONS5.map(reason => reason[0]),
+    close: phase5 ? CLOSED_REASONS5.map(reason => reason[0]) : ['明确拒绝', '号码无效', '重复 Lead', '要求不联系', '其他'],
   }
   const lifecycleOptions = isClosed
     ? [{ label: t('sales.consultation.action.reactivate'), value: 'reactivate' }]
     : isPaused
       ? [
           { label: t('sales.consultation.action.resume'), value: 'continue' },
-          { label: t('sales.consultation.action.close'), value: 'close' },
+          ...(phase5 ? [{label: 'Rejected', value: 'reject'}] : []),
+          { label: phase5 ? 'Closed' : t('sales.consultation.action.close'), value: 'close' },
         ]
       : [
           { label: t('sales.consultation.action.continue'), value: 'continue' },
-          ...(!activeAppointment ? [{ label: t('sales.consultation.action.pause'), value: 'pause' }] : []),
+          ...(!phase5 && !activeAppointment ? [{ label: t('sales.consultation.action.pause'), value: 'pause' }] : []),
           ...(!activeAppointment && currentStage !== '咨询完成待支付' && (currentStage === '待外呼' || appointmentHistory.length > 0 || hasConnectedCall) ? [{ label: t('sales.consultation.action.create'), value: 'create' }] : []),
           ...(activeAppointment ? [
         { label: t('sales.consultation.action.reschedule'), value: 'reschedule' },
@@ -1500,9 +1563,9 @@ function Modal_Follow({
         { label: t('sales.consultation.action.completed'), value: 'completed' },
         { label: t('sales.consultation.action.incomplete'), value: 'incomplete' },
           ] : []),
-          ...(!activeAppointment ? [{ label: t('sales.consultation.action.close'), value: 'close' }] : []),
+          ...(phase5 ? [{ label: 'Rejected', value: 'reject' }, { label: 'Closed', value: 'close' }] : !activeAppointment ? [{ label: t('sales.consultation.action.close'), value: 'close' }] : []),
         ]
-  const requiresReason = ['pause', 'reschedule', 'cancel', 'noShow', 'incomplete', 'close'].includes(lifecycleAction)
+  const requiresReason = ['reject', 'pause', 'reschedule', 'cancel', 'noShow', 'incomplete', 'close'].includes(lifecycleAction)
   return (
     <ModalWrapper open={!!editing} title={t('sales.modal.title')} onCancel={onCancel} onOk={onOk} okText={t('sales.saveFollow')} cancelText={t('common.cancel')}>
       <Form form={form} layout="vertical" preserve={false} style={{ marginTop: 8 }}>
@@ -1522,17 +1585,18 @@ function Modal_Follow({
           </Select>
         </Form.Item>
         {isVietnamLead && <>
-          {currentStage && <div style={{ marginBottom: 12 }}>{t('sales.consultation.currentStage')}：<Tag color={CONSULTATION_STAGE_COLOR[currentStage]}>{t(`sales.consultation.stage.${currentStage}`)}</Tag></div>}
+          {phase5 && ['reject', 'close'].includes(lifecycleAction) && <Typography.Paragraph type="secondary">{lifecycleAction === 'reject' ? (lang === 'en' ? 'Customer answered but rejected. Choose the rejection reason.' : '客户接听后拒绝，请选择拒绝原因。') : (lang === 'en' ? 'Sales confirmed no further follow-up. Trial completion is not required.' : '销售确认不再推进，不要求已完成试听课。')}</Typography.Paragraph>}
+          {currentStage && <div style={{ marginBottom: 12 }}>{t('sales.consultation.currentStage')}：<Tag color={CONSULTATION_STAGE_COLOR[currentStage]}>{currentStage === 'Rejected' || currentStage === 'Closed' ? currentStage : t(`sales.consultation.stage.${currentStage}`)}</Tag></div>}
           {activeAppointment && <div style={{ marginBottom: 12 }}><Tag color="blue">{t('sales.consultation.currentAppointment')}：{activeAppointment.scheduledStartAt}</Tag></div>}
           {!activeAppointment && currentStage !== '待外呼' && appointmentHistory.length === 0 && !hasConnectedCall && <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.consultation.noAppointment')} description={t('sales.consultation.noAppointmentHint')} />}
           <Form.Item name="lifecycleAction" label={t('sales.consultation.nextAction')}>
             <Select options={lifecycleOptions} onChange={() => form.setFieldsValue({ reason: undefined, reasonOther: '' })} />
           </Form.Item>
           {['create', 'reschedule'].includes(lifecycleAction) && <>
-            <Form.Item name="scheduledStartAt" label={t('sales.consultation.appointmentTime')} rules={[{ required: true, message: t('sales.consultation.appointmentTimeRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
+            <Form.Item name="scheduledStartAt" label={`${t('sales.consultation.appointmentTime')}${phase5 ? ` · ${tzOf(editing?.country || editing?.businessLine)}` : ''}`} rules={[{ required: true, message: t('sales.consultation.appointmentTimeRequired') }]}><DatePicker showTime style={{ width: '100%' }} /></Form.Item>
             <Form.Item name="meetingLink" label="Google Meet"><Input placeholder={t('sales.optional')} /></Form.Item>
           </>}
-          {requiresReason && <Form.Item name="reason" label={t('sales.consultation.reason')} rules={[{ required: true, message: t('sales.consultation.reasonRequired') }]}><Select options={(reasonOptions[lifecycleAction] || []).map((value) => ({ label: t(`sales.consultation.reasonOption.${value}`), value }))} /></Form.Item>}
+          {requiresReason && <Form.Item name="reason" label={t('sales.consultation.reason')} rules={[{ required: true, message: t('sales.consultation.reasonRequired') }]}><Select options={(reasonOptions[lifecycleAction] || []).map((value) => ({ label: phase5 && ['reject', 'close'].includes(lifecycleAction) ? (lang === 'en' ? [...REJECTED_REASONS5, ...CLOSED_REASONS5].find(r => r[0] === value)?.[1] || value : value) : t(`sales.consultation.reasonOption.${value}`), value }))} /></Form.Item>}
           {requiresReason && reasonValue === '其他' && <Form.Item name="reasonOther" label={t('sales.consultation.reasonOther')} rules={[{ required: true, message: t('sales.consultation.reasonOtherRequired') }]}><Input.TextArea rows={2} /></Form.Item>}
         </>}
         <Form.Item name="note" label={requiresReason ? t('sales.consultation.noteOptional') : t('sales.f.note')} rules={[{ required: !requiresReason, message: t('sales.f.noteRequired') }]}>

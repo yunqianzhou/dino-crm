@@ -81,6 +81,7 @@ export default function App() {
         >
           <Route index element={<HomeRedirect />} />
           <Route path="users-v5" element={<Guard module="usersV2"><UserCenter phase3 phase5 /></Guard>} />
+          <Route path="system-v5" element={<Guard module="system"><SystemConfig phase5 /></Guard>} />
           <Route path="users-v5/:studentId" element={<Guard module="usersV2"><UserDetail backPath="/users-v5" /></Guard>} />
           <Route path="sales-v5" element={<Guard module="salesV3"><SalesCenterP3 phase5 /></Guard>} />
           <Route path="sales-v5/:studentId" element={<Guard module="salesV3"><UserDetail variant="sales" backPath="/sales-v5" backText="返回销售中心五期" /></Guard>} />

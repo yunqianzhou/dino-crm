@@ -154,6 +154,7 @@ export type Student = {
   salesAppointments?: SalesAppointment[] // 销售咨询预约历史（与 App 课程分离）
   salesLifecycleEvents?: SalesLifecycleEvent[] // 节点标签上报事件（不可覆盖）
   salesLifecycleStatus?: SalesLifecycleStatus // 本期仅记录当前状态，不产生待办或提醒
+  salesOutcome5?: { stage: 'rejected' | 'closed'; reason: string } // 五期：拒绝与销售关闭分开记录
   // 用户在 Landing Page 主动提交的期望外呼时间。由落地页服务按 UTC 回传；
   // 它是销售的联系偏好，不等同于销售确认后的咨询预约（salesAppointments）。
   landingCallbackAt?: string

@@ -45,7 +45,7 @@ export function assignLeads(state: AppState, request: AssignmentRequest): { stat
     else if (!student) failure = '线索不存在'
     else if (request.scope !== null && !request.scope.includes(line)) failure = '不在授权业务线范围内'
     else if (request.source === '销售中心五期' && !request.seeAllOwners && student.salesOwner && student.salesOwner !== request.actor) failure = '不在可操作的线索范围内'
-    else if (!isSalesLead(student, state.lessons)) failure = '当前用户不符合销售线索条件'
+    else if (request.source === '销售中心五期' && !isSalesLead(student, state.lessons)) failure = '当前用户不符合销售线索条件'
     else if (student.salesOwner !== before.salesOwner) failure = '负责人已变化，请刷新后重试'
     else if (!target || !canReceiveLead(target, state.roles, line)) failure = '目标销售已停用、无承接权限或业务线不匹配'
     if (failure || !student || !target) {
@@ -57,7 +57,7 @@ export function assignLeads(state: AppState, request: AssignmentRequest): { stat
       continue
     }
     const old = state.accounts.find(account => account.email === student.salesOwner)
-    const oldLabel = old ? `${old.name}（${old.email}）` : student.salesOwner || '未分配'
+    const oldLabel = old ? `${old.name}（${old.email}）` : student.salesOwner || student.ccName || '未分配'
     const newLabel = `${target.name}（${target.email}）`
     const note = `【${request.source}】${oldLabel} → ${newLabel}${request.reason.trim() ? `；原因：${request.reason.trim()}` : ''}`
     const progress = student.salesOwner ? student.salesProgress || '跟进中' : '跟进中'

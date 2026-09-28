@@ -5,10 +5,13 @@ const { resolve, join } = require('node:path')
 const { execFileSync } = require('node:child_process')
 const tmp = mkdtempSync(join(tmpdir(), 'crm-phase5-tests-'))
 try {
-  execFileSync(resolve('node_modules/.bin/tsc'), ['src/phase5.ts', 'src/phase5Orders.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
+  execFileSync(resolve('node_modules/.bin/tsc'), ['src/phase5.ts', 'src/phase5Orders.ts', 'src/review5.ts', 'src/salesReporting.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
   const { assignLeads, canReceiveLead, withPhase5Members } = require(join(tmp, 'phase5.js'))
   const { matchesOrderFilters5, orderCreatedTime, orderTime5 } = require(join(tmp, 'phase5Orders.js'))
+  const { canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
+  const { matchesLocalDateRange } = require(join(tmp, 'salesReporting.js'))
+  const dayjs = require('dayjs')
   const target = { id: 'cc', name: '真实销售', email: 'cc@test.invalid', roleId: 'sales', isSalesMember: true, status: '启用', businessLines: ['越南'] }
   const roles = [{ id: 'sales', dataScope: 'line', perms: { salesV3: 'operate' } }]
   assert(canReceiveLead(target, roles, '越南'))
@@ -38,6 +41,48 @@ try {
   assert.equal(assignLeads(state, { ...request, permitted: false }).state.logs.length, 0)
   assert.equal(assignLeads(state, { ...request, seeAllOwners: false }).results[0].status, '失败')
   assert.equal(assignLeads(state, { ...request, source: '用户中心五期', seeAllOwners: false }).results[0].status, '成功', 'user center permission is independent of existing reassign permission')
+  const transferredUsers = assignLeads(state, { ...request, source: '用户中心五期' })
+  assert.equal(transferredUsers.results[2].status, '成功', 'paid users may change their CC in User Center')
+  assert.equal(transferredUsers.state.students[2].status, '付费', 'ownership transfer must not change paid status')
+  assert.deepEqual(transferredUsers.state.students[2].salesAppointments, lead.salesAppointments)
+  assert.deepEqual(transferredUsers.state.students[2].salesLifecycleEvents, lead.salesLifecycleEvents)
+  const perms = {usersV2:'view', salesV3:'view', salesV3_config:'operate'}
+  assert(canTransferUser5(key => perms[key] || 'none', target))
+  for (const key of ['usersV2', 'salesV3', 'salesV3_config']) assert(!canTransferUser5(k => k === key ? 'none' : perms[k] || 'none', target), `${key} required`)
+  assert(!canTransferUser5(key => perms[key] || 'none', {...target,status:'停用'}))
+  assert.deepEqual(ccFilterAccounts5([target, {...target,id:'noncc',isSalesMember:false}, {...target,id:'disabled',status:'停用'}, {...target,id:'foreign',businessLines:['韩国']}], roles, line => line === '越南', ['越南']), [target])
+  assert.equal(ccFilterAccounts5([target], roles, line => line === '韩国', ['韩国']).length, 0, 'hide CC filter if the scope has no CCs')
+  const membershipState = {...state, students:[{...lead,expireTime:'2026-09-30 00:00:00'}]}
+  const membershipRequest = {studentId:lead.studentId,days:3,actor:target.email,permitted:true,scope:['越南'],source:'users',now:'2026-09-28 00:00:00'}
+  for (const source of ['users','sales']) {
+    const extended = addMembership5(membershipState,{...membershipRequest,source})
+    assert.equal(extended.students[0].expireTime,'2026-10-03 00:00:00')
+    assert.equal(extended.students[0].editHistory[0].changes[0].before,'2026-09-30 00:00:00')
+    for (const days of [0, -1, 1.5, 4, NaN]) assert.throws(() => addMembership5(membershipState,{...membershipRequest,source,days}))
+  }
+  assert.throws(() => addMembership5(membershipState,{...membershipRequest,permitted:false}))
+  assert.throws(() => addMembership5(membershipState,{...membershipRequest,scope:['韩国']}))
+  assert.throws(() => addMembership5({...membershipState,accounts:[{...target,status:'停用'}]},membershipRequest))
+  assert.equal(membershipLimit5({...target,isSalesMember:false}),365, 'non-CC limit remains unchanged')
+  assert.equal(addMembership5({...membershipState,students:[{...lead,expireTime:'2020-01-01 00:00:00'}]},membershipRequest).students[0].expireTime,'2026-10-01 00:00:00', 'expired memberships extend from now')
+  const range = [dayjs('2026-09-28'),dayjs('2026-09-28')]
+  assert(matchesLocalDateRange('2026-09-27 17:00:00',range,'越南'))
+  assert(matchesLocalDateRange('2026-09-28 16:59:59',range,'越南'))
+  assert(!matchesLocalDateRange('2026-09-27 16:59:59',range,'越南'))
+  assert(!matchesLocalDateRange('2026-09-28 17:00:00',range,'越南'))
+  const booking = {appointmentId:'booking',appointmentStatus:'已预约',scheduledStartAt:'2026-09-30 23:59:59',timezone:'Asia/Ho_Chi_Minh',attendanceStatus:'待标记',consultationStatus:'待标记'}
+  const booked = {...lead,salesProgress:'跟进中',salesAppointments:[booking]}
+  assert(appointmentMatches5(booked,'booked','2026-09-30','2026-09-30'))
+  assert(!appointmentMatches5(booked,'booked','2026-10-01','2026-10-02'))
+  assert(!appointmentMatches5({...booked,salesAppointments:[{...booking,appointmentStatus:'已取消'}]},'booked'))
+  assert(appointmentMatches5({...booked,salesAppointments:[{...booking,appointmentStatus:'已取消'}]},'none'))
+  assert(!appointmentMatches5({...booked,salesAppointments:[]},undefined,'2026-09-30','2026-10-01'))
+  assert.equal(followStage5({...booked,salesOutcome5:{stage:'rejected',reason:'号码错误'}}),'Rejected')
+  assert.equal(followStage5({...booked,salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'费用高'}}),'Closed')
+  assert.equal(followStage5(booked),'已预约', 'trial facts are not required for existing appointment flow')
+  assert.equal(followReason5({...booked,salesOutcome5:{stage:'closed',reason:'费用高'}}),'费用高')
+  assert.equal(REJECTED_REASONS5.length,5)
+  assert.equal(CLOSED_REASONS5.length,11)
   assert.equal(assignLeads({ ...state, accounts: [{ ...target, status: '停用' }] }, request).results[0].status, '失败')
   const pool = { ...lead, studentId: 'pool', salesOwner: undefined, salesProgress: '待领取' }
   const allocated = assignLeads({ ...state, students: [pool] }, { ...request, records: [pool] })

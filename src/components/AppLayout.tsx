@@ -31,6 +31,7 @@ const { Header, Sider, Content } = Layout
 const { Text } = Typography
 
 const NAV_MODULE: Record<string, ModuleKey> = {
+  '/system-v5': 'system',
   '/users-v5': 'usersV2',
   '/sales-v5': 'salesV3',
   '/orders-v5': 'ordersV3',
@@ -133,6 +134,7 @@ export default function AppLayout() {
     { key: '/users-v5', icon: <TeamOutlined />, label: appABPhaseLabel(t('app.nav.users')) },
     { key: '/sales-v5', icon: <SolutionOutlined />, label: appABPhaseLabel(t('app.nav.sales')) },
     { key: '/orders-v5', icon: <ProfileOutlined />, label: appABPhaseLabel(t('app.nav.orders')) },
+    { key: '/system-v5', icon: <SafetyOutlined />, label: appABPhaseLabel(t('app.nav.system')) },
   ].filter(item => visible(item.key))
 
   const NAV = [
@@ -159,6 +161,7 @@ export default function AppLayout() {
   ]
 
   const TITLES: Record<string, string> = {
+    '/system-v5': lang === 'en' ? 'System Configuration · Phase 5' : '系统配置 · 五期',
     '/users-v5': '用户中心 · 五期',
     '/sales-v5': '销售中心 · 五期',
     '/orders-v5': '订单中心 · 五期',
