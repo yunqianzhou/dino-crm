@@ -22,7 +22,7 @@
 - “更多”菜单增加“添加会员时长”，沿用更新跟进操作权限，与用户中心共用表单及保存校验，CC 每次最多 3 天。
 - “我的跟进”独立显示销售预约时间及预约时区；改期后显示新预约，取消的预约不作为当前预约。日期按预约自身时区的日历日期，含两端。销售预约不等同于落地页预约外呼。
 - 阶段名称、原因、说明和确认提示适配当前可切换的中文、英文、韩文；保存前再次校验预约历史与原因匹配。
-- 新增 Rejected、Closed 分开的阶段、原因选择、列表原因和阶段筛选；按评审反馈不提供单独的跟进原因筛选。历史阶段不擅自转为新类别。
+- 新增 Rejected、Closed 分开的阶段、原因选择和阶段筛选；按评审反馈不提供单独的跟进原因筛选，销售中心列表及对应导出移除跟进原因列，更新跟进时的原因填写和历史记录保留。历史阶段不擅自转为新类别。
 - Rejected（已拒绝）：从未有过销售预约时才提供，包括家长拒绝接听电话；新增 Parent declined the call，保留业务截图原有 5 项：Wrong number、No demand、Call back later、Under 4 years old、Above 13/Adults。
 - Closed（已关闭）：有过销售预约后才提供，不再提供 Rejected；取消预约、改期、未出勤或完成咨询后仍属于预约后阶段。原因按截图保留 11 项：Course is unsuitable to kids、Kids don't like、Parent's don't like、High fee、Device、Payment method、Not trust branding、App bug/lagging、Window demands、Just want to take the trial class、Others。Others 需补充说明。
 - 用户已确认：保留原型已有销售预约、出席和咨询流程；不增加必须完成 App 试听课才能 Closed 的限制。Rejected／Closed 后可重新激活，历史记录和预约保留。

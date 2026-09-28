@@ -1,7 +1,7 @@
 import CCSelect from '../components/CCSelect'
 import SalesTimeFilter5 from '../components/SalesTimeFilter5'
 import MembershipModal5 from '../components/MembershipModal5'
-import { changeSalesPresence5, defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, followReason5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
+import { changeSalesPresence5, defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
 import LeadAssignmentModal from '../components/LeadAssignmentModal'
 import { assignLeads, canReceiveLead, isSalesMember } from '../phase5'
 import { useEffect, useMemo, useState } from 'react'
@@ -867,10 +867,6 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     ...userColumns.filter((column) => column.key !== 'callCount'),
     ...consultationColumns,
     ...(phase5 ? [
-      { title: t('sales.outcome.reasonLabel'), key: 'followReason5', width: 220, render: (_: unknown, s: Student) => {
-        const reason = followReason5(s)
-        return outcomeReasonLabel5(reason, t)
-      } },
       { title: text('销售预约时间', 'Sales appointment time'), key: 'appointmentTime5', width: 240, render: (_: unknown, s: Student) => {
         const appointment = currentAppointment(s)
         return appointment ? <div><div>{appointment.scheduledStartAt}</div><Text type="secondary" style={{ fontSize: 12 }}>{appointment.timezone}</Text></div> : '—'
@@ -1057,7 +1053,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
         const appointment = stage === '已预约' ? currentAppointment(s) : undefined
         const stageText = phase5 ? stageLabel(stage) : appointment ? `${stage} · ${appointment.scheduledStartAt} ${appointment.timezone}` : stage
         const displayedAppointment = currentAppointment(s)
-        return [s.studentId, s.localName || s.name, s.purchaseIntention || '未填写', resolveUserStatus(s, lessons), resolveUserType(s), s.ageGroup || '—', s.courseLevel || '—', s.account, lpChannelSourceText(channels, s), s.channelCode || '—', appChannelSourceText(s), lineLabel(s), validCallback(s.landingCallbackAt) ? `已填写 · ${reportTime(s.landingCallbackAt, country)}` : '未填写', reportTime(s.registerTime, country), accounts.find((a) => a.email === s.salesOwner)?.name || s.salesOwner || '—', ...(tab === 'pool' && isLeader ? [leadCallCounts.get(s.studentId) || '未外呼'] : []), ...(tab === 'follow' ? [stageText, ...(phase5 ? [outcomeReasonLabel5(followReason5(s), t), displayedAppointment ? `${displayedAppointment.scheduledStartAt} ${displayedAppointment.timezone}` : '—'] : []), s.salesLatestNote || '—', reportTime(s.salesUpdatedAt, country)] : [])]
+        return [s.studentId, s.localName || s.name, s.purchaseIntention || '未填写', resolveUserStatus(s, lessons), resolveUserType(s), s.ageGroup || '—', s.courseLevel || '—', s.account, lpChannelSourceText(channels, s), s.channelCode || '—', appChannelSourceText(s), lineLabel(s), validCallback(s.landingCallbackAt) ? `已填写 · ${reportTime(s.landingCallbackAt, country)}` : '未填写', reportTime(s.registerTime, country), accounts.find((a) => a.email === s.salesOwner)?.name || s.salesOwner || '—', ...(tab === 'pool' && isLeader ? [leadCallCounts.get(s.studentId) || '未外呼'] : []), ...(tab === 'follow' ? [stageText, ...(phase5 ? [displayedAppointment ? `${displayedAppointment.scheduledStartAt} ${displayedAppointment.timezone}` : '—'] : []), s.salesLatestNote || '—', reportTime(s.salesUpdatedAt, country)] : [])]
       }))
     }
     message.success('数据下载已开始')
