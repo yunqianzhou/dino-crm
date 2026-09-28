@@ -9,7 +9,7 @@ try {
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
   const { assignLeads, canReceiveLead, withPhase5Members } = require(join(tmp, 'phase5.js'))
   const { matchesOrderFilters5, orderCreatedTime, orderTime5 } = require(join(tmp, 'phase5Orders.js'))
-  const { defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
+  const { changeSalesTimeKind5, changeSalesPresence5, defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
   const { matchesLocalDateRange } = require(join(tmp, 'salesReporting.js'))
   const dayjs = require('dayjs')
   const target = { id: 'cc', name: '真实销售', email: 'cc@test.invalid', roleId: 'sales', isSalesMember: true, status: '启用', businessLines: ['越南'] }
@@ -88,8 +88,8 @@ try {
   assert(matchesSalesTime5(booked,appointmentQuery))
   assert(!matchesSalesTime5(noBooking,appointmentQuery), 'appointment type requires a sales booking even without dates')
   assert(!matchesSalesTime5({...booked,salesAppointments:[{...booking,appointmentStatus:'已取消'}]},appointmentQuery))
-  assert(matchesSalesTime5(noBooking,{...timeQuery,noAppointment:true}))
-  assert(!matchesSalesTime5(booked,{...timeQuery,noAppointment:true}))
+  assert(matchesSalesTime5(noBooking,{...timeQuery,appointmentPresence:'no'}))
+  assert(!matchesSalesTime5(booked,{...timeQuery,appointmentPresence:'no'}))
   const dayRange = [dayjs('2026-09-30'),dayjs('2026-09-30')]
   assert(matchesSalesTime5(booked,{...appointmentQuery,range:dayRange}), 'appointment dates use the stored local date')
   assert(!matchesSalesTime5(booked,{...appointmentQuery,range:range}))
@@ -101,7 +101,25 @@ try {
   assert(!matchesSalesTime5({...timed,landingCallbackAt:'invalid'},callbackQuery))
   assert(matchesSalesTime5(timed,{...callbackQuery,range:dayRange}), 'callback date uses the user timezone')
   assert(!matchesSalesTime5({...timed,landingCallbackAt:'2026-09-30 17:00:00'},{...callbackQuery,range:dayRange}))
-  assert(matchesSalesTime5(timed,{...callbackQuery,noAppointment:true}), 'no sales booking can combine with a scheduled callback')
+  assert(matchesSalesTime5(timed,{...callbackQuery,appointmentPresence:'no'}), 'no sales booking can combine with a scheduled callback')
+  const presenceCases = [noBooking, {...noBooking,salesAppointments:[booking]}, timed, {...timed,salesAppointments:[booking]}]
+  for (const appointmentPresence of ['all','yes','no']) for (const callbackPresence of ['all','yes','no']) {
+    const actual = presenceCases.map(student => matchesSalesTime5(student,{...timeQuery,appointmentPresence,callbackPresence}))
+    const expected = [[false,false],[true,false],[false,true],[true,true]].map(([a,c]) => (appointmentPresence === 'all' || a === (appointmentPresence === 'yes')) && (callbackPresence === 'all' || c === (callbackPresence === 'yes')))
+    assert.deepEqual(actual,expected,`${appointmentPresence}/${callbackPresence} independent presence filters`)
+  }
+  for (const [kind,field] of [['appointment','appointmentPresence'],['callback','callbackPresence']]) {
+    const chosen = changeSalesTimeKind5({...timeQuery,range:dayRange},kind)
+    assert.equal(chosen[field],'yes', 'time type visibly sets the matching presence filter')
+    assert.equal(chosen.range,null)
+    for (const value of ['all','no']) {
+      const changed = changeSalesPresence5({...chosen,range:dayRange},field,value)
+      assert.equal(changed.kind,'follow', 'removing the positive condition removes its dependent time filter')
+      assert.equal(changed.range,null)
+    }
+    const negative = changeSalesPresence5(timeQuery,field,'no')
+    assert.equal(changeSalesTimeKind5(negative,kind),negative,'negative presence blocks the corresponding time type')
+  }
   const beforeBooking = {...booked,salesAppointments:[],salesLifecycleEvents:[]}
   assert.equal(outcomeAction5(beforeBooking),'reject')
   assert(outcomeAllowed5(beforeBooking,'reject','家长拒绝接听电话'))

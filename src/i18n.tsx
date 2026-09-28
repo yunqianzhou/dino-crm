@@ -2787,7 +2787,6 @@ Object.assign(zh, {
   "sales.time5.today": "今天",
   "sales.time5.last7": "近 7 天",
   "sales.time5.last30": "近 30 天",
-  "sales.time5.noAppointment": "仅看暂无销售咨询预约的用户",
   "sales.time5.appointmentHint": "仅查看有销售预约的用户；日期按预约时区。",
   "sales.time5.callbackHint": "仅查看已填写预约外呼的用户；日期按用户所在时区。"
 })
@@ -2803,7 +2802,6 @@ Object.assign(en, {
   "sales.time5.today": "Today",
   "sales.time5.last7": "Last 7 days",
   "sales.time5.last30": "Last 30 days",
-  "sales.time5.noAppointment": "Only users without a sales consultation appointment",
   "sales.time5.appointmentHint": "Only users with a sales appointment; dates use the appointment timezone.",
   "sales.time5.callbackHint": "Only users with a scheduled callback; dates use the user’s timezone."
 })
@@ -2819,9 +2817,40 @@ Object.assign(ko, {
   "sales.time5.today": "오늘",
   "sales.time5.last7": "최근 7일",
   "sales.time5.last30": "최근 30일",
-  "sales.time5.noAppointment": "영업 상담 예약이 없는 사용자만",
   "sales.time5.appointmentHint": "영업 상담 예약이 있는 사용자만 표시합니다. 날짜는 예약 시간대 기준입니다.",
   "sales.time5.callbackHint": "콜백 예약이 있는 사용자만 표시합니다. 날짜는 사용자 시간대 기준입니다."
+})
+
+// Independent appointment and callback presence filters.
+Object.assign(zh, {
+  "sales.presence5.appointmentPresence": "销售咨询预约",
+  "sales.presence5.callbackPresence": "预约外呼",
+  "sales.presence5.appointmentPresence.all": "全部",
+  "sales.presence5.appointmentPresence.yes": "有预约",
+  "sales.presence5.appointmentPresence.no": "无预约",
+  "sales.presence5.callbackPresence.all": "全部",
+  "sales.presence5.callbackPresence.yes": "已填写",
+  "sales.presence5.callbackPresence.no": "未填写"
+})
+Object.assign(en, {
+  "sales.presence5.appointmentPresence": "Sales consultation appointment",
+  "sales.presence5.callbackPresence": "Scheduled callback",
+  "sales.presence5.appointmentPresence.all": "All",
+  "sales.presence5.appointmentPresence.yes": "Booked",
+  "sales.presence5.appointmentPresence.no": "Not booked",
+  "sales.presence5.callbackPresence.all": "All",
+  "sales.presence5.callbackPresence.yes": "Provided",
+  "sales.presence5.callbackPresence.no": "Not provided"
+})
+Object.assign(ko, {
+  "sales.presence5.appointmentPresence": "영업 상담 예약",
+  "sales.presence5.callbackPresence": "콜백 예약",
+  "sales.presence5.appointmentPresence.all": "전체",
+  "sales.presence5.appointmentPresence.yes": "예약 있음",
+  "sales.presence5.appointmentPresence.no": "예약 없음",
+  "sales.presence5.callbackPresence.all": "전체",
+  "sales.presence5.callbackPresence.yes": "입력됨",
+  "sales.presence5.callbackPresence.no": "미입력"
 })
 
 const DICTS: Record<Lang, Dict> = { zh, zhTW, en, ko, ja, ar, id, de, es, fr, hi, it, nl, pl, pt, ru, th, vi, tr }

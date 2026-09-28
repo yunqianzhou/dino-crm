@@ -1,7 +1,7 @@
 import CCSelect from '../components/CCSelect'
 import SalesTimeFilter5 from '../components/SalesTimeFilter5'
 import MembershipModal5 from '../components/MembershipModal5'
-import { defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, followReason5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
+import { changeSalesPresence5, defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, followReason5, followStage5, FOLLOW_STAGES5, REJECTED_REASONS5, CLOSED_REASONS5 } from '../review5'
 import LeadAssignmentModal from '../components/LeadAssignmentModal'
 import { assignLeads, canReceiveLead, isSalesMember } from '../phase5'
 import { useEffect, useMemo, useState } from 'react'
@@ -1086,6 +1086,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
         {seeAllOwners && (phase5 ? <Select className="sales-filter-control" aria-label="CC" allowClear showSearch optionFilterProp="label" placeholder="CC" popupMatchSelectWidth={360} value={ownerFilter} onChange={setOwnerFilter} options={ccAccounts.filter(a => a.status === '启用' && isSalesMember(a)).map(a => ({label: `${a.name} (${a.email})`, value: a.email}))} /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />)}
         {tab === 'follow' && (phase5 || showVietnamStageFilter) && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={(phase5 ? FOLLOW_STAGES5 : CONSULTATION_STAGES).map((value) => ({ label: stageLabel(value), value }))} />}
         {phase5 && <Select className="sales-filter-control" aria-label={t('user.col.status')} mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.status')} value={userStatusFilter} onChange={setUserStatusFilter} options={USER_STATUSES.map(value => ({ label: t(`enum.status.${value}`), value }))} />}
+        {phase5 && (['appointmentPresence', 'callbackPresence'] as const).map(field => <Select key={field} className="sales-filter-control"
+          aria-label={t(`sales.presence5.${field}`)} optionLabelProp="title" value={salesTime5[field]}
+          onChange={presence => setSalesTime5(changeSalesPresence5(salesTime5, field, presence))}
+          options={(['all', 'yes', 'no'] as const).map(value => {
+            const label = t(`sales.presence5.${field}.${value}`)
+            return { value, label, title: `${t(`sales.presence5.${field}`)}：${label}` }
+          })} />)}
         {!phase5 && <Select className="sales-filter-control" allowClear placeholder={text('预约外呼', 'Callback')} value={landingCallbackFilter} onChange={setLandingCallbackFilter} options={[{ label: text('已填写预约外呼', 'Callback provided'), value: 'filled' }, { label: text('待外呼（已到时间）', 'Callback due'), value: 'due' }, { label: text('即将外呼（24小时内）', 'Callback within 24 hours'), value: 'upcoming' }]} />}
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={text('购买意向', 'Purchase intent')} value={purchaseIntentionFilter} onChange={setPurchaseIntentionFilter} options={['有意向', '无意向', '未填写'].map((value, i) => ({ label: t(['sales.purchaseIntention.yes', 'sales.purchaseIntention.no', 'sales.purchaseIntention.none'][i]), value }))} />
         <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.courseLevel')} value={courseLevelFilter} onChange={setCourseLevelFilter} options={courseLevelOptions.map((value) => ({ label: value, value }))} />

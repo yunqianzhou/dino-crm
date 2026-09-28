@@ -89,11 +89,15 @@ export function outcomeReasonLabel5(reason: string | undefined, t: (key: string)
 export type SalesTimeQuery5 = {
   kind: 'register' | 'follow' | 'appointment' | 'callback'
   range: [Dayjs | null, Dayjs | null] | null
-  noAppointment: boolean
+  appointmentPresence: 'all' | 'yes' | 'no'
+  callbackPresence: 'all' | 'yes' | 'no'
 }
-export const defaultSalesTime5 = (): SalesTimeQuery5 => ({ kind: 'follow', range: null, noAppointment: false })
+export const defaultSalesTime5 = (): SalesTimeQuery5 => ({ kind: 'follow', range: null, appointmentPresence: 'all', callbackPresence: 'all' })
 export function matchesSalesTime5(student: Student, query: SalesTimeQuery5) {
-  if (query.noAppointment && currentAppointment(student)) return false
+  const hasAppointment = !!currentAppointment(student)
+  const hasCallback = !!validCallback(student.landingCallbackAt)
+  if (query.appointmentPresence !== 'all' && hasAppointment !== (query.appointmentPresence === 'yes')) return false
+  if (query.callbackPresence !== 'all' && hasCallback !== (query.callbackPresence === 'yes')) return false
   if (query.kind === 'appointment') {
     const appointment = currentAppointment(student)
     return !!appointment && dayjs(appointment.scheduledStartAt).isValid() && appointmentMatches5(student, 'booked', query.range?.[0]?.format('YYYY-MM-DD'), query.range?.[1]?.format('YYYY-MM-DD'))
@@ -103,4 +107,15 @@ export function matchesSalesTime5(student: Student, query: SalesTimeQuery5) {
     return matchesLocalDateRange(student.landingCallbackAt, query.range, student.country || student.businessLine)
   }
   return matchesLocalDateRange(query.kind === 'register' ? student.registerTime : student.salesUpdatedAt, query.range, student.country || student.businessLine)
+}
+
+export function changeSalesTimeKind5(query: SalesTimeQuery5, kind: SalesTimeQuery5['kind']): SalesTimeQuery5 {
+  if ((kind === 'appointment' && query.appointmentPresence === 'no') || (kind === 'callback' && query.callbackPresence === 'no')) return query
+  return { ...query, kind, range: null,
+    ...(kind === 'appointment' ? { appointmentPresence: 'yes' } : {}),
+    ...(kind === 'callback' ? { callbackPresence: 'yes' } : {}) }
+}
+export function changeSalesPresence5(query: SalesTimeQuery5, field: 'appointmentPresence' | 'callbackPresence', presence: 'all' | 'yes' | 'no'): SalesTimeQuery5 {
+  const tiedToTime = query.kind === (field === 'appointmentPresence' ? 'appointment' : 'callback')
+  return { ...query, [field]: presence, ...(tiedToTime && presence !== 'yes' ? { kind: 'follow', range: null } : {}) }
 }
