@@ -32,7 +32,7 @@ import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
 import { genCallId, setState, uid, updateSalesSettings, useStore } from '../store'
 import type { Account, CallRecord, CallResult, SalesFollowLog, SalesLifecycleNode, SalesSettings, Student, UserType, UserStatus } from '../types'
-import { CALL_RESULTS } from '../types'
+import { CALL_RESULTS, USER_STATUSES } from '../types'
 import { useI18n } from '../i18n'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import DashboardLinkContext, { useDashboardContext } from '../components/DashboardLinkContext'
@@ -140,6 +140,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const [sourceLpFilter, setSourceLpFilter] = useState<string | undefined>()
   const [sourceAppFilter, setSourceAppFilter] = useState<string[] | undefined>()
   const [userTypeFilter, setUserTypeFilter] = useState<string[]>([])
+  const [userStatusFilter, setUserStatusFilter] = useState<UserStatus[]>([])
   const [registerDateRange, setRegisterDateRange] = useState<any>(null)
   const [followDateRange, setFollowDateRange] = useState<any>(null)
   const [callResultFilter, setCallResultFilter] = useState<string | undefined>()
@@ -149,13 +150,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const [landingCallbackFilter, setLandingCallbackFilter] = useState<string | undefined>()
   const [appointmentFilter5, setAppointmentFilter5] = useState<string>()
   const [appointmentRange5, setAppointmentRange5] = useState<any>(null)
-  const [outcomeReasonFilter5, setOutcomeReasonFilter5] = useState<string>()
   const [addingMembership, setAddingMembership] = useState<Student | null>(null)
   const [pages, setPages] = useState<Record<string, { current: number; pageSize: number }>>({})
   const [sorts, setSorts] = useState<Record<string, { field?: string; order?: string }>>({})
   useEffect(() => {
     setPages((prev) => ({ ...prev, pool: { ...prev.pool, current: 1, pageSize: prev.pool?.pageSize || 10 }, follow: { ...prev.follow, current: 1, pageSize: prev.follow?.pageSize || 10 } }))
-  }, [keyword, lineSel, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter, appointmentFilter5, appointmentRange5, outcomeReasonFilter5])
+  }, [keyword, lineSel, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, landingCallbackFilter, appointmentFilter5, appointmentRange5])
   useEffect(() => { setPages((prev) => ({ ...prev, follow: { current: 1, pageSize: prev.follow?.pageSize || 10 } })) }, [consultationStageFilter])
   useEffect(() => { setPages((prev) => ({ ...prev, calls: { current: 1, pageSize: prev.calls?.pageSize || 10 } })) }, [keyword, lineSel, callResultFilter, callAgentFilter, callDateRange])
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     setSorts((prev) => ({ ...prev, [key]: { field: sorter.field, order: sorter.order } }))
   }
 
-  const selectionScope = JSON.stringify([account?.id, actor, tab, lineSel, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, appointmentFilter5, appointmentRange5, outcomeReasonFilter5, canBatchAssign])
+  const selectionScope = JSON.stringify([account?.id, actor, tab, lineSel, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, appointmentFilter5, appointmentRange5, canBatchAssign])
   useEffect(() => { setSelectedIds([]); setBatchRecords(null) }, [selectionScope])
   const batchSelection = canBatchAssign ? { selectedRowKeys: selectedIds, preserveSelectedRowKeys: true, onChange: (keys: React.Key[]) => setSelectedIds(keys), columnWidth: 48 } : undefined
   const ccAccounts = accounts.filter(item => item.businessLines.some(matchLine) || (item.businessLines.length === 0 && isSalesMember(item) && roles.find(role => role.id === item.roleId)?.dataScope === 'all'))
@@ -286,6 +286,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       sourceLpMatches &&
       sourceAppMatches &&
       (!userTypeFilter.length || userTypeFilter.includes(resolveUserType(s))) &&
+      (!phase5 || !userStatusFilter.length || userStatusFilter.includes(resolveUserStatus(s, lessons))) &&
       matchesLocalDateRange(s.registerTime, registerDateRange, s.country || s.businessLine) &&
       matchesLocalDateRange(s.salesUpdatedAt, followDateRange, s.country || s.businessLine) &&
       matchesCallback(s.landingCallbackAt, landingCallbackFilter)
@@ -294,12 +295,12 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
 
   const poolData = useMemo(
     () => poolAll.filter(matchesLeadFilters),
-    [poolAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, landingCallbackFilter, channels],
+    [phase5, lessons, poolAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, landingCallbackFilter, channels],
   )
 
   const followData = useMemo(
-    () => followAll.filter(matchesLeadFilters).filter(s => !phase5 || (appointmentMatches5(s, appointmentFilter5, appointmentRange5?.[0]?.format('YYYY-MM-DD'), appointmentRange5?.[1]?.format('YYYY-MM-DD')) && (!outcomeReasonFilter5 || followReason5(s) === outcomeReasonFilter5 || followReason5(s)?.startsWith(`${outcomeReasonFilter5}：`)))).filter((s) => consultationStageFilter.length === 0 || ((phase5 || s.businessLine === '越南') && consultationStageFilter.includes(stageOf(s)))),
-    [phase5, tab, appointmentFilter5, appointmentRange5, outcomeReasonFilter5, followAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
+    () => followAll.filter(matchesLeadFilters).filter(s => !phase5 || appointmentMatches5(s, appointmentFilter5, appointmentRange5?.[0]?.format('YYYY-MM-DD'), appointmentRange5?.[1]?.format('YYYY-MM-DD'))).filter((s) => consultationStageFilter.length === 0 || ((phase5 || s.businessLine === '越南') && consultationStageFilter.includes(stageOf(s)))),
+    [phase5, lessons, tab, appointmentFilter5, appointmentRange5, followAll, targetStudentId, keyword, purchaseIntentionFilter, ownerFilter, ageGroupFilter, courseLevelFilter, sourceLpFilter, sourceAppFilter, userTypeFilter, userStatusFilter, registerDateRange, followDateRange, consultationStageFilter, landingCallbackFilter, callRecords, channels],
   )
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
@@ -1017,13 +1018,13 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     setSourceLpFilter(undefined)
     setSourceAppFilter(undefined)
     setUserTypeFilter([])
+    setUserStatusFilter([])
     setRegisterDateRange(null)
     setFollowDateRange(null)
     setConsultationStageFilter([])
     setLandingCallbackFilter(undefined)
     setAppointmentFilter5(undefined)
     setAppointmentRange5(null)
-    setOutcomeReasonFilter5(undefined)
   }
 
   // 下载当前标签页、当前筛选范围内的数据，避免用户还需手动复刻页面筛选条件。
@@ -1080,9 +1081,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       ) : <>
         {seeAllOwners && (phase5 ? <Select className="sales-filter-control" aria-label="CC" allowClear showSearch optionFilterProp="label" placeholder="CC" popupMatchSelectWidth={360} value={ownerFilter} onChange={setOwnerFilter} options={ccAccounts.filter(a => a.status === '启用' && isSalesMember(a)).map(a => ({label: `${a.name} (${a.email})`, value: a.email}))} /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('user.col.cc')} value={ownerFilter} onChange={setOwnerFilter} options={[{ label: t('sales.unassigned'), value: '__unassigned__' }, ...salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))]} />)}
         {tab === 'follow' && (phase5 || showVietnamStageFilter) && <Select className="sales-filter-control" mode="multiple" allowClear maxTagCount="responsive" placeholder={t('sales.consultation.filter')} value={consultationStageFilter} onChange={setConsultationStageFilter} options={(phase5 ? FOLLOW_STAGES5 : CONSULTATION_STAGES).map((value) => ({ label: stageLabel(value), value }))} />}
+        {phase5 && <Select className="sales-filter-control" aria-label={t('user.col.status')} mode="multiple" allowClear maxTagCount="responsive" placeholder={t('user.col.status')} value={userStatusFilter} onChange={setUserStatusFilter} options={USER_STATUSES.map(value => ({ label: t(`enum.status.${value}`), value }))} />}
         {phase5 && tab === 'follow' && <>
-          <Select className="sales-filter-control" aria-label={text('跟进原因', 'Follow-up reason')} allowClear showSearch optionFilterProp="label" placeholder={text('跟进原因', 'Follow-up reason')}
-            value={outcomeReasonFilter5} onChange={setOutcomeReasonFilter5} options={[...REJECTED_REASONS5, ...CLOSED_REASONS5].map(([zh, en]) => ({value: zh, label: text(zh, en)}))} />
           <Select className="sales-filter-control" aria-label={text('销售预约', 'Sales appointment')} allowClear placeholder={text('销售预约', 'Sales appointment')} value={appointmentFilter5} onChange={setAppointmentFilter5}
             options={[{value:'booked',label:text('有销售预约', 'Has a sales appointment')},{value:'none',label:text('无销售预约', 'No sales appointment')}]} />
           <DatePicker.RangePicker className="sales-filter-date" aria-label={text('销售预约日期范围', 'Sales appointment dates')} value={appointmentRange5} onChange={setAppointmentRange5}
