@@ -47,7 +47,7 @@ import { businessLineOf, lineLabel, lpChannelSourceText, appChannelSourceText } 
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
 import { tzOf } from '../time'
-import { CONSULTATION_STAGE_COLOR, CONSULTATION_STAGES, consultationStage, currentAppointment } from '../salesLifecycle'
+import { CONSULTATION_STAGE_COLOR, CONSULTATION_STAGES, consultationStage, currentAppointment, followHistoryStage5 } from '../salesLifecycle'
 import { downloadXlsx } from '../export'
 import { callSeconds, matchesCallback, matchesLocalDateRange, reportTime, validCallback } from '../salesReporting'
 
@@ -464,7 +464,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
           }
           if (action === 'pause') event = { eventId: uid('sle_'), node: 'lead' as SalesLifecycleNode, result: actionLabel[action], reason, description: note, occurredAt, reportedAt: now, reportedBy: actor, source: 'CC手动' as const }
           const historyNote = action && action !== 'continue' ? `${note ? `${note}\n` : ''}【销售咨询】${actionLabel[action]}${reason ? `：${reason}` : ''}` : note
-          return {
+          const updated: Student = {
             ...x,
             purchaseIntention: v.purchaseIntention,
             salesProgress: currentProgress,
@@ -474,8 +474,10 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
             salesLifecycleEvents: event ? [event, ...(x.salesLifecycleEvents ?? [])] : x.salesLifecycleEvents,
             salesLatestNote: historyNote,
             salesUpdatedAt: now,
-            salesHistory: [{ progress: currentProgress, note: historyNote, time: now, owner: actor }, ...(x.salesHistory || [])],
           }
+          return { ...updated, salesHistory: [{ progress: currentProgress,
+            ...(phase5 ? { stage5: followStage5(updated, prev.callRecords) } : {}),
+            note: historyNote, time: now, owner: actor }, ...(x.salesHistory || [])] }
         }
         return x
       }),
@@ -1611,40 +1613,44 @@ function Modal_Follow({
         <div style={{ marginTop: 12 }}>
           {history.length ? (
             <Timeline
-              items={history.map((h) => ({
-                color: PROGRESS_COLOR[h.progress] === 'default' ? 'gray' : PROGRESS_COLOR[h.progress],
-                children: (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div>
-                      <Text strong>{t(`sales.progress.${h.progress}`)}</Text> · {h.note}
-                    </div>
-                    {h.audioUrl && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <audio controls src={h.audioUrl} style={{ height: 32, flex: 1, maxWidth: 300 }} />
-                        <Button
-                          size="small"
-                          onClick={() => {
-                            if (h.aiSummary) {
-                              Modal.info({
-                                title: 'AI自动总结',
-                                content: h.aiSummary,
-                                maskClosable: true,
-                              })
-                            } else {
-                              message.info('AI正在总结中，稍后再试')
-                            }
-                          }}
-                        >
-                          AI自动总结
-                        </Button>
+              items={history.map((h) => {
+                const stage = phase5 ? followHistoryStage5(h, editing?.salesLifecycleEvents) : undefined
+                const color = stage === 'Rejected' ? 'red' : stage === 'Closed' ? 'gray' : stage ? CONSULTATION_STAGE_COLOR[stage] : PROGRESS_COLOR[h.progress]
+                return {
+                  color: color === 'default' ? 'gray' : color,
+                  children: (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div>
+                        <Text strong>{stage ? t(stage === 'Rejected' || stage === 'Closed' ? `sales.outcome.${stage}` : `sales.consultation.stage.${stage}`) : t(`sales.progress.${h.progress}`)}</Text> · {h.note}
                       </div>
-                    )}
-                    <div style={{ color: '#8c8c8c', fontSize: 12 }}>
-                      {h.time} · {h.owner}
+                      {h.audioUrl && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <audio controls src={h.audioUrl} style={{ height: 32, flex: 1, maxWidth: 300 }} />
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              if (h.aiSummary) {
+                                Modal.info({
+                                  title: 'AI自动总结',
+                                  content: h.aiSummary,
+                                  maskClosable: true,
+                                })
+                              } else {
+                                message.info('AI正在总结中，稍后再试')
+                              }
+                            }}
+                          >
+                            AI自动总结
+                          </Button>
+                        </div>
+                      )}
+                      <div style={{ color: '#8c8c8c', fontSize: 12 }}>
+                        {h.time} · {h.owner}
+                      </div>
                     </div>
-                  </div>
-                ),
-              }))}
+                  ),
+                }
+              })}
             />
           ) : (
             <Text type="secondary">{t('sales.history.empty')}</Text>

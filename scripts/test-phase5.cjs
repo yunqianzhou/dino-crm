@@ -11,6 +11,7 @@ try {
   const { matchesOrderFilters5, orderCreatedTime, orderTime5 } = require(join(tmp, 'phase5Orders.js'))
   const { changeSalesTimeKind5, changeSalesPresence5, defaultSalesTime5, matchesSalesTime5, outcomeAction5, outcomeAllowed5, outcomeReasonLabel5, canTransferUser5, ccFilterAccounts5, addMembership5, membershipLimit5, appointmentMatches5, followStage5, followReason5, REJECTED_REASONS5, CLOSED_REASONS5 } = require(join(tmp, 'review5.js'))
   const { matchesLocalDateRange } = require(join(tmp, 'salesReporting.js'))
+  const { followHistoryStage5 } = require(join(tmp, 'salesLifecycle.js'))
   const dayjs = require('dayjs')
   const target = { id: 'cc', name: '真实销售', email: 'cc@test.invalid', roleId: 'sales', isSalesMember: true, status: '启用', businessLines: ['越南'] }
   const roles = [{ id: 'sales', dataScope: 'line', perms: { salesV3: 'operate' } }]
@@ -81,6 +82,17 @@ try {
   assert.equal(followStage5({...booked,salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'费用高'}}),'Closed')
   assert.equal(followStage5(booked),'已预约', 'trial facts are not required for existing appointment flow')
   assert.equal(followReason5({...booked,salesOutcome5:{stage:'closed',reason:'费用高'}}),'费用高')
+  const closedEvent = {result:'已关闭',reportedAt:'2026-09-28 10:55:17',reportedBy:'manager'}
+  const closedLog = {progress:'跟进中',note:'【销售咨询】已关闭：课程不适合孩子',time:closedEvent.reportedAt,owner:'manager'}
+  assert.equal(followHistoryStage5(closedLog,[closedEvent]),'Closed', 'recover existing closed logs without rewriting their stored history')
+  assert.equal(followHistoryStage5({...closedLog,note:'补充备注\n【销售咨询】已拒绝：无需求'},[{...closedEvent,result:'已拒绝'}]),'Rejected')
+  assert.equal(followHistoryStage5({...closedLog,note:'【销售咨询】新建预约'},[closedEvent]),undefined, 'do not relabel earlier appointment or unrelated records')
+  assert.equal(followHistoryStage5({...closedLog,time:'2026-09-01 00:00:00'},[closedEvent]),undefined)
+  assert.equal(followHistoryStage5({...closedLog,owner:'someone-else'},[closedEvent]),undefined)
+  assert.equal(followHistoryStage5({...closedLog,stage5:'已预约'},[closedEvent]),'已预约', 'reactivation uses its saved stage, never a later closure')
+  for (const stage of ['Rejected','Closed','已预约','咨询完成待支付']) {
+    assert.equal(followHistoryStage5({...closedLog,stage5:stage}),stage, 'new logs retain a stage snapshot without requiring event lookup')
+  }
   const timeQuery = defaultSalesTime5()
   const noBooking = {...booked,salesAppointments:[],salesUpdatedAt:undefined}
   assert(matchesSalesTime5(noBooking,timeQuery), 'empty default range must not filter users without a follow-up')

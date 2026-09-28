@@ -1,4 +1,4 @@
-import type { CallRecord, Student } from './types'
+import type { CallRecord, SalesFollowLog, SalesLifecycleEvent, Student } from './types'
 
 export const CONSULTATION_STAGES = ['待外呼', '未接通待跟进', '已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '暂不跟进', '已关闭'] as const
 
@@ -28,6 +28,16 @@ export function followStage5(student: Student, calls: CallRecord[] = []) {
 export function followReason5(student: Student) {
   return student.salesOutcome5?.reason || (student.salesLifecycleStatus === '已关闭'
     ? student.salesLifecycleEvents?.find(e => e.result === '已关闭')?.reason : undefined)
+}
+
+export function followHistoryStage5(log: SalesFollowLog, events: SalesLifecycleEvent[] = []) {
+  if (log.stage5) return log.stage5
+  // Older follow-up logs only stored the coarse progress. Recover terminal
+  // stages from this log's own event, never from the student's current state.
+  const event = events.find(item => item.reportedAt === log.time && item.reportedBy === log.owner &&
+    (item.result === '已关闭' || item.result === '已拒绝') &&
+    log.note.split('\n').some(line => line === `【销售咨询】${item.result}` || line.startsWith(`【销售咨询】${item.result}：`)))
+  return event?.result === '已关闭' ? 'Closed' : event?.result === '已拒绝' ? 'Rejected' : undefined
 }
 
 // P0 暂无会议状态自动回传：预约存在且尚未人工标记结果时，始终保持“已预约”。

@@ -170,6 +170,7 @@ export type SalesProgress = '待领取' | '跟进中' | '暂不跟进'
 
 export type SalesFollowLog = {
   progress: string
+  stage5?: string // 五期：本次操作保存后的阶段快照，不能用用户当前阶段覆盖历史
   note: string
   time: string
   owner: string
