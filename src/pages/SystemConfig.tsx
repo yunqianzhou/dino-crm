@@ -103,7 +103,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
   const lines = BUSINESS_LINES
 
   const moduleLabel = (m: ModuleKey) => {
-    if (m === 'salesV5_batch_assign') return '批量分配线索（五期 · 独立权限）'
+    if (m === 'salesV5_batch_assign') return lang === 'en' ? 'Batch assign leads' : '批量分配线索'
     if (m === 'appABTest') return lang === 'en' ? 'APP A/B test (Phase 6)' : 'APP A/B test配置（六期）'
     if (m === 'marketingV2_channel_types') return lang === 'en' ? 'Manage channel types' : '维护渠道类型（独立授权）'
     const marketingV2Labels: Partial<Record<ModuleKey, string>> = lang === 'en' ? {
@@ -118,7 +118,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
     if (marketingV2Labels[m]) return marketingV2Labels[m]!
     if (m === 'usersV2') return t('app.nav.users')
     if (m === 'ordersV3') return t('app.nav.orders')
-    if (m === 'salesV3') return t('app.nav.sales')
+    if (m === 'salesV3') return phase5 ? `${t('app.nav.sales')}（${lang === 'en' ? 'Phase 5' : '五期'}）` : t('app.nav.sales')
     return m.includes('_') ? t(`perm.${m}`) : t(`app.nav.${m}`)
   }
   const levelLabel = (lv: PermLevel) => t(`sys.level.${lv}`)
@@ -251,10 +251,13 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
   ]
 
   const PHASE3_MODULES = ['usersV2', 'ordersV3', 'salesV3']
-  const isPhase3 = (m: string) => PHASE3_MODULES.some(p => m === p || m.startsWith(p + '_'))
+  const isPhase3 = (m: string) => PHASE3_MODULES.filter(p => !phase5 || p !== 'salesV3').some(p => m === p || m.startsWith(p + '_'))
 
   // 权限矩阵：行=模块（主模块+子模块平铺），列=角色
-  const matrixData = MODULE_ROWS
+  const isCurrentSales = (row: ModuleRow) => row.key === 'salesV3' || row.ancestors.includes('salesV3')
+  const matrixData = phase5
+    ? [...MODULE_ROWS.filter(isCurrentSales), ...MODULE_ROWS.filter(row => !isCurrentSales(row))]
+    : MODULE_ROWS
 
   const matrixColumns: ColumnsType<ModuleRow> = [
     {
@@ -306,10 +309,10 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
         roleId: a.roleId,
         isSalesMember: a.isSalesMember === true,
         businessLines: a.businessLines,
-        status: a.status === '启用',
+        ...(!phase5 ? { status: a.status === '启用' } : {}),
       })
     } else {
-      form.setFieldsValue({ status: true })
+      form.setFieldsValue({ isSalesMember: false, ...(!phase5 ? { status: true } : {}) })
     }
   }
   const submitAcc = async () => {
@@ -321,7 +324,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
       name: v.name,
       roleId: v.roleId,
       businessLines: scope === 'all' ? [] : v.businessLines ?? [],
-      status: v.status ? '启用' : '停用',
+      status: phase5 ? accEditing?.status ?? '启用' : v.status ? '启用' : '停用',
       isSalesMember: v.isSalesMember === true,
       salesLead: accEditing?.salesLead,
       lastLogin: accEditing?.lastLogin,
@@ -330,7 +333,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
     setState((prev) => ({
       ...prev,
       accounts: accEditing
-        ? prev.accounts.map((a) => (a.id === next.id ? next : a))
+        ? prev.accounts.map((a) => (a.id === next.id ? { ...next, ...(phase5 ? { status: a.status } : {}) } : a))
         : [next, ...prev.accounts],
     }))
     addLog({
@@ -771,13 +774,13 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
               options={lines.map((l) => ({ label: l, value: l }))}
             />
           </Form.Item>
-          <Form.Item name="isSalesMember" label={phase5 ? (lang === 'en' ? 'Frontline sales (CC)' : '是否为一线销售（CC）') : '销售成员'} valuePropName="checked" extra={phase5 ? (lang === 'en' ? 'Identifies a CC without granting permissions. Enabled CCs appear in business-line CC filters; membership extensions are limited to 3 days per operation. Assignment also requires sales operation and business-line access.' : '仅标识 CC 身份，不自动增加权限。启用的 CC 纳入对应业务线筛选；每次添加会员上限 3 天。承接分配仍需销售操作及业务线权限。') : '开启后纳入五期 CC 筛选的在职销售列表；接收分配还需启用账号、销售操作权限及对应业务线权限。'}><Switch checkedChildren={lang === 'en' ? 'Yes' : '是'} unCheckedChildren={lang === 'en' ? 'No' : '否'} /></Form.Item>
-          <Form.Item name="status" label={t('sys.acc.col.status')} valuePropName="checked">
+          <Form.Item name="isSalesMember" label={phase5 ? (lang === 'en' ? 'Frontline sales (CC)' : '是否为一线销售（CC）') : '销售成员'} valuePropName="checked" extra={phase5 ? undefined : '开启后纳入五期 CC 筛选的在职销售列表；接收分配还需启用账号、销售操作权限及对应业务线权限。'}><Switch checkedChildren={lang === 'en' ? 'Yes' : '是'} unCheckedChildren={lang === 'en' ? 'No' : '否'} /></Form.Item>
+          {!phase5 && <Form.Item name="status" label={t('sys.acc.col.status')} valuePropName="checked">
             <Switch
               checkedChildren={t('sys.status.enabled')}
               unCheckedChildren={t('sys.status.disabled')}
             />
-          </Form.Item>
+          </Form.Item>}
         </Form>
       </Modal>
     </Card>
