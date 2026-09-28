@@ -18,6 +18,13 @@ export function currentAppointment(student: Student) {
   return (student.salesAppointments ?? []).find((item) => item.appointmentStatus === '已预约')
 }
 
+// Shared by Sales Center v5 and the dashboard's current-state counts.
+export function followStage5(student: Student, calls: CallRecord[] = []) {
+  if (student.salesLifecycleStatus === '已关闭') return 'Closed'
+  if (student.salesOutcome5?.stage === 'rejected') return 'Rejected'
+  return consultationStage(student, calls)
+}
+
 // P0 暂无会议状态自动回传：预约存在且尚未人工标记结果时，始终保持“已预约”。
 export function consultationStage(student: Student, callRecords: CallRecord[] = []) {
   if (student.salesLifecycleStatus === '已关闭') return '已关闭'

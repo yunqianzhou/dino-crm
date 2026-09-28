@@ -42,6 +42,29 @@ try {
  const rejected=user('reject',{salesLifecycleStatus:'已关闭',salesLifecycleEvents:[event('r','lead','已关闭',{closureType:'phone',reason:'暂无需求'})]})
  const consultationClosed=user('after',{salesLifecycleStatus:'已关闭',salesLifecycleEvents:[event('cc','lead','已关闭',{closureType:'consultation',reason:'费用高'})]})
  const reasonFilters={...filters,start:'',end:''}
+ // Current outcomes share Sales Center v5 state precedence; historical events
+ // alone must not retain a reactivated lead in a terminal status.
+ const rejected5=user('rejected5',{salesOwner:'cc-a',salesOutcome5:{stage:'rejected',reason:'无需求'}})
+ const closed5=user('closed5',{salesOwner:'cc-b',salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'closed',reason:'费用高'}})
+ const restarted5=user('restarted5',{salesOwner:'cc-a',salesLifecycleEvents:[event('old-rejection','lead','已拒绝')]})
+ const conflicting5=user('conflicting5',{salesLifecycleStatus:'已关闭',salesOutcome5:{stage:'rejected',reason:'无需求'}})
+ const outcomeUsers=[rejected5,rejected5,closed5,restarted5,conflicting5,
+  user('test-rejected',{userType:'测试用户',salesOutcome5:{stage:'rejected'}}),
+  user('paid-rejected',{status:'付费',salesOutcome5:{stage:'rejected'}}),
+  user('order-rejected',{salesOutcome5:{stage:'rejected'}})]
+ const outcomeOrders=[{orderId:'paid-outcome',studentId:'order-rejected',orderStatus:'已支付',paidAmount:100,paidTime:'2026-09-06T00:00:00Z'}]
+ const outcomes=followupMetrics(outcomeUsers,[],[],outcomeOrders,reasonFilters)
+ assert.deepEqual(outcomes.current['已拒绝'].map(s=>s.studentId),['rejected5'],'deduplicate and exclude test / paid users')
+ assert.deepEqual(outcomes.current['已关闭'].map(s=>s.studentId),['closed5','conflicting5'],'Closed takes precedence exactly as in Sales Center v5')
+ assert.deepEqual(outcomes.current['待外呼'].map(s=>s.studentId),['restarted5'],'rejection is not also counted as a pending call')
+ assert.deepEqual(followupMetrics(outcomeUsers,[],[],outcomeOrders,filters).current,outcomes.current,'outcomes ignore activity date filters')
+ const ownerOutcomes=followupMetrics(outcomeUsers,[],[],outcomeOrders,{...reasonFilters,owner:['cc-a']}).current
+ assert.equal(ownerOutcomes['已拒绝'].length,1)
+ assert.equal(ownerOutcomes['已关闭'].length,0,'outcomes obey current CC filters')
+ const outcomeGroups=followupComparisonRows(outcomes.current,outcomes.activity,[],'cc',['已拒绝','已关闭'],['paid'])
+ assert.equal(outcomeGroups.find(r=>r.value==='cc-a').metrics['已拒绝'].length,1)
+ assert.equal(outcomeGroups.find(r=>r.value==='cc-b').metrics['已关闭'].length,1)
+ assert.equal(followupMetrics([],[],[],[],reasonFilters).current['已拒绝'].length,0)
  assert.equal(reasonEvidence([closed,rejected,consultationClosed],[],[],[],reasonFilters,'closedUnknown',false).length,1)
  assert.equal(reasonEvidence([closed,rejected,consultationClosed],[],[],[],reasonFilters,'rejected',true).length,1)
  assert.equal(reasonEvidence([closed,rejected,consultationClosed],[],[],[],reasonFilters,'closedAfter',false).length,1)

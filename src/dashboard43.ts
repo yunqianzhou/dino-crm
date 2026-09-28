@@ -3,7 +3,7 @@ import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import type { CallRecord, LessonRecord, Order, SalesAppointment, SalesLifecycleEvent, Student } from './types'
 import { dashboardOwnerIds, dashboardGroupRows, inVietnamRange, isDashboardPaidOrder, type DashboardFilters, type DashboardGrouping } from './dashboardData'
-import { consultationStage } from './salesLifecycle'
+import { followStage5 } from './salesLifecycle'
 import { isSalesLead } from './funnel'
 import { resolveUserType } from './userType'
 dayjs.extend(utc)
@@ -33,7 +33,7 @@ export function cohortFunnel(population: Student[], calls: CallRecord[], lessons
 }
 export const l2s = (metrics: PeopleMetrics) => metrics.leads.length ? metrics.paid.length / metrics.leads.length * 100 : null
 export const CURRENT_CALL_KEYS = ['待外呼', '未接通待跟进']
-export const CURRENT_FOLLOW_KEYS = ['已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付']
+export const CURRENT_FOLLOW_KEYS = ['已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '已拒绝', '已关闭']
 export const ACTIVITY_CALL_KEYS = ['called', 'connected']
 export const ACTIVITY_FOLLOW_KEYS = ['paid']
 export function closureKind(event: FollowEvent) {
@@ -41,8 +41,8 @@ export function closureKind(event: FollowEvent) {
   return event.closureType === 'phone' ? 'rejected' : event.closureType === 'consultation' ? 'closedAfter' : 'closedUnknown'
 }
 export function currentFollowStage(s: Student, calls: CallRecord[]) {
-  // Keep the dashboard aligned with the stages already used by Sales Center.
-  return consultationStage(s, calls)
+  const stage = followStage5(s, calls)
+  return stage === 'Rejected' ? '已拒绝' : stage === 'Closed' ? '已关闭' : stage
 }
 export function followupMetrics(population: Student[], calls: CallRecord[], lessons: LessonRecord[], orders: Order[], filters: DashboardFilters) {
   const rows = scopedPeople(population, filters)
