@@ -1,5 +1,5 @@
 import OutboundBindingModal from '../components/OutboundBindingModal'
-import { bindingsOf, outboundRoutes, providerName } from '../outbound'
+import { bindingsOf, providerName } from '../outbound'
 import { useMemo, useState } from 'react'
 import {
   Alert,
@@ -446,7 +446,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
       width: 170,
       render: (v) => v || <Text type="secondary">—</Text>,
     },
-    { title: lang === 'en' ? 'Calling capability' : '外呼能力', key: 'outbound', width: 260, render: (_, r) => <Space direction="vertical" size={4}>{bindingsOf(r).length ? bindingsOf(r).map(b => <div key={b.provider}><Tag color={b.provider === 'omicall' ? 'blue' : 'default'}>{providerName(b.provider, lang === 'en')}</Tag><Text type="secondary">{outboundRoutes.find(route => route.id === b.routeId)?.name || '—'} · {b.seat}</Text></div>) : <Text type="secondary">—</Text>}</Space> },
+    { title: lang === 'en' ? 'Calling capability' : '外呼能力', key: 'outbound', width: 200, render: (_, r) => <Space wrap size={4}>{bindingsOf(r).length ? bindingsOf(r).map(b => <Tag key={b.provider} color={b.provider === 'omicall' ? 'blue' : 'default'}>{providerName(b.provider, lang === 'en')}</Tag>) : <Text type="secondary">—</Text>}</Space> },
     ...(canEditAcc
       ? [
           {
@@ -506,7 +506,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
         if (!bindingAccount || !canEditAcc) return
         const target = bindingAccount
         setState(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === target.id ? { ...a, outboundBindings: bindings, outboundSeatBound: bindings.length > 0 } : a) }))
-        addLog({ actor, module: 'system', action: bindings.length ? 'sys.log.bindOutbound' : 'sys.log.unbindOutbound', target: `${target.email} · ${bindings.map(b => `${providerName(b.provider)} / ${b.seat} / ${b.routeId}`).join('；') || '全部解绑'}` })
+        addLog({ actor, module: 'system', action: bindings.length ? 'sys.log.bindOutbound' : 'sys.log.unbindOutbound', target: `${target.email} · ${bindings.map(b => providerName(b.provider)).join('；') || '全部解绑'}` })
         setBindingAccount(null)
         message.success(lang === 'en' ? 'Calling bindings saved' : '外呼绑定已保存')
       }} />

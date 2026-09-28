@@ -1,20 +1,15 @@
 import type { Account, CallRecord, OutboundBinding, OutboundProvider } from './types'
 
 export const outboundProviders: OutboundProvider[] = ['existing', 'omicall']
-export const providerName = (provider?: OutboundProvider, en = false) => provider === 'omicall' ? 'Omicall' : provider === 'existing' ? (en ? 'Existing calling system' : '现有外呼系统') : (en ? 'Historical / not recorded' : '历史记录 / 未记录')
-export const outboundRoutes = [
-  { id: 'existing-default', provider: 'existing' as const, name: '现有线路', nameEn: 'Existing route', callerNumber: '沿用既有外显号码', countries: [] as string[] },
-  { id: 'omi-vn-01', provider: 'omicall' as const, name: '越南本地线路 01', nameEn: 'Vietnam local route 01', callerNumber: '演示号码 · 01', countries: ['越南'] },
-  { id: 'omi-vn-02', provider: 'omicall' as const, name: '越南本地线路 02', nameEn: 'Vietnam local route 02', callerNumber: '演示号码 · 02', countries: ['越南'] },
-]
+export const providerName = (provider?: OutboundProvider, en = false) => provider === 'omicall' ? 'Omicall' : provider === 'existing' ? 'Sobot' : (en ? 'Historical / not recorded' : '历史记录 / 未记录')
 export function bindingsOf(account?: Account | null): OutboundBinding[] {
   if (!account) return []
   // Preserve old bindings without silently granting access to the new provider.
-  return account.outboundBindings ?? (account.outboundSeatBound ? [{ provider: 'existing', seat: '既有坐席', routeId: 'existing-default' }] : [])
+  return account.outboundBindings ?? (account.outboundSeatBound ? [{ provider: 'existing' }] : [])
 }
 export function availableBindings(account: Account | null | undefined, country: string) {
   if (!account || account.status !== '启用') return []
-  return bindingsOf(account).filter(b => !!b.seat.trim() && outboundRoutes.some(r => r.id === b.routeId && r.provider === b.provider && (!r.countries.length || r.countries.includes(country))))
+  return bindingsOf(account).filter(b => b.provider === 'existing' || (b.provider === 'omicall' && country === '越南'))
 }
 export function isCompletedCall(call: CallRecord) {
   return (!call.callStatus || call.callStatus === 'COMPLETED') && ['已接通', '无人接听'].includes(call.result)

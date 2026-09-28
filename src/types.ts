@@ -258,7 +258,7 @@ export type LessonRecord = {
 export type CallResult = '已接通' | '无人接听' | '发起失败' | '待确认'
 export const CALL_RESULTS: CallResult[] = ['已接通', '无人接听', '发起失败', '待确认']
 export type OutboundProvider = 'existing' | 'omicall'
-export type OutboundBinding = { provider: OutboundProvider; seat: string; routeId: string }
+export type OutboundBinding = { provider: OutboundProvider; seat?: string; routeId?: string }
 
 // 外呼通话记录（坐席点击号码发起外呼，挂断后填写通话小结，归档到客户档案与销售跟进记录）
 export type CallRecord = {

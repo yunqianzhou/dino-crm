@@ -1,6 +1,6 @@
 # CRM 双外呼系统接入与通话数据同步需求
 
-版本：V1.0｜日期：2026-09-28｜需求状态：待评审｜原型：GitHub Pages 五期版本
+版本：V1.1｜日期：2026-09-28｜需求状态：待评审｜原型：GitHub Pages 五期版本
 
 在线原型：[系统配置 · 五期](https://yunqianzhou.github.io/dino-crm/#/system-v5)｜[销售中心 · 五期](https://yunqianzhou.github.io/dino-crm/#/sales-v5)｜[管理看板](https://yunqianzhou.github.io/dino-crm/#/management-dashboard)
 
@@ -8,13 +8,13 @@
 
 ## 一、背景与目标
 
-CRM 已有外呼能力，越南业务需要增加 Omicall 本地外呼。销售继续从 CRM 联系客户；管理员为销售分别绑定外呼系统、坐席与线路；同时具备两套可用外呼能力时，由销售在每次起呼前选择本次使用哪套系统。
+CRM 已有 Sobot 外呼能力，越南业务需要增加 Omicall 本地外呼。销售继续从 CRM 联系客户；管理员为销售勾选绑定 Sobot、Omicall；CRM 页面不填写或选择坐席和线路；同时具备两套可用外呼能力时，由销售在每次起呼前选择本次使用哪套系统。
 
 两套系统的通话数据统一转换成 CRM 的结构化记录，自动进入通话记录，并同步到现有 Dashboard、下钻明细与数据导出。
 
 本期确认的范围：
 
-1. 系统管理绑定外呼时，可以选择对应系统的线路。
+1. 系统管理绑定外呼时，只勾选 Sobot、Omicall，无需填写或选择坐席和线路。
 2. 同时配置两套可用外呼能力时，起呼前必须选择系统。
 3. 补齐结构化通话数据，与现有 CRM 数据结构兼容。
 4. 现有 Dashboard 合并统计两套系统的数据，明细和导出可核对。
@@ -23,30 +23,28 @@ CRM 已有外呼能力，越南业务需要增加 Omicall 本地外呼。销售�
 
 ## 二、业务流程
 
-管理员打开成员账号的“绑定外呼/管理外呼” → 选择系统 → 为各系统填写或关联坐席、选择线路 → 保存。
+管理员打开成员账号的“绑定外呼/管理外呼” → 勾选 Sobot / Omicall → 保存。
 
-销售点击客户外呼按钮 → 校验可用能力 → 仅一套则自动选中、两套则由销售选择 → 点击“发起外呼” → 使用该系统绑定的坐席和线路呼叫 → 自动接收通话结果 → 保存结构化通话记录 → Dashboard 更新 → 销售可另行填写跟进。
+销售点击客户外呼按钮 → 校验可用能力 → 仅一套则自动选中、两套则由销售选择 → 点击“发起外呼” → 调用所选系统，坐席与线路由服务端对接配置及供应商能力自动解析 → 自动接收通话结果 → 保存结构化通话记录 → Dashboard 更新 → 销售可另行填写跟进。
 
 “外呼请求被接受”“通话已结束”“客户已接通”分别表达，不将请求成功等同客户接通。
 
 ## 三、原型及页面交互
 
-### 3.1 系统管理：绑定外呼时选线路（CALL-001）
+### 3.1 系统管理：选择要绑定的外呼系统（CALL-001）
 
 入口：系统设置 → 成员账号 → 绑定外呼；已有绑定的成员显示“管理外呼”。沿用成员管理编辑权限。
 
 | 配置项 | 交互与规则 |
 | --- | --- |
-| 外呼系统 | 可分别勾选“现有外呼系统”和“Omicall”，允许同时绑定 |
-| 坐席/分机 | 每套已勾选系统必填，关联该系统的真实坐席；生产校验账号存在且可用 |
-| 外呼线路 | 每套已勾选系统必选一条；候选仅来自该系统且该坐席被授权使用的线路 |
-| 保存绑定 | 校验通过后一次保存；缺坐席或线路提示对应项，不部分成功 |
+| 外呼系统 | 可分别勾选“Sobot”和“Omicall”，允许同时绑定 |
+| 保存绑定 | 按勾选结果一次保存外呼系统绑定；不校验页面坐席或线路输入 |
 | 解绑 | 取消对应系统勾选并保存；只解绑该系统；全部取消则不再具备外呼能力 |
-| 列表回显 | 系统、绑定线路和坐席；刷新、编辑成员基本资料后仍保留 |
+| 列表回显 | 已绑定系统名称（Sobot / Omicall）；刷新、编辑成员基本资料后仍保留 |
 
-本期一个成员在每套系统下绑定一个坐席和一条使用线路；如要变更线路，在管理外呼中修改。本期不增加销售起呼时的二次选线流程。
+本期绑定页面仅包含两个外呼系统选项。不提供坐席/分机和线路输入或选择，起呼窗口也只选择系统。实际坐席和线路由后端解析，不能因去掉表单而伪造默认供应商编号；服务端配置不完整时返回明确失败原因。
 
-保存时重新校验成员操作权限及线路授权。停用账号不可起呼。绑定不赋予用户原本没有的客户数据或拨号权限。修改和解绑记录操作人、时间、变更前后值；历史通话的系统、坐席和线路快照不随之修改。
+保存时重新校验成员管理操作权限；起呼时由服务端校验供应商授权及实际配置。停用账号不可起呼。绑定不赋予用户原本没有的客户数据或拨号权限。修改和解绑记录操作人、时间、变更前后值；历史通话的系统、坐席和线路快照不随之修改。
 
 历史仅存“已绑定”的账号继续沿用原系统既有配置；不能因为升级自动增加 Omicall 权限。旧系统真实坐席/线路缺失时由研发核对迁移，不伪造供应商编号。
 
@@ -57,14 +55,14 @@ CRM 已有外呼能力，越南业务需要增加 Omicall 本地外呼。销售�
 | 当前账号对该客户的可用能力 | 页面行为 |
 | --- | --- |
 | 没有可用能力 | 阻止起呼，提示未绑定、绑定失效、账号停用、无权限或国家不支持的具体原因 |
-| 仅一套可用 | 自动选中该系统，显示坐席和绑定线路；点击发起外呼后才拨号 |
+| 仅一套可用 | 自动选中并显示该系统名称；点击发起外呼后才拨号 |
 | 两套均可用 | 展示两张选择项；默认均不选；必须选定一套才能点击发起外呼 |
 
 可用能力取以下条件交集：成员启用、拥有外呼权限、客户在可操作范围、系统已绑定、坐席有效、线路可用且支持该客户号码所属国家。
 
-每张选择项显示系统名称、坐席及线路名称。两套都配置但只有一套对当前客户可用时，按“一套可用”处理。每次打开新的起呼窗口重新选择，不默认沿用上一次系统。
+每张选择项只显示系统名称（Sobot / Omicall）。两套都配置但只有一套对当前客户可用时，按“一套可用”处理。每次打开新的起呼窗口重新选择，不默认沿用上一次系统。
 
-发起时重新校验绑定，调用选定系统与线路。通话进行中不能改选系统；关闭/取消选择窗口不生成电话。防止重复点击、多标签页同时提交产生多次起呼。请求超时但供应商是否起呼不明时，先核实结果，不盲目重拨。
+发起时重新校验绑定，调用选定系统；实际坐席、线路自动解析。通话进行中不能改选系统；关闭/取消选择窗口不生成电话。防止重复点击、多标签页同时提交产生多次起呼。请求超时但供应商是否起呼不明时，先核实结果，不盲目重拨。
 
 通话面板按真实事件显示发起中、响铃中、通话中、结束或失败。客户接通后才累计接通时长。挂断调用对应供应商能力；关闭页面不能代替挂断，浏览器离开后服务端仍接收结果。
 
@@ -78,38 +76,78 @@ CRM 已有外呼能力，越南业务需要增加 Omicall 本地外呼。销售�
 
 录音状态至少区分待同步、可播放、无录音、同步失败；未返回录音不阻塞通话记录和指标更新。供应商源地址与 CRM 可播放地址分别处理，继续复用已有录音同步及访问权限。原型不提供假录音。
 
-## 四、结构化数据（CALL-003）
+## 四、结构化数据（CALL-003，已通过测试库核验）
 
-以已有 `sales_call_record` 为主要落点，沿用客户、坐席、权限和时间口径。以下表列出逻辑含义和已核验的历史字段；研发应以当前数据库和接口契约复核字段类型、枚举及约束，不另建一套平行的 Omicall 业务统计表。
+2026-09-28 通过 `dino_mysql` MCP 对测试库 `dino_english_mgt` 执行只读查询：`SHOW FULL COLUMNS`、`SHOW INDEX`、状态分组统计及跟进关联核对。核验表包括 `sales_call_record`、`sales_outbound_seat`、`sales_follow_log`、`admin_user`、`sales_outbound_audit_log`、`zhichi_callback_event`。未读取客户明细、录音内容或凭证，未执行数据库写入。以下区分已存在的结构与本期改造要求；数据库字段为事实，供应商 API 映射仍需联调。
 
-| 数据 | CRM 字段参考 | 来源及要求 |
+### 4.1 已存在的通话表字段
+
+两套系统统一落到现有 `sales_call_record`。以下字段均已实际查询确认，不能按前端演示模型另建同名字段。
+
+| 数据 | 实际字段与类型 | 使用要求 |
 | --- | --- | --- |
-| 内部通话 ID | id | CRM 唯一标识，贯穿发起、回调、跟进及明细 |
-| 客户关联 | user_id、customer、business_line | 来自 CRM 起呼上下文；不只凭号码猜测客户 |
-| 被叫号码 | phone、dial_code、national_number、e164_number | 统一号码标准，调用供应商时按其格式转换 |
-| 外呼系统 | provider | 使用 CRM 内部供应商标识；原系统与 Omicall 分开 |
-| 请求关联与防重复标识 | correlation_id、idempotency_key | 起呼前生成，用于关联请求和抑制重复起呼 |
-| 第三方通话 ID | provider_call_id；必要时 provider_session_id | 供应商返回；最终话单与实时事件标识关系需联调确认 |
-| 外呼线路快照 | route_id、route_name、caller_number、gateway_number | 按现有语义分别存储配置线路、实际外显号码和网关，不混为一值 |
-| 操作人与坐席 | agent、owner_email、agent_uuid + 坐席绑定关系 | 保存起呼人的稳定标识与当时坐席；不直接以供应商姓名匹配 CRM 用户 |
-| 通话流程状态 | call_status | 至少能区分进行中、已完结、发起失败、结果待核实；复用或最小扩充当前枚举 |
-| 通话结果 | call_result | 完结后记录接通/未接通；不得把进行中或发起失败伪装为无人接听 |
-| 结束原因 | reason_of_not_answer、early_detect_cause 等 | 保存忙线、无人接听、拒接、线路异常等技术原因；保留必要供应商原值 |
-| 起呼、接通、结束时间 | started_at、bridge_at、ended_at | UTC 存储；客户实际接通时间，不是请求时间或坐席注册时间 |
-| 接通时长 | duration_seconds | 非负整数秒，仅客户有效通话时长；展示再格式化为 mm:ss |
-| 录音 | provider_record_url、audio_url、recording_object_key、recording_status 等 | 源录音与 CRM 同步结果分开；晚到录音补到同一条通话 |
-| 人工跟进 | note + 现有跟进关联 | 系统自动记录允许尚无人工备注；保存跟进仍执行原必填规则 |
-| 同步及排障 | updated_at、现有同步日志；必要时新增接收/同步时间 | 区分通话发生时间与回调接收、数据更新时间，支持定位延迟或补偿 |
+| 内部通话 ID | `id bigint`，自增主键 | 与第三方 ID 分开；前端按字符串传递大整数，避免精度丢失 |
+| 客户关联 | `user_id bigint NOT NULL`；`customer varchar(128)`；`business_line varchar(32)` 可空 | `user_id` 关联 `dino_english.user.id`；业务线用于范围与隔离 |
+| 被叫号码 | `phone varchar(64)`；`dial_code varchar(8)`、`national_number varchar(32)`、`e164_number varchar(32)` 可空 | 保存起呼时号码快照，供应商适配器负责格式转换 |
+| 外呼系统 | `provider varchar(32) NOT NULL DEFAULT 'ZHICHI'` | Sobot 在现库中使用 `ZHICHI`，不改写为 `Sobot` 或 `existing`；本次查询未发现 Omicall 记录，新增值须后端明确，不能声称库内已有 `OMICALL` |
+| 防重复与关联 | `correlation_id varchar(36)`、`idempotency_key varchar(64)` 可空 | 已有唯一约束，见 4.3；发起前建立关联 |
+| 供应商标识 | `provider_call_id varchar(128)`、`provider_session_id varchar(128)` 可空 | Omicall 最终话单和实时会话 ID 的对应关系需联调 |
+| 操作人、领取人 | `agent varchar(128) NOT NULL`；`owner_email varchar(128)` 可空 | `agent` 是起呼坐席/操作人邮箱；`owner_email` 注释是“拨号时的客户领取人快照”，不是操作人或当前 CC |
+| 坐席标识 | `agent_uuid varchar(64)` 可空 | 现注释为智齿座席 UUID；Omicall 如何适配须明确，不能把分机号随意塞入 |
+| 实际线路 | `route_id varchar(64)`、`route_name varchar(128)`、`caller_number varchar(64)`、`gateway_number varchar(64)` 均可空 | 无需在页面填写。由后端配置/话单提供实际值；未知保留 NULL，不生成默认线路编号；外显号码与网关号码不混用 |
+| 流程状态 | `call_status varchar(32) NOT NULL DEFAULT 'COMPLETED'` | 实际值及注释不一致，见 4.2；不能仅依赖默认值或字段注释 |
+| 最终结果 | `call_result varchar(32)` 可空 | 注释列出 `CONNECTED / NOT_CONNECTED / FAILED`；主话单到达前允许空；与流程状态组合判断 |
+| 接通时长 | `duration_seconds int` 可空 | 注释明确无人接听为 NULL；保留现有存储语义。看板仅对有效已接通记录求和，显示时空值按 0 处理；不得把 NULL 当成零秒接通 |
+| 通话时间 | `started_at`、`bridge_at`、`ended_at datetime` 可空 | 分别为 UTC 起呼、双方桥接、结束时间；不是 `answered_at`。是否已桥接客户由供应商事实确认 |
+| 等待期限 | `expires_at`、`cdr_deadline_at datetime` 可空 | 分别为拨号意图过期和等待主话单截止时间，沿用现有机制 |
+| 技术原值 | `provider_call_result int`、`early_detect_cause varchar(64)`、`reason_of_not_answer varchar(64)`、`hangup_disposition int` 可空 | 当前注释均指智齿语义；不能直接写入 Omicall 不同类型/含义的原值；无已确认通用 `end_reason` 字段 |
+| 录音地址 | `provider_record_url varchar(1000)`、`audio_url varchar(1000)`、`recording_object_key varchar(512)` 可空 | 区分供应商地址、CRM 地址、私有对象 Key；不得泄露未授权录音 |
+| 录音状态与同步 | `recording_status varchar(32)` 默认 `PENDING`；`recording_synced_at datetime` 可空 | 注释列出 `PENDING / SYNCING / AVAILABLE / FAILED / PROVIDER_EXPIRED`；还有 `recording_retry_count`、`recording_error`、`recording_next_retry_at` 等现成重试字段 |
+| 人工备注 | `note varchar(1000) NOT NULL DEFAULT ''` | 自动通话允许空备注；后补备注更新同一记录，供应商回调不覆盖 |
+| 记录更新时间 | `created_at`、`updated_at datetime` | 通话表没有通用 `synced_at`；`updated_at` 不是专属回调接收时间，`recording_synced_at` 仅表示录音同步 |
 
-特别注意：Omicall 回传的 `provider` 表示运营商，不能直接写入 CRM 的外呼系统字段。Omicall 总呼叫时长 `duration`、接通时长候选 `answer_sec`、计费秒数 `bill_sec` 含义不同，须用真实话单确认接通口径。零秒或不足一秒接通不能只凭时长判定未接通。[官方话单说明](https://api.omicall.com/webhooks/call-hooks)
+### 4.2 实际状态、空值与展示映射
 
-原型使用驼峰字段表达上述逻辑，是演示数据模型；原型字段名、中文状态、演示第三方 ID 不作为生产 API 的命名与枚举要求。
+本次分组查询只观察到 `provider = ZHICHI`。`call_status` 字段注释仍写 `PENDING/COMPLETED/FAILED`，但实际数据已存在 `DIALING / START_FAILED / EXPIRED / COMPLETED / FAILED`；这些列是 varchar，不是数据库 ENUM，观察值也不等于完整接口契约。
+
+| 查询到的组合 | 产品处理要求 |
+| --- | --- |
+| `COMPLETED + CONNECTED` | 展示已接通，进入有效外呼、接通人数/次数与接通时长 |
+| `COMPLETED + NOT_CONNECTED` | 展示未接通，进入有效外呼，不进入接通；具体无人接听/忙线等按原因字段判断 |
+| `COMPLETED + FAILED` 或 `FAILED + FAILED` | 展示失败，不计本需求定义的有效外呼；禁止只按 COMPLETED 累计 |
+| `START_FAILED + NULL` | 发起失败，保留尝试记录，不计有效外呼 |
+| `EXPIRED + NULL` | 已过期/结果未确认，不伪装成无人接听；沿用补查策略 |
+| `DIALING + NOT_CONNECTED` | 尚未完结，不因 result 已有值提前纳入统计 |
+
+实际录音状态观察到 `PENDING / AVAILABLE / FAILED`，其余以字段注释为依据，仍需接口验证。“无录音”是产品展示状态，不能擅自新增数据库 `UNAVAILABLE` 值。原型当前中文结果及 `recordingStatus` 小写值只是演示视图模型，生产必须做显式映射。
+
+Omicall 的 `provider` 表示运营商，不能直接覆盖 CRM 的 `provider`。其 `duration`、`answer_sec`、`bill_sec` 不能混用，需结合真实话单确认接通秒数。[官方话单说明](https://api.omicall.com/webhooks/call-hooks)
+
+### 4.3 已存在的绑定、唯一约束与跟进关联
+
+- `sales_outbound_seat` 已有 `admin_user_id`、`member_email`、`provider`、`agent_uuid`、`agent_no`、`agent_name`、`agent_phone`、`ext`、`phone_type`、`enabled`、`bound_by`、`created_at`、`updated_at`。没有 `route_id / route_name` 字段。`agent_uuid` 当前必填；只勾选系统的界面需由后端自动解析真实坐席，不能写空串或假 UUID 绕过。
+- 绑定表的真实唯一索引为 `uk_seat_admin_user(admin_user_id)`、`uk_seat_member_email(member_email)`、`uk_provider_agent_uuid(provider, agent_uuid)`。前两个约束使一个成员目前只能有一条绑定；双系统需要有明确迁移方案，不能直接新增第二行，也不能覆盖第一套。
+- `admin_user.outbound_seat_id varchar(64)` 注释为“外呼坐席账号（供应商侧 ID）”，不是已确认的 `sales_outbound_seat.id` 外键，也不能塞入系统数组；`admin_user.status` 为 `0=启用，1=禁用`。
+- `sales_call_record` 已有 `uk_provider_call(provider, provider_call_id)`、`uk_correlation_id(correlation_id)`、`uk_agent_idempotency(agent, idempotency_key)`。第三方 ID 未返回时可空，需由内部关联防重复。
+- `sales_follow_log.call_id varchar(128)` 注释为“外呼录音 callID”。本次全部非空样本都匹配 `sales_call_record.provider_call_id`，没有匹配内部 `id`；因此不能把它默认映射为原型 `callId` 的内部 ID。跟进表没有 `provider`，跨系统第三方 ID 重号的处理需要明确改造。
+- `sales_outbound_audit_log` 有 `action`、`target_type`、`target_id`、`operator_email`、`detail_json`、`created_at`，可沿用记录绑定变更。
+- 现有回调表是 `zhichi_callback_event`，有唯一 `event_key`、`company_id`、`call_id`、`received_at`、`processed_at`、`process_status`、`payload_json` 等；没有通用供应商字段。它是智齿专用现状，不是已经支持 Omicall 的通用回调表。
+
+### 4.4 本期需评审的后端改造（尚未实施）
+
+1. **双系统绑定**：建议将成员绑定唯一范围调整为“成员 + provider”，同时审查邮箱约束与坐席约束；保持每个成员每个系统一套可用绑定。迁移脚本、兼容读写及回滚由研发确认。本次未执行 DDL。
+2. **后台自动关联**：明确勾选后如何按 CRM 成员匹配/创建供应商坐席及解析可用线路；自动关联失败应保存失败并说明原因，不能让用户补填已移除的表单。
+3. **供应商标识与回调**：Sobot 继续用 `ZHICHI`；Omicall 标识、专用回调或通用回调适配方案待研发确定。没有证据的字段或表不列为现有结构。
+4. **跟进关联**：保留既有 `call_id` 语义，评审是否增加供应商维度或显式内部通话关联，并迁移历史记录；本文不假定新增字段已存在。
+5. **供应商原值与租户**：智齿专属整数/原因字段不直接复用为任意 Omicall 内容；原始话单落点及多租户去重范围待接口设计。当前通话表没有供应商租户字段，不能声称已具备租户级唯一约束。
+6. **Dashboard 数据源**：复用通话事实及现有查询服务。仅凭库表不能确认看板接口、缓存或刷新时限；不得据此宣称生产看板已接通。
+
 
 ## 五、回调与一致性
 
 1. 发起前建立内部关联，记录所选系统、线路、客户与操作人快照。回调必须能定位这次尝试；号码相同不代表是同一客户或同一次外呼。
 2. 实时事件驱动页面状态，最终话单及历史查询负责确认最终事实。重复或乱序事件不会新增通话或令完结状态退回响铃。
-3. 生产去重范围为供应商 + 供应商租户/账号配置 + 第三方通话 ID；实时事件 ID 另作事件去重。多段话单合并到整通电话，不能逐事件累计次数。
+3. 现库通话去重范围为 `provider + provider_call_id`，另有 `correlation_id` 与坐席幂等键唯一约束；多租户隔离是待评审改造，不是现有字段。实时事件单独去重。多段话单合并到整通电话，不能逐事件累计次数。
 4. 客户已接通与坐席先接听须分开；只确认客户接通才写接通结果。
 5. 缺回调、回调失败或话单晚到时进行补查；迟到录音补全同一条记录。正式接入约定补偿间隔、上限、失败告警和权威修正规则。
 6. 限定接收并关联本期 CRM 发起的人工外呼；不把 inbound/local 或供应商平台独立起呼混入统计。
@@ -136,7 +174,7 @@ CRM 已有外呼能力，越南业务需要增加 Omicall 本地外呼。销售�
 | 接通时长 | 有效已接通电话的 duration_seconds 之和；未接通计 0，不累计响铃或计费时长 |
 | 系统/线路合计 | 次数与秒数可以汇总；跨系统、跨线路的人数重新按用户去重，不将分组人数直接相加 |
 
-例：同一客户先通过现有系统未接通，再通过 Omicall 接通 60 秒，则通话次数 2、外呼人数 1、接通次数 1、接通人数 1、时长 60 秒。另一次线路发起失败可以查到尝试记录，但不把通话次数变成 3。
+例：同一客户先通过 Sobot 未接通，再通过 Omicall 接通 60 秒，则通话次数 2、外呼人数 1、接通次数 1、接通人数 1、时长 60 秒。另一次线路发起失败可以查到尝试记录，但不把通话次数变成 3。
 
 ### 6.3 时间、权限和历史
 
@@ -152,8 +190,8 @@ CRM 已有外呼能力，越南业务需要增加 Omicall 本地外呼。销售�
 
 | 编号 | 场景 | 通过条件 |
 | --- | --- | --- |
-| A01 | 绑定一套 | 坐席和线路必填；保存、刷新、编辑成员后正确保留 |
-| A02 | 绑定两套 | 两套分别使用各自坐席与线路，不互相覆盖 |
+| A01 | 绑定一套 | 只勾选 Sobot 或 Omicall 即可保存，无坐席/线路输入；刷新、编辑成员后保留 |
+| A02 | 绑定两套 | 可同时勾选 Sobot 与 Omicall；两个绑定独立保存，不互相覆盖 |
 | A03 | 单套起呼 | 自动选中；点击发起后才调用；记录实际系统与线路 |
 | A04 | 双套起呼 | 每次重新选择；未选择不可发起；分别选择两套都能走对应链路 |
 | A05 | 解绑/停用/失效 | 单独解绑不影响另一套；全部解绑、停用或无权限不能起呼；提交时重新校验 |
@@ -167,8 +205,8 @@ CRM 已有外呼能力，越南业务需要增加 Omicall 本地外呼。销售�
 
 ## 八、研发对接材料与交付边界
 
-研发需要补齐：当前 CRM 外呼接口与枚举、原系统标识和绑定迁移方案、Omicall 租户/环境/SDK 版本、授权测试坐席和线路、成功与各失败场景的脱敏真实话单、回调校验及补查方案、录音有效期与同步规则、Dashboard 数据刷新时限。
+研发需要补齐：当前 CRM 外呼接口契约（库中实际值已核验）、已核验约束对应的绑定迁移方案、Omicall 租户/环境/SDK 版本、授权测试坐席和线路、成功与各失败场景的脱敏真实话单、回调校验及补查方案、录音有效期与同步规则、Dashboard 数据刷新时限。
 
 [Omicall Web SDK](https://api.omicall.com/sdk/web-sdk/v2-integration) 支持 CRM 内嵌通话和指定热线；[线路接口](https://api.omicall.com/omicall-api/call-center)提供坐席可呼出线路；[历史查询](https://api.omicall.com/omicall-api/call-transaction/v2)可作为结果补查依据。实际能力与字段以当前租户联调为准。
 
-本次原型交付用于验证绑定、选择、结构化记录、Dashboard 和导出联动；使用虚构线路与模拟通话，未接入真实供应商、未拨打真实电话。真实语音、供应商回调、录音回收及生产缓存刷新必须通过联调验收。
+本次原型交付用于验证绑定、选择、结构化记录、Dashboard 和导出联动；使用模拟通话；坐席、线路等未取得真实返回的字段保持为空，未接入真实供应商、未拨打真实电话。真实语音、供应商回调、录音回收及生产缓存刷新必须通过联调验收。

@@ -12,11 +12,13 @@ try {
   const account = {status:'启用',outboundSeatBound:true}
   assert.equal(o.bindingsOf(account)[0].provider,'existing')
   assert.equal(o.bindingsOf({...account,outboundBindings:[]}).length,0)
-  const bindings = [{provider:'existing',seat:'100',routeId:'existing-default'},{provider:'omicall',seat:'201',routeId:'omi-vn-01'}]
+  const bindings = [{provider:'existing'},{provider:'omicall'}]
   assert.equal(o.availableBindings({...account,outboundBindings:bindings},'越南').length,2)
   assert.equal(o.availableBindings({...account,outboundBindings:bindings},'泰国').length,1)
   assert.equal(o.availableBindings({...account,status:'停用',outboundBindings:bindings},'越南').length,0)
-  assert.equal(o.availableBindings({...account,outboundBindings:[{...bindings[1],routeId:'existing-default'}]},'越南').length,0)
+  assert.equal(o.availableBindings({...account,outboundBindings:[]},'越南').length,0)
+  assert.equal(o.providerName('existing'),'Sobot')
+  assert.equal(o.availableBindings({...account,outboundBindings:[{provider:'omicall',seat:'',routeId:''}]},'越南').length,1)
   const base = {id:'crm-1',studentId:'u1',provider:'omicall',providerCallId:'p-1',result:'已接通',callStatus:'COMPLETED',duration:'99:00',durationSeconds:9,note:'人工备注',time:'2026-09-28T01:00:00Z',agent:'cc1'}
   const second = {...base,id:'crm-2',provider:'existing',providerCallId:'p-1',durationSeconds:11}
   const failed = {...base,id:'crm-3',providerCallId:'p-3',result:'发起失败',callStatus:'START_FAILED'}
