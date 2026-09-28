@@ -1,3 +1,5 @@
+import OutboundDashboard from './OutboundDashboard'
+import { structuredCallHeaders, structuredCallRow } from '../outbound'
 import { useState } from 'react'
 import DashboardOutcomeReasons43 from './DashboardOutcomeReasons43'
 import { Card, Radio, Space } from 'antd'
@@ -46,7 +48,7 @@ export default function DashboardFollowup43(props:Props) {
  const exportSection = (section:'calls'|'followup') => <Export43 name={`followup-${section}`} sheets={()=>[
   {name:'Current snapshot',headers:['CRM ID','Name','Current CC',...(section==='followup'?['Appointment date UTC+7']:[]),...(section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).map(section==='followup'?followupLabel:label)],rows:uniquePeople((section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).flatMap(k=>metrics.current[k]||[])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...(section==='followup'?[groupName(followupAppointmentDate(s),'date')]:[]),...(section==='calls'?CURRENT_CALL_KEYS:CURRENT_FOLLOW_KEYS).map(k=>Number(metrics.current[k]?.some(u=>u.studentId===s.studentId)))])},
   {name:'Period user metrics',headers:['CRM ID','Name','Current CC',...(section==='followup'?['Appointment date UTC+7']:[]),...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(section==='followup'?followupLabel:label)],rows:uniquePeople((section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).flatMap(k=>metrics.activity[k])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...(section==='followup'?[groupName(followupAppointmentDate(s),'date')]:[]),...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(k=>Number(metrics.activity[k].some(u=>u.studentId===s.studentId)))])},
-  ...(section==='calls'?[{name:'Calls',headers:['CRM ID','Call ID','Time UTC','Result','Agent'],rows:calls.filter(c=>allowed.has(c.studentId)&&activityTime(c.time)).map(c=>[c.studentId,c.id,c.time,c.result,c.agent])}]:[
+  ...(section==='calls'?[{name:'Calls',headers:structuredCallHeaders,rows:calls.filter(c=>allowed.has(c.studentId)&&activityTime(c.time)).map(structuredCallRow)}]:[
    {name:'Appointments',headers:['CRM ID','Appointment ID','Status','Scheduled start','Timezone','Current grouping date UTC+7'],rows:selected.flatMap(s=>(s.salesAppointments||[]).map(a=>[s.studentId,a.appointmentId,a.appointmentStatus,a.scheduledStartAt,a.timezone,groupName(followupAppointmentDate(s),'date')]))},
    {name:'Payments',headers:['CRM ID','Order ID','Paid UTC','Currency','Amount','Appointment date UTC+7'],rows:dashboardPaymentOrders(orders,selected,filters).map(o=>[o.studentId,o.orderId,o.paidTime,o.currency,o.paidAmount,groupName(followupAppointmentDate(selected.find(s=>s.studentId===o.studentId)!),'date')])},
   ]),
@@ -63,6 +65,7 @@ export default function DashboardFollowup43(props:Props) {
     </div>
     {exportSection(section)}
    </div>
+   {section==='calls' && <OutboundDashboard calls={calls.filter(c=>allowed.has(c.studentId)&&activityTime(c.time))} />}
    <MetricTable43 key={`${section}-${primary(section)}-${secondary(section)}`} rows={comparisonRows(section,currentKeys,activityKeys)} total={{...metrics.current,...metrics.activity}} keys={[...currentKeys,...activityKeys]} currentKeys={currentKeys} labels={section==='followup'?followupLabels:undefined} firstTitle={`${groupLabel(primary(section),section)}${secondary(section)?' → '+groupLabel(primary(section)==='cc'?'date':'cc',section):''}`} context={rangeLabel} orders={section==='followup'?dashboardPaymentOrders(orders,selected,filters):undefined}/>
    {section==='calls'&&<p className="dashboard-help dashboard-bottom-note">{text('已拒绝按当前状态统计；展开查看每日活动，日期行的“—”表示不重复展示当前状态。期间合计按用户去重，不等于每日人数相加。','Rejected counts the current state. Expand for daily activity. A dash on date rows means current status is not repeated. Period totals deduplicate users across days.')}</p>}
    {section==='followup'&&<p className="dashboard-help dashboard-bottom-note">{text('按当前有效预约的上课日期分组，未预约和日期缺失单列；各行展示该组用户的当前状态。已结束用户重新激活后移出该数量。活动日期不影响当前状态和原因分布；已支付人数、金额及 AOV 仍按所选期间的支付日期统计，再归入用户的预约日期组。','Group users by their current active appointment’s scheduled date; not booked and missing dates are separate groups. Rows show current statuses, and reactivated leads leave the closed count. Activity dates do not affect current states or reasons. Paid users, amounts and AOV still use payment dates in the selected period, grouped by each user’s appointment date.')}</p>}

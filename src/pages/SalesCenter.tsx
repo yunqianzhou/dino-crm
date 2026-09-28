@@ -1,3 +1,6 @@
+import OutboundDialModal from '../components/OutboundDialModal'
+import OutboundCallDetails from '../components/OutboundCallDetails'
+import { isCompletedCall, providerName, callResultName, uniqueCalls, upsertCall, structuredCallHeaders, structuredCallRow } from '../outbound'
 import CCSelect from '../components/CCSelect'
 import SalesTimeFilter5 from '../components/SalesTimeFilter5'
 import MembershipModal5 from '../components/MembershipModal5'
@@ -31,7 +34,7 @@ import {
 import { CheckOutlined, DownOutlined, DownloadOutlined, EditOutlined, PhoneOutlined, SearchOutlined, SettingOutlined, SwapOutlined, RollbackOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import dayjs from 'dayjs'
-import { genCallId, getState, setState, uid, updateSalesSettings, useStore } from '../store'
+import { getState, setState, uid, updateSalesSettings, useStore } from '../store'
 import type { Account, CallRecord, CallResult, SalesFollowLog, SalesLifecycleNode, SalesSettings, Student, UserType, UserStatus } from '../types'
 import { CALL_RESULTS, USER_STATUSES } from '../types'
 import { useI18n } from '../i18n'
@@ -56,6 +59,8 @@ const { Text } = Typography
 const CALL_RESULT_COLOR: Record<CallResult, string> = {
   已接通: 'green',
   无人接听: 'red',
+  发起失败: 'orange',
+  待确认: 'default',
 }
 
 function fmtDuration(sec: number) {
@@ -175,6 +180,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const ccAccounts = accounts.filter(item => item.businessLines.some(matchLine) || (item.businessLines.length === 0 && isSalesMember(item) && roles.find(role => role.id === item.roleId)?.dataScope === 'all'))
 
   const [editing, setEditing] = useState<Student | null>(null)
+  const [callDetail, setCallDetail] = useState<CallRecord | null>(null)
   const [dialing, setDialing] = useState<Student | null>(null)
   const [reassigning, setReassigning] = useState<Student | null>(null)
   const [dropping, setDropping] = useState<Student | null>(null)
@@ -303,7 +309,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
 
   // 通话记录：按业务线默认勾选过滤，非超管仅看自己坐席的记录
   const callScoped = useMemo(() => {
-    let list = callRecords.filter((c) => matchLine(c.businessLine) && matchesDashboardScope(dashboardScope, c.studentId) && (!targetStudentId || c.studentId === targetStudentId))
+    let list = uniqueCalls(callRecords).filter((c) => matchLine(c.businessLine) && matchesDashboardScope(dashboardScope, c.studentId) && (!targetStudentId || c.studentId === targetStudentId))
     if (!seeAllOwners) list = list.filter((c) => c.agent === actor)
     return list
   }, [callRecords, targetStudentId, lineSel, matchLine, seeAllOwners, actor, dashboardScope])
@@ -329,14 +335,14 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
 
   // 触达汇总不受关键词、单次通话结果筛选影响；只按国家、CC 和统计周期确定漏斗范围。
   const summaryCallData = useMemo(
-    () => callScoped.filter((call) => (!callAgentFilter || call.agent === callAgentFilter) && matchesCallDate(call)),
+    () => callScoped.filter(isCompletedCall).filter((call) => (!callAgentFilter || call.agent === callAgentFilter) && matchesCallDate(call)),
     [callScoped, callAgentFilter, callDateRange],
   )
 
   // Lead 列表中的累计外呼次数：不受统计周期影响，只受当前数据权限和国家范围约束。
   const leadCallCounts = useMemo(() => {
     const counts = new Map<string, number>()
-    callScoped.forEach((call) => counts.set(call.studentId, (counts.get(call.studentId) || 0) + 1))
+    callScoped.filter(isCompletedCall).forEach((call) => counts.set(call.studentId, (counts.get(call.studentId) || 0) + 1))
     return counts
   }, [callScoped])
   const callSummary = useMemo(() => {
@@ -631,30 +637,15 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     message.success(t('sales.reassigned', { name }))
   }
 
-  // 保存外呼通话小结：生成通话记录 + 归档到该线索的销售跟进记录
-  const saveCall = (note: string, intention: string, appointment?: { booked: boolean; scheduledStartAt?: string; meetingLink?: string }) => {
+  // 通话事实已自动归档；人工备注更新同一通话及关联跟进记录
+  const saveCall = (note: string, intention: string, appointment?: { booked: boolean; scheduledStartAt?: string; meetingLink?: string }, completedCall?: CallRecord) => {
     if (!dialing) return
     const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
-    // 模拟外呼录音链接
-    const dummyAudio = 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'
-    // 模拟外呼结果里携带的 AI 总结
-    const dummySummary = '【AI自动总结】用户对课程表达了兴趣，询问了试听课的时间安排，对师资情况较为关注，建议后续跟进体验课安排。'
-    const record: CallRecord = {
-      id: genCallId(),
-      studentId: dialing.studentId,
-      customer: dialing.localName || dialing.name,
-      phone: dialing.phone ?? '',
-      businessLine: dialing.businessLine,
-      result: '已接通',
-      duration: '01:30',
-      note,
-      audioUrl: dummyAudio,
-      agent: actor,
-      time: now,
-    }
+    if (!completedCall) return
+    const record: CallRecord = { ...completedCall, note }
     setState((prev) => ({
       ...prev,
-      callRecords: [record, ...prev.callRecords],
+      callRecords: upsertCall(prev.callRecords, record).map(c => c.id === record.id ? { ...c, note } : c),
       students: prev.students.map((x) => {
         if (x.studentId !== dialing.studentId) return x
         const appointmentNote = appointment?.booked ? `【销售咨询预约】已预约：${appointment.scheduledStartAt}${appointment.meetingLink ? ` · ${appointment.meetingLink}` : ''}` : ''
@@ -669,7 +660,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
               salesLatestNote: followNote,
               salesUpdatedAt: now,
               salesHistory: [
-                { progress: x.salesProgress || '跟进中', note: followNote, time: now, owner: actor, audioUrl: dummyAudio, aiSummary: dummySummary },
+                { progress: x.salesProgress || '跟进中', note: followNote, time: now, owner: actor, audioUrl: completedCall.audioUrl, callId: completedCall.id },
                 ...(x.salesHistory || []),
               ],
             }
@@ -959,15 +950,16 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       title: t('sales.call.result'),
       dataIndex: 'result',
       width: 110,
-      render: (v: CallResult) => <Tag color={CALL_RESULT_COLOR[v]}>{t(`sales.callResult.${v}`)}</Tag>,
+      render: (v: CallResult) => <Tag color={CALL_RESULT_COLOR[v]}>{callResultName(v, lang === 'en')}</Tag>,
     },
+    { title: text('外呼系统 / 线路', 'System / route'), key: 'route', width: 210, render: (_, r) => <Space direction="vertical" size={0}><span>{providerName(r.provider, lang === 'en')}</span><Text type="secondary">{r.routeName || '—'}</Text></Space> },
     { title: t('sales.call.duration'), dataIndex: 'duration', width: 90 },
     {
       title: '录音',
       dataIndex: 'audioUrl',
       width: 110,
-      render: (url: string | undefined) =>
-        url ? <Button type="link" style={{ padding: 0 }} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>播放</Button> : <Text type="secondary">—</Text>,
+      render: (url: string | undefined, r) =>
+        url ? <Button type="link" style={{ padding: 0 }} onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}>播放</Button> : <Text type="secondary">{r.recordingStatus === 'pending' ? text('待同步', 'Pending') : '—'}</Text>,
     },
     {
       title: t('sales.call.note'),
@@ -977,6 +969,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       render: (v: string) => v || <Text type="secondary">—</Text>,
     },
     { title: t('sales.call.agent'), dataIndex: 'agent', width: 190 },
+    { title: text('详情', 'Details'), key: 'details', width: 90, render: (_, r) => <Button type="link" onClick={() => setCallDetail(r)}>{text('查看', 'View')}</Button> },
   ]
 
   const callSummaryColumns: ColumnsType<{ key: string; agent: string; country: string; outboundLeads: number; connectedLeads: number; total: number; answered: number; seconds: number }> = [
@@ -1036,9 +1029,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       return [...rows].sort((a, b) => (dayjs.utc(String(a[field] || 0)).valueOf() - dayjs.utc(String(b[field] || 0)).valueOf()) * (sort.order === 'ascend' ? 1 : -1))
     }
     if (tab === 'calls') {
-      downloadXlsx(filename, callColumns.map((column) => String(column.title)), sorted(callData).map((call) => [
-        reportTime(call.time, call.businessLine), call.customer, ...(phase3 ? [call.studentId] : []), call.phone, call.result, call.duration, call.audioUrl || '—', call.note, call.agent,
-      ]))
+      downloadXlsx(filename, structuredCallHeaders, sorted(callData).map(structuredCallRow))
     } else if (tab === 'summary') {
       downloadXlsx(filename, callSummaryColumns.map((column) => String(column.title)), callSummary.rows.map((row) => [
         accounts.find((item) => item.email === row.agent)?.name || row.agent, row.country, row.outboundLeads, row.connectedLeads, row.total, row.answered, fmtDuration(row.seconds),
@@ -1073,7 +1064,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
       </div>
       {(tab === 'calls' || tab === 'summary') ? (
         <>
-          {tab === 'calls' && <Select className="sales-filter-control" allowClear placeholder={t('sales.call.result')} value={callResultFilter} onChange={setCallResultFilter} options={CALL_RESULTS.map((r) => ({ label: t(`sales.callResult.${r}`), value: r }))} />}
+          {tab === 'calls' && <Select className="sales-filter-control" allowClear placeholder={t('sales.call.result')} value={callResultFilter} onChange={setCallResultFilter} options={CALL_RESULTS.map((r) => ({ label: callResultName(r, lang === 'en'), value: r }))} />}
           {seeAllOwners && (phase5 ? <CCSelect className="sales-filter-control" accounts={ccAccounts} owners={callRecords.filter(record => matchLine(record.businessLine)).map(record => record.agent)} value={callAgentFilter} onChange={setCallAgentFilter} unassigned={false} placeholder="坐席 · 搜索销售姓名 / 邮箱" /> : <Select className="sales-filter-control" allowClear showSearch optionFilterProp="label" placeholder={t('sales.call.agent')} value={callAgentFilter} onChange={setCallAgentFilter} options={salesAccounts.map((item) => ({ label: `${item.name}（${item.email}）`, value: item.email }))} />)}
           <DatePicker.RangePicker className="sales-filter-date" value={callDateRange} onChange={setCallDateRange} allowClear placeholder={[t('pkg.startTime'), t('pkg.endTime')]} />
         </>
@@ -1257,15 +1248,28 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
         phase5={phase5}
         editing={editing}
         form={form}
-        hasConnectedCall={editing ? callRecords.some((item) => item.studentId === editing.studentId && item.result === '已接通') : false}
+        hasConnectedCall={editing ? callRecords.some((item) => item.studentId === editing.studentId && isCompletedCall(item) && item.result === '已接通') : false}
         currentStage={editing ? stageOf(editing) : undefined}
         onCancel={() => setEditing(null)}
         onOk={saveFollow}
       />
       {addingMembership && <MembershipModal5 student={addingMembership} source="sales" permitted={canEdit && can('salesV3') !== 'none'} onClose={() => setAddingMembership(null)} />}
 
-      <Modal_Dial t={t} dialing={dialing} onCancel={() => setDialing(null)} onSave={saveCall} />
-      <Modal_Consultation student={consulting} paid={consulting ? isPaidStudent(consulting) : false} hasConnectedCall={consulting ? callRecords.some((item) => item.studentId === consulting.studentId && item.result === '已接通') : false} onCancel={() => setConsulting(null)} onSave={saveConsultation} />
+      <OutboundDialModal student={dialing} account={account} actor={actor} canDial={canDial} onCancel={() => setDialing(null)} onSave={(record, note, intention, appointment) => saveCall(note, intention, appointment, record)} />
+      <OutboundCallDetails call={callDetail} onClose={() => setCallDetail(null)} onSaveNote={canEdit && callDetail && isCompletedCall(callDetail) ? (note) => {
+        const record = callDetail
+        const now = dayjs.utc().format('YYYY-MM-DD HH:mm:ss')
+        setState(prev => ({ ...prev, callRecords: prev.callRecords.map(c => c.id === record.id ? { ...c, note } : c), students: prev.students.map(s => {
+          if (s.studentId !== record.studentId) return s
+          const history = s.salesHistory || []
+          const exists = history.some(h => h.callId === record.id)
+          const entry = { callId: record.id, progress: s.salesProgress || '跟进中', note, time: now, owner: actor, audioUrl: record.audioUrl }
+          return { ...s, salesLatestNote: note, salesUpdatedAt: now, salesHistory: exists ? history.map(h => h.callId === record.id ? { ...h, note } : h) : [entry, ...history] }
+        }) }))
+        setCallDetail({ ...record, note })
+        message.success(text('备注已保存，通话次数不变', 'Note saved; call count unchanged'))
+      } : undefined} />
+      <Modal_Consultation student={consulting} paid={consulting ? isPaidStudent(consulting) : false} hasConnectedCall={consulting ? callRecords.some((item) => item.studentId === consulting.studentId && isCompletedCall(item) && item.result === '已接通') : false} onCancel={() => setConsulting(null)} onSave={saveConsultation} />
 
       <Modal
         open={!!reassigning}
@@ -1382,134 +1386,6 @@ function Modal_Consultation({ student, paid, hasConnectedCall, onCancel, onSave 
       <Form.Item name="note" label="标记说明" rules={[{ required: true, message: '请填写本次标记说明' }]}><Input.TextArea rows={3} /></Form.Item>
     </Form>}
   </Modal>
-}
-
-// 外呼弹窗：模拟发起呼叫 → 挂断后填写通话小结
-function Modal_Dial({
-  t,
-  dialing,
-  onCancel,
-  onSave,
-}: {
-  t: (k: string, v?: Record<string, string | number>) => string
-  dialing: Student | null
-  onCancel: () => void
-  onSave: (note: string, intention: string, appointment?: { booked: boolean; scheduledStartAt?: string; meetingLink?: string }) => void
-}) {
-  const [phase, setPhase] = useState<'calling' | 'summary'>('calling')
-  const [seconds, setSeconds] = useState(0)
-  const [note, setNote] = useState('')
-  const [purchaseIntention, setPurchaseIntention] = useState('未填写')
-  const [appointmentAction, setAppointmentAction] = useState<'create' | 'continue'>('continue')
-  const [appointmentTime, setAppointmentTime] = useState<any>(null)
-  const [meetingLink, setMeetingLink] = useState('')
-
-  // 打开弹窗时重置状态并开始计时
-  useEffect(() => {
-    if (dialing) {
-      setPhase('calling')
-      setSeconds(0)
-      setNote('')
-      setPurchaseIntention(dialing.purchaseIntention || '未填写')
-      setAppointmentAction('continue')
-      setAppointmentTime(null)
-      setMeetingLink('')
-    }
-  }, [dialing])
-
-  useEffect(() => {
-    if (!dialing || phase !== 'calling') return
-    const id = setInterval(() => setSeconds((s) => s + 1), 1000)
-    return () => clearInterval(id)
-  }, [dialing, phase])
-
-  const handleHangup = () => {
-    setPhase('summary')
-  }
-
-  const submit = () => {
-    if (!note.trim()) {
-      message.warning(t('sales.dial.noteRequired'))
-      return
-    }
-    if (dialing?.businessLine === '越南' && appointmentAction === 'create' && !appointmentTime) {
-      message.warning('请选择销售咨询预约时间')
-      return
-    }
-    onSave(note, purchaseIntention, dialing?.businessLine === '越南' ? { booked: appointmentAction === 'create', scheduledStartAt: appointmentTime?.format('YYYY-MM-DD HH:mm:ss'), meetingLink } : undefined)
-  }
-
-  return (
-    <Modal
-      open={!!dialing}
-      title={t('sales.dial.title', { name: dialing?.localName || dialing?.name || '' })}
-      onCancel={onCancel}
-      width={520}
-      destroyOnClose
-      footer={
-        phase === 'calling'
-          ? [
-              <Button key="hangup" danger type="primary" icon={<PhoneOutlined />} onClick={handleHangup}>
-                {t('sales.dial.hangup')}
-              </Button>,
-            ]
-          : [
-              <Button key="cancel" onClick={onCancel}>
-                {t('common.cancel')}
-              </Button>,
-              <Button key="save" type="primary" onClick={submit}>
-                {t('sales.dial.save')}
-              </Button>,
-            ]
-      }
-    >
-      <div style={{ padding: '4px 0 12px' }}>
-        <div style={{ fontSize: 15 }}>
-          <Text strong>{dialing?.localName || dialing?.name}</Text>
-          <Tag style={{ marginInlineStart: 8 }}>{dialing?.businessLine}</Tag>
-        </div>
-        <div style={{ color: '#8c8c8c', marginTop: 4 }}>
-          <PhoneOutlined /> {dialing?.phone}
-        </div>
-      </div>
-
-      {phase === 'calling' ? (
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{ color: '#52c41a', marginBottom: 8 }}>{t('sales.dial.connected')}</div>
-          <div style={{ fontSize: 34, fontWeight: 600, letterSpacing: 2 }}>{fmtDuration(seconds)}</div>
-        </div>
-      ) : (
-        <Form layout="vertical" style={{ marginTop: 4 }}>
-          <Alert type="info" showIcon style={{ marginBottom: 12 }} message={t('sales.dial.summaryTip')} />
-          <Form.Item label={t('user.col.purchaseIntention')}>
-            <Select value={purchaseIntention} onChange={setPurchaseIntention}>
-              <Select.Option value="未填写">{t('sales.purchaseIntention.none')}</Select.Option>
-              <Select.Option value="有意向">{t('sales.purchaseIntention.yes')}</Select.Option>
-              <Select.Option value="无意向">{t('sales.purchaseIntention.no')}</Select.Option>
-            </Select>
-          </Form.Item>
-          {dialing?.businessLine === '越南' && <>
-            <div style={{ marginBottom: 12 }}>{t('sales.consultation.currentStage')}：<Tag color={CONSULTATION_STAGE_COLOR['待外呼']}>{t('sales.consultation.stage.待外呼')}</Tag></div>
-            <Form.Item label={t('sales.consultation.nextAction')} required>
-              <Select value={appointmentAction} onChange={setAppointmentAction} options={[
-                { label: t('sales.consultation.action.continue'), value: 'continue' },
-                { label: t('sales.consultation.action.create'), value: 'create' },
-              ]} />
-            </Form.Item>
-            {appointmentAction === 'create' && <><Form.Item label={t('sales.consultation.appointmentTime')} required><DatePicker showTime value={appointmentTime} onChange={setAppointmentTime} style={{ width: '100%' }} /></Form.Item><Form.Item label="Google Meet"><Input value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} placeholder={t('sales.optional')} /></Form.Item></>}
-          </>}
-          <Form.Item label={t('sales.f.note')} required>
-            <Input.TextArea
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t('sales.f.notePlaceholder')}
-            />
-          </Form.Item>
-        </Form>
-      )}
-    </Modal>
-  )
 }
 
 // 更新跟进弹窗

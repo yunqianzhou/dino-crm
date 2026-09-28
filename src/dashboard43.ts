@@ -1,3 +1,4 @@
+import { isCompletedCall } from './outbound'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
@@ -24,8 +25,8 @@ export function cohortFunnel(population: Student[], calls: CallRecord[], lessons
   const valid = (s: Student, time?: string) => !!time && dayjs.utc(time).isValid() && dayjs.utc(time).valueOf() >= dayjs.utc(s.registerTime).valueOf() && dayjs.utc(time).valueOf() <= dayjs.utc(now).valueOf()
   return {
     leads,
-    called: leads.filter(s => calls.some(c => c.studentId === s.studentId && ['已接通', '无人接听'].includes(c.result) && valid(s, c.time))),
-    connected: leads.filter(s => calls.some(c => c.studentId === s.studentId && c.result === '已接通' && valid(s, c.time))),
+    called: leads.filter(s => calls.some(c => c.studentId === s.studentId && isCompletedCall(c) && valid(s, c.time))),
+    connected: leads.filter(s => calls.some(c => c.studentId === s.studentId && isCompletedCall(c) && c.result === '已接通' && valid(s, c.time))),
     booked: leads.filter(s => s.salesAppointments?.some(a => valid(s, a.createdAt))),
     trialCompleted: leads.filter(s => lessons.some(l => l.studentId === s.studentId && l.lessonType === '体验课' && l.status === '已完课' && valid(s, l.completedAt))),
     paid: leads.filter(s => orders.some(o => o.studentId === s.studentId && isDashboardPaidOrder(o) && valid(s, o.paidTime))),
@@ -69,8 +70,8 @@ export function followupMetrics(population: Student[], calls: CallRecord[], less
   const range = (time?: string) => inVietnamRange(time, filters.start, filters.end) && dayjs.utc(time).valueOf() <= Date.now()
   const eventUsers = (predicate: (e: FollowEvent) => boolean) => rows.filter(s => s.salesLifecycleEvents?.some(e => range(e.reportedAt) && predicate(e)))
   const activity: PeopleMetrics = {
-    called: rows.filter(s => calls.some(c => c.studentId === s.studentId && ['已接通', '无人接听'].includes(c.result) && range(c.time))),
-    connected: rows.filter(s => calls.some(c => c.studentId === s.studentId && c.result === '已接通' && range(c.time))),
+    called: rows.filter(s => calls.some(c => c.studentId === s.studentId && isCompletedCall(c) && range(c.time))),
+    connected: rows.filter(s => calls.some(c => c.studentId === s.studentId && isCompletedCall(c) && c.result === '已接通' && range(c.time))),
     booked: rows.filter(s => s.salesAppointments?.some(a => range(a.createdAt))),
     attended: eventUsers(e => e.node === 'attendance' && e.result === '已出勤'),
     completed: eventUsers(e => e.node === 'consultation' && e.result === '咨询完成'),

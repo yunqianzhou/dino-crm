@@ -1,3 +1,5 @@
+import OutboundBindingModal from '../components/OutboundBindingModal'
+import { bindingsOf, outboundRoutes, providerName } from '../outbound'
 import { useMemo, useState } from 'react'
 import {
   Alert,
@@ -332,6 +334,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
       salesLead: accEditing?.salesLead,
       lastLogin: accEditing?.lastLogin,
       outboundSeatBound: accEditing?.outboundSeatBound || false,
+      outboundBindings: accEditing?.outboundBindings,
     }
     setState((prev) => ({
       ...prev,
@@ -392,21 +395,8 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
     }
   }
 
-  const toggleOutboundBound = (a: Account) => {
-    setState((prev) => ({
-      ...prev,
-      accounts: prev.accounts.map((x) =>
-        x.id === a.id ? { ...x, outboundSeatBound: !x.outboundSeatBound } : x,
-      ),
-    }))
-    addLog({
-      actor,
-      module: 'system',
-      action: a.outboundSeatBound ? 'sys.log.unbindOutbound' : 'sys.log.bindOutbound',
-      target: a.email,
-    })
-    message.success(a.outboundSeatBound ? '外呼坐席已解绑' : '外呼坐席已绑定')
-  }
+  const [bindingAccount, setBindingAccount] = useState<Account | null>(null)
+  const toggleOutboundBound = (a: Account) => setBindingAccount(a)
 
   const accColumns: ColumnsType<Account> = [
     { title: t('sys.acc.col.name'), dataIndex: 'name', width: 140 },
@@ -456,6 +446,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
       width: 170,
       render: (v) => v || <Text type="secondary">—</Text>,
     },
+    { title: lang === 'en' ? 'Calling capability' : '外呼能力', key: 'outbound', width: 260, render: (_, r) => <Space direction="vertical" size={4}>{bindingsOf(r).length ? bindingsOf(r).map(b => <div key={b.provider}><Tag color={b.provider === 'omicall' ? 'blue' : 'default'}>{providerName(b.provider, lang === 'en')}</Tag><Text type="secondary">{outboundRoutes.find(route => route.id === b.routeId)?.name || '—'} · {b.seat}</Text></div>) : <Text type="secondary">—</Text>}</Space> },
     ...(canEditAcc
       ? [
           {
@@ -473,8 +464,8 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
                 <Button type="link" size="small" style={{ padding: 0 }} onClick={() => openAcc(r)}>
                   {t('common.edit')}
                 </Button>
-                <Button type="link" size="small" style={{ padding: 0, color: r.outboundSeatBound ? '#ff4d4f' : '#2F6BFF' }} onClick={() => toggleOutboundBound(r)}>
-                  {r.outboundSeatBound ? '解绑外呼' : '绑定外呼'}
+                <Button type="link" size="small" style={{ padding: 0 }} onClick={() => toggleOutboundBound(r)}>
+                  {lang === 'en' ? (bindingsOf(r).length ? 'Manage calling' : 'Bind calling') : (bindingsOf(r).length ? '管理外呼' : '绑定外呼')}
                 </Button>
               </Space>
             ),
@@ -511,6 +502,14 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
         <Text type="secondary">{phase5 ? (lang === 'en' ? 'Roles control permissions. Mark frontline sales (CC) in member accounts; CCs may add up to 3 membership days per operation in both centers.' : '角色管理操作权限；在成员账号中标记一线销售（CC）。CC 在用户中心和销售中心每次添加会员时长均最多 3 天。') : t('sys.intro')}</Text>
       </div>
 
+      <OutboundBindingModal account={bindingAccount} onCancel={() => setBindingAccount(null)} onSave={bindings => {
+        if (!bindingAccount || !canEditAcc) return
+        const target = bindingAccount
+        setState(prev => ({ ...prev, accounts: prev.accounts.map(a => a.id === target.id ? { ...a, outboundBindings: bindings, outboundSeatBound: bindings.length > 0 } : a) }))
+        addLog({ actor, module: 'system', action: bindings.length ? 'sys.log.bindOutbound' : 'sys.log.unbindOutbound', target: `${target.email} · ${bindings.map(b => `${providerName(b.provider)} / ${b.seat} / ${b.routeId}`).join('；') || '全部解绑'}` })
+        setBindingAccount(null)
+        message.success(lang === 'en' ? 'Calling bindings saved' : '外呼绑定已保存')
+      }} />
       <Tabs
         items={[
           {

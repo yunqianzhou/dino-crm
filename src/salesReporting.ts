@@ -1,3 +1,4 @@
+import { callDurationSeconds } from './outbound'
 import dayjs from 'dayjs'
 import { tzOf, toLocalTime, tzLabel } from './time'
 import type { CallRecord } from './types'
@@ -28,8 +29,4 @@ export function reportTime(value?: string, country?: string) {
   return validCallback(value) ? `${toLocalTime(value, country)} ${tzLabel(country)}` : '—'
 }
 
-export function callSeconds(call: Pick<CallRecord, 'duration' | 'result'>) {
-  if (call.result !== '已接通' || !/^\d+:[0-5]\d$/.test(call.duration || '')) return 0
-  const [minutes, seconds] = call.duration.split(':').map(Number)
-  return minutes * 60 + seconds
-}
+export const callSeconds = callDurationSeconds

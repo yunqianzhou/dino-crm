@@ -1,3 +1,4 @@
+import { isCompletedCall } from './outbound'
 import type { CallRecord, SalesFollowLog, SalesLifecycleEvent, Student } from './types'
 
 export const CONSULTATION_STAGES = ['待外呼', '未接通待跟进', '已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '暂不跟进', '已关闭'] as const
@@ -61,7 +62,7 @@ export function consultationStage(student: Student, callRecords: CallRecord[] = 
   if (last?.consultationStatus === '未完成') return '咨询未完成待跟进'
   if (last?.consultationStatus === '已完成') return '咨询完成待支付'
 
-  const calls = callRecords.filter((item) => item.studentId === student.studentId)
+  const calls = callRecords.filter(isCompletedCall).filter((item) => item.studentId === student.studentId)
   if (!calls.length) return '待外呼'
   return calls.some((item) => item.result === '已接通') ? '已接通待预约' : '未接通待跟进'
 }

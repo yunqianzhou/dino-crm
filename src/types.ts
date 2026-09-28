@@ -169,6 +169,7 @@ export type Student = {
 export type SalesProgress = '待领取' | '跟进中' | '暂不跟进'
 
 export type SalesFollowLog = {
+  callId?: string
   progress: string
   stage5?: string // 五期：本次操作保存后的阶段快照，不能用用户当前阶段覆盖历史
   note: string
@@ -254,11 +255,27 @@ export type LessonRecord = {
 }
 
 // 外呼通话结果
-export type CallResult = '已接通' | '无人接听'
-export const CALL_RESULTS: CallResult[] = ['已接通', '无人接听']
+export type CallResult = '已接通' | '无人接听' | '发起失败' | '待确认'
+export const CALL_RESULTS: CallResult[] = ['已接通', '无人接听', '发起失败', '待确认']
+export type OutboundProvider = 'existing' | 'omicall'
+export type OutboundBinding = { provider: OutboundProvider; seat: string; routeId: string }
 
 // 外呼通话记录（坐席点击号码发起外呼，挂断后填写通话小结，归档到客户档案与销售跟进记录）
 export type CallRecord = {
+  provider?: OutboundProvider
+  providerCallId?: string
+  correlationId?: string
+  routeId?: string
+  routeName?: string
+  callerNumber?: string
+  seat?: string
+  callStatus?: 'DIALING' | 'COMPLETED' | 'START_FAILED'
+  answeredAt?: string
+  endedAt?: string
+  durationSeconds?: number
+  endReason?: string
+  recordingStatus?: 'pending' | 'available' | 'unavailable'
+  syncedAt?: string
   id: string
   studentId: string
   customer: string // 客户姓名
@@ -425,6 +442,7 @@ export type Account = {
   status: AccountStatus
   lastLogin?: string
   salesLead?: boolean // 销售组长：可查看并重新分配组内（业务线范围）全部销售的跟进线索
+  outboundBindings?: OutboundBinding[]
   outboundSeatBound?: boolean // 是否已绑定外呼坐席
 }
 

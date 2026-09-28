@@ -1,3 +1,4 @@
+import { isCompletedCall, uniqueCalls } from '../outbound'
 import { useState } from 'react'
 import { Button, Card, DatePicker, Modal, Select, Space, Tag, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
@@ -21,7 +22,8 @@ export default function ManagementDashboard() {
  const accounts=useStore(s=>s.accounts)
  const roles=useStore(s=>s.roles)
  const channels=useStore(s=>s.channels)
- const calls=useStore(s=>s.callRecords??[])
+ const rawCalls=useStore(s=>s.callRecords??[])
+ const calls=uniqueCalls(rawCalls).filter(isCompletedCall)
  const lessons=useStore(s=>s.lessons??[])
  const orders=useStore(s=>s.orders)
  const [query,setQuery]=useSearchParams()

@@ -35,6 +35,8 @@ jobs:
         run: pnpm run test:ab-config
       - name: Check phase 5 assignment and order filters
         run: node scripts/test-phase5.cjs
+      - name: Check outbound bindings and reporting
+        run: node scripts/test-outbound.cjs
       - name: Build site
         run: pnpm run build
       - name: Configure Pages
