@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react'
+import { dashboardPermission, dashboardExportPermission } from './dashboardPermissions'
 import { useStore } from './store'
 import { useSession } from './auth'
 import type { Account, ModuleKey, PermLevel, Role } from './types'
@@ -56,6 +57,8 @@ export function usePerm() {
 
   // role 为空（任意工作邮箱登录、未匹配账号）时，按超级管理员处理，保证原型可用。
   const can = (m: ModuleKey): PermLevel => {
+    if (m === 'managementDashboard') return dashboardPermission(role, account)
+    if (m === 'managementDashboard_export') return dashboardExportPermission(role, account)
     if (!role) return 'operate'
     const saved = role.perms[m]
     if (saved) return saved

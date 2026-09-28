@@ -20,6 +20,7 @@ import type {
   SalesSettings,
 } from './types'
 import { LINE_CURRENCY } from './types'
+import { withDashboardPermission } from './dashboardPermissions'
 import { withPhase5Members } from './phase5'
 import { withManagementDemo } from './managementDemo'
 
@@ -219,7 +220,7 @@ function load(): AppState {
       const withCallbackDemo = normalized.students.some((student) => student.studentId === callbackDemo.studentId)
         ? normalized
         : { ...normalized, students: [callbackDemo, ...normalized.students] }
-      const migrated = autoAllocate(withPhase5Members(withManagementDemo(withCallbackDemo)))
+      const migrated = autoAllocate(withDashboardPermission(withPhase5Members(withManagementDemo(withCallbackDemo))))
       localStorage.setItem(KEY, JSON.stringify(migrated))
       return migrated
     }
@@ -759,6 +760,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        managementDashboard: 'none', managementDashboard_export: 'none',
         salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'operate',
@@ -827,6 +829,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        managementDashboard: 'none', managementDashboard_export: 'none',
         salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'operate',
@@ -895,6 +898,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        managementDashboard: 'none', managementDashboard_export: 'none',
         salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'none',
@@ -963,6 +967,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'all',
       perms: {
+        managementDashboard: 'view', managementDashboard_export: 'operate',
         salesV5_batch_assign: 'operate',
         marketingV2_channel_types: 'operate',
         appABTest: 'operate',
@@ -1031,6 +1036,7 @@ function seed(): AppState {
       builtin: true,
       dataScope: 'line',
       perms: {
+        managementDashboard: 'none', managementDashboard_export: 'none',
         salesV5_batch_assign: 'none',
         marketingV2_channel_types: 'none',
         appABTest: 'none',

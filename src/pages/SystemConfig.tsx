@@ -42,6 +42,7 @@ type ModuleNode = { key: ModuleKey; children?: ModuleNode[] }
 type ModuleRow = { key: ModuleKey; depth: number; ancestors: ModuleKey[] }
 
 const MODULE_HIERARCHY: ModuleNode[] = [
+  { key: 'managementDashboard', children: [{ key: 'managementDashboard_export' }] },
   { key: 'appABTest' },
   { key: 'users', children: [{ key: 'users_edit' }, { key: 'users_phone_view' }, { key: 'users_export' }] },
   { key: 'sales', children: [{ key: 'sales_claim' }, { key: 'sales_dial' }, { key: 'sales_update' }, { key: 'sales_reassign' }, { key: 'sales_config' }] },
@@ -103,6 +104,8 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
   const lines = BUSINESS_LINES
 
   const moduleLabel = (m: ModuleKey) => {
+    if (m === 'managementDashboard_export') return lang === 'en' ? 'Export dashboard data' : '下载看板数据'
+    if (m === 'managementDashboard') return lang === 'en' ? 'Management Dashboard (Phase 5)' : '管理看板（五期）'
     if (m === 'salesV5_batch_assign') return lang === 'en' ? 'Batch assign leads' : '批量分配线索'
     if (m === 'appABTest') return lang === 'en' ? 'APP A/B test (Phase 6)' : 'APP A/B test配置（六期）'
     if (m === 'marketingV2_channel_types') return lang === 'en' ? 'Manage channel types' : '维护渠道类型（独立授权）'
@@ -547,6 +550,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
                     ))}
                   </Space>
                 </Paragraph>
+                <Paragraph type="secondary">{lang === 'en' ? 'Dashboard read-only access allows viewing only. Export dashboard data requires separate permission.' : '管理看板只读仅允许查看，下载看板数据需单独授权。'}</Paragraph>
                 <Table
                   rowKey="key"
                   size="small"
@@ -667,7 +671,7 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
                 pageSizeOptions: ['10', '20', '50']
               }}
               dataSource={matrixData.filter((m) => {
-                return m.ancestors.every((parent) => draftPerms[parent] === 'operate')
+                return m.ancestors.every((parent) => parent === 'managementDashboard' ? ['view','operate'].includes(draftPerms[parent]) : draftPerms[parent] === 'operate')
               })}
               columns={[
                 { title: t('sys.module'), dataIndex: 'key', render: (m: ModuleKey, row: ModuleRow) => {
@@ -695,14 +699,14 @@ export default function SystemConfig({ phase5 = false }: { phase5?: boolean }) {
                           setDraftPerms((prev) => {
                             const next = { ...prev, [row.key]: val }
                             // 模块未处于可操作状态时，其下所有层级的权限均不可见且重置。
-                            if (!isAction && val !== 'operate') {
+                            if (!isAction && (row.key === 'managementDashboard' ? val === 'none' : val !== 'operate')) {
                               descendantsOf(row.key).forEach((child) => (next[child] = 'none'))
                             }
                             return next
                           })
                         }}
                         optionType="button"
-                        options={(isAction ? ['none', 'operate'] : ['none', 'view', 'operate'] as PermLevel[]).map((lv) => ({
+                        options={(row.key === 'managementDashboard' ? ['none', 'view'] : isAction ? ['none', 'operate'] : ['none', 'view', 'operate'] as PermLevel[]).map((lv) => ({
                           label: levelLabel(lv as PermLevel),
                           value: lv,
                         }))}

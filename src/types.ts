@@ -355,6 +355,7 @@ export type DataScope = 'all' | 'line'
 
 // 受权限管控的功能模块
 export type ModuleKey =
+  | 'managementDashboard' | 'managementDashboard_export'
   | 'salesV5_batch_assign'
   | 'appABTest'
   | 'marketingV2_channel_types'
@@ -386,6 +387,7 @@ export type ModuleKey =
   | 'system_role_add' | 'system_role_edit' | 'system_role_delete' | 'system_acc_add' | 'system_acc_edit'
 
 export const PERMISSION_MODULES: ModuleKey[] = [
+  'managementDashboard', 'managementDashboard_export',
   'salesV5_batch_assign',
   'appABTest',
   'marketing',

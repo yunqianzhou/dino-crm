@@ -43,7 +43,7 @@ import { isClaimedLead, isPoolLead, isSalesLead } from '../funnel'
 import { resolveUserType } from '../userType'
 import { latestTrialReport, resolveUserStatus, TRIAL_REPORT_URL } from '../lessons'
 import { useLineScope } from '../useLineScope'
-import { businessLineOf, lineLabel, lpChannelSourceText, appChannelSourceText } from '../channel'
+import { businessLineOf, salesBusinessLineOptions, lineLabel, lpChannelSourceText, appChannelSourceText } from '../channel'
 import LineFilter from '../components/LineFilter'
 import LocalTime from '../components/LocalTime'
 import { tzOf } from '../time'
@@ -116,7 +116,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const canManageSettings = can(phase3 ? 'salesV3_config' : 'sales_config') === 'operate'
   // 全业务线（超管）或拥有重新分配权限的主管可见范围内全部领取记录
   const seeAllOwners = allowedLines() === null || canReassign
-  const dashboardRows = dashboardScope ? dashboardSalesRows(students, dashboardScope, allowedLines(), seeAllOwners, actor) : undefined
+  const dashboardRows = dashboardScope ? dashboardSalesRows(students, dashboardScope, allowedLines(), seeAllOwners, actor, channels) : undefined
   // 当拥有分配与掉库设置权限时，视为 Leader 身份以显示横幅和设置入口
   const isLeader = canManageSettings
   const { selected: lineSel, setSelected: setLineSel, matchLine, disabled: lineDisabled, filterOptions } = useLineScope()
@@ -208,10 +208,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
 
   // 业务线筛选选项：渠道业务线 + 学员中出现的业务线（空业务线不入选项）
   const lineOptions = useMemo(
-    () =>
-      Array.from(
-        new Set([...channels.map((c) => c.name), ...students.map((s) => businessLineOf(channels, s))].filter(Boolean)),
-      ),
+    () => salesBusinessLineOptions(channels, students),
     [channels, students],
   )
   // 仅当当前国家筛选范围包含越南时展示越南销售咨询阶段；避免其他国家看到无关筛选。

@@ -43,6 +43,7 @@ const MODULE_PATH: { module: ModuleKey; path: string }[] = [
   { module: 'landing', path: '/landing' },
   { module: 'system', path: '/system' },
   { module: 'appABTest', path: '/app-ab-test' },
+  { module: 'managementDashboard', path: '/management-dashboard' },
 ]
 
 function firstAllowedPath(can: (m: ModuleKey) => string): string {
@@ -88,7 +89,7 @@ export default function App() {
           <Route path="orders-v5" element={<Guard module="ordersV3"><OrderCenter phase5 detailsPath="/orders-v5" exportPermission="ordersV3_export" /></Guard>} />
           <Route path="orders-v5/:orderId" element={<Guard module="ordersV3"><OrderDetail backPath="/orders-v5" /></Guard>} />
           <Route path="app-ab-test" element={<Guard module="appABTest"><AppABTest /></Guard>} />
-          <Route path="management-dashboard" element={<Guard module="salesV3"><ManagementDashboard /></Guard>} />
+          <Route path="management-dashboard" element={<Guard module="managementDashboard"><ManagementDashboard /></Guard>} />
           <Route path="channels" element={<Guard module="channels"><ChannelManagement /></Guard>} />
           <Route path="landing" element={<Guard module="landing"><LandingPageManagement /></Guard>} />
           <Route path="users" element={<Guard module="users"><UserCenterP1 /></Guard>} />

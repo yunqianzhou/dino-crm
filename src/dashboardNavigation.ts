@@ -1,4 +1,4 @@
-import type { Order, Student } from './types'
+import type { ChannelLine, Order, Student } from './types'
 import { dashboardPopulation } from './dashboardData'
 
 export type DashboardListScope = { label: string; studentIds: string[]; orderIds?: string[] }
@@ -17,6 +17,6 @@ export function dashboardMetricDestination(metric: string) {
 }
 
 /** Historical cohorts may include paid users and unassigned leads; retain that exact set. */
-export function dashboardSalesRows(students: Student[], selection: DashboardListScope, lines: string[] | null, seeAll: boolean, actor: string) {
-  return dashboardPopulation(students, lines, seeAll, actor).filter(student => matchesDashboardScope(selection, student.studentId))
+export function dashboardSalesRows(students: Student[], selection: DashboardListScope, lines: string[] | null, seeAll: boolean, actor: string, channels: ChannelLine[] = []) {
+  return dashboardPopulation(students, lines, seeAll, actor, [], channels).filter(student => matchesDashboardScope(selection, student.studentId))
 }

@@ -1,7 +1,8 @@
+import { salesBusinessLineOptions } from '../channel'
 import { useState } from 'react'
 import { Button, Empty, Select, Table } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
@@ -62,12 +63,21 @@ export function MetricTable43({ rows, total, keys, firstTitle, context, conversi
  ]} summary={() => <Table.Summary fixed="top"><Table.Summary.Row><Table.Summary.Cell index={0}>{text('合计（去重）','Total (unique users)')}</Table.Summary.Cell>{keys.map((key,i) => <Table.Summary.Cell index={i+1} key={key}>{numeric(total,key)}</Table.Summary.Cell>)}{conversion && <Table.Summary.Cell index={keys.length+1}>{rateText(l2s(total))}</Table.Summary.Cell>}{orders && <Table.Summary.Cell index={keys.length+1+(conversion?1:0)}><DashboardMoneyCell orders={rowOrders(total)} /></Table.Summary.Cell>}</Table.Summary.Row></Table.Summary>} />
 }
 export type ExportSheet43 = { name: string; headers: string[]; rows: unknown[][] }
-export function Export43({ name, sheets, disabled = false, orders = false }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean; orders?:boolean }) {
+export function Export43({ name, sheets, disabled = false }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean }) {
  const { text, can } = useDashboard43()
- if (can(orders ? 'ordersV3_export' : 'usersV2_export') !== 'operate') return null
+ const [query] = useSearchParams()
+ const { allowedLines } = usePerm()
+ const channels = useStore(s => s.channels)
+ const students = useStore(s => s.students)
+ const scope = allowedLines()
+ const selectedLines = query.getAll('line').filter(Boolean)
+ const permittedLines = salesBusinessLineOptions(channels, students).filter(line => scope === null || scope.includes(line))
+ const exportLines = permittedLines.filter(line => !selectedLines.length || selectedLines.includes(line))
+ if (can('managementDashboard_export') !== 'operate') return null
  return <Button size="small" icon={<DownloadOutlined />} disabled={disabled} onClick={() => {
   const workbook = XLSX.utils.book_new()
-  sheets().forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(() => ({wch:24})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
+  const businessRows = [['Selected business lines', selectedLines.length ? selectedLines.join(', ') : 'All permitted business lines'], ['Permitted business lines in selection', exportLines.join(', ') || 'None'], ['User type', 'Formal'], ['Reporting timezone', 'UTC+7']]
+  sheets().map(sheet => sheet.headers[0] === 'Scope' ? { ...sheet, rows: [...sheet.rows, ...businessRows] } : sheet).forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(() => ({wch:24})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
   XLSX.writeFile(workbook,`${name}.xlsx`)
  }}>{text('下载原始数据','Download raw data')}</Button>
 }

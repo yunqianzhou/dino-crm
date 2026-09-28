@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
-import type { CallRecord, LessonRecord, Order, Student } from './types'
+import { businessLineOf } from './channel'
+import type { Account, CallRecord, ChannelLine, LessonRecord, Order, Role, Student } from './types'
 import { isSalesLead } from './funnel'
 import { consultationStage } from './salesLifecycle'
 import { resolveUserType } from './userType'
@@ -14,6 +15,16 @@ function matchesOwner(student: Student, owner: DashboardFilters['owner']) {
   const ids = dashboardOwnerIds(owner)
   return !ids.length || ids.includes(student.salesOwner || '__unassigned__')
 }
+/** CC filter candidates come from explicitly marked system members in the selected lines. */
+export function dashboardCCAccounts(accounts: Account[], roles: Role[], lines: string[], students: Student[]) {
+  return accounts.filter(account => {
+    if (account.status !== '启用' || account.isSalesMember !== true || !lines.length) return false
+    const inLine = account.businessLines.some(line => lines.includes(line)) ||
+      (!account.businessLines.length && roles.find(role => role.id === account.roleId)?.dataScope === 'all')
+    const assigned = students.filter(student => student.salesOwner === account.email)
+    return inLine && (!assigned.length || assigned.some(student => resolveUserType(student) === '正式用户'))
+  })
+}
 export const PERIOD_METRICS = ['registered', 'called', 'connected', 'booked', 'attended', 'completed', 'paid'] as const
 /** A paid profile flag is not payment evidence; count only valid, positive paid orders. */
 export function isDashboardPaidOrder(order: Order) {
@@ -25,9 +36,12 @@ export function inVietnamRange(time: string | undefined, start: string, end: str
   const date = dayjs.utc(time).utcOffset(7 * 60).format('YYYY-MM-DD')
   return (!start || date >= start) && (!end || date <= end)
 }
-export function dashboardPopulation(students: Student[], scope: string[] | null, seeAll: boolean, actor: string) {
-  return [...new Map(students.filter(s => s.businessLine === '越南' && (!scope || scope.includes(s.businessLine)) &&
-    (seeAll || !s.salesOwner || s.salesOwner === actor)).map(s => [s.studentId, s])).values()]
+export function dashboardPopulation(students: Student[], scope: string[] | null, seeAll: boolean, actor: string, selectedLines: string[] = [], channels: ChannelLine[] = []) {
+  return [...new Map(students.filter(s => {
+    const line = businessLineOf(channels, s)
+    return (scope === null || scope.includes(line)) && (!selectedLines.length || selectedLines.includes(line)) &&
+      (seeAll || !s.salesOwner || s.salesOwner === actor)
+  }).map(s => [s.studentId, s])).values()]
 }
 export function dashboardMetrics(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters, orders: Order[] = []) {
   const range = (time?: string) => inVietnamRange(time, filters.start, filters.end)

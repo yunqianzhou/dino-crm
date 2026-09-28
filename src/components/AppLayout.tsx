@@ -37,7 +37,7 @@ const NAV_MODULE: Record<string, ModuleKey> = {
   '/orders-v5': 'ordersV3',
   '/channels': 'channels',
   '/landing': 'landing',
-  '/management-dashboard': 'salesV3',
+  '/management-dashboard': 'managementDashboard',
   '/app-ab-test': 'appABTest',
   '/users': 'users',
   '/sales': 'sales',

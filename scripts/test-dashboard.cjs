@@ -6,9 +6,23 @@ const { execFileSync } = require('node:child_process')
 execFileSync(process.execPath, [resolve('scripts/test-dashboard43.cjs')], { stdio: 'inherit' })
 const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
-  execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/managementDemo.ts', 'src/dashboardView.ts', 'src/dashboardNavigation.ts', 'src/dashboardSort.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
+  execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/dashboard43.ts', 'src/dashboardPermissions.ts', 'src/managementDemo.ts', 'src/dashboardView.ts', 'src/dashboardNavigation.ts', 'src/dashboardSort.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
-  const { dashboardOwnerIds, dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, dashboardBreakdownPayments, dashboardCohortRates, dashboardCohortMetrics, dashboardCohortRows, COHORT_METRICS, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
+  const { dashboardCCAccounts, dashboardOwnerIds, dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, dashboardBreakdownPayments, dashboardCohortRates, dashboardCohortMetrics, dashboardCohortRows, COHORT_METRICS, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
+  const { dashboardPermission, dashboardExportPermission, withDashboardPermission } = require(join(tmp, 'dashboardPermissions.js'))
+  const salesOnlyRole = { id: 'sales', builtin: false, perms: { salesV3: 'operate', salesV3_reassign: 'operate', usersV2_export: 'operate', ordersV3_export: 'operate' } }
+  const dashboardOnlyRole = { ...salesOnlyRole, perms: { managementDashboard: 'view', salesV3: 'none' } }
+  assert.equal(dashboardPermission(salesOnlyRole, null), 'none', 'sales rights must not grant dashboard view')
+  assert.equal(dashboardPermission(dashboardOnlyRole, null), 'view', 'dashboard view must not require sales rights')
+  assert.equal(dashboardExportPermission(salesOnlyRole, null), 'none', 'user/order export rights must not grant dashboard export')
+  assert.equal(dashboardExportPermission(dashboardOnlyRole, null), 'none', 'view alone does not grant export')
+  assert.equal(dashboardExportPermission({ ...dashboardOnlyRole, perms: { ...dashboardOnlyRole.perms, managementDashboard_export: 'operate' } }, null), 'operate')
+  assert.equal(dashboardExportPermission({ ...dashboardOnlyRole, perms: { managementDashboard: 'none', managementDashboard_export: 'operate' } }, null), 'none', 'revoked view blocks export even if child permission is stale')
+  assert.equal(dashboardPermission(dashboardOnlyRole, { status: '停用' }), 'none', 'disabled accounts cannot view dashboard')
+  const migratedRoles = withDashboardPermission({ roles: [salesOnlyRole, dashboardOnlyRole, { id: 'role_admin', builtin: true, perms: {} }, { id: 'role_admin', builtin: true, perms: { managementDashboard: 'none', managementDashboard_export: 'none' } }] })
+  assert.deepEqual(migratedRoles.roles.map(r => r.perms.managementDashboard), ['none', 'view', 'view', 'none'])
+  assert.deepEqual(migratedRoles.roles.map(r => r.perms.managementDashboard_export), ['none', 'none', 'operate', 'none'])
+  assert.deepEqual(withDashboardPermission(migratedRoles), migratedRoles, 'permission migration is idempotent and preserves saved denials')
   const user = (id, extra = {}) => ({ studentId: id, name: id, phone: '+840000000', account: id, businessLine: '越南', status: '未付费-未体验', userType: '正式用户', registerTime: '2026-09-01 00:00:00', ...extra })
   const a = user('a', { salesOwner: 'a@example.com' })
   const b = user('b', { salesOwner: 'b@example.com', salesProgress: '暂不跟进' })
@@ -22,12 +36,43 @@ try {
   assert.equal(inVietnamRange('2026-09-01T16:59:59Z', '2026-09-01', '2026-09-01'), true)
   assert.equal(inVietnamRange('2026-09-01T17:00:00Z', '2026-09-01', '2026-09-01'), false)
   assert.equal(inVietnamRange(undefined, '', ''), false)
-  assert.deepEqual(dashboardPopulation(rows, ['韩国'], true, '').map(s => s.studentId), [])
-  const population = dashboardPopulation(rows, null, true, '')
+  assert.deepEqual(dashboardPopulation(rows, ['韩国'], true, '').map(s => s.studentId), ['other'])
+  const population = dashboardPopulation(rows, null, true, '', ['越南'])
   assert.equal(population.length, 5)
   const own = dashboardPopulation(rows, ['越南'], false, 'a@example.com')
   assert(!own.some(s => s.studentId === 'b'))
   assert(own.some(s => s.studentId === 'pool'))
+
+  const { salesBusinessLineOptions, businessLineOf } = require(join(tmp, 'channel.js'))
+  const channels = [{ name: '韩国', children: [{ name: 'LP', children: [{ code: 'kr-channel', name: 'Campaign', children: [] }] }] }, { name: '越南', children: [] }, { name: '沙特', children: [] }]
+  const kr = user('kr', { country: '韩国', businessLine: '越南', salesOwner: 'kr-cc', salesOutcome5: { stage: 'rejected', reason: '无需求' } })
+  const attributed = user('attributed', { country: '越南', channelCode: 'kr-channel' })
+  const my = user('my', { country: '马来西亚', businessLine: '其他' })
+  const lineRows = [a, b, pool, test, other, kr, attributed, my, kr]
+  assert.deepEqual(salesBusinessLineOptions(channels, lineRows), ['韩国', '越南', '沙特', '马来'])
+  const korean = dashboardPopulation(lineRows, null, true, '', ['韩国'], channels)
+  assert.deepEqual(korean.map(s => s.studentId), ['other', 'kr', 'attributed'], 'line attribution must match Sales Center, including channel precedence')
+  assert(korean.every(s => businessLineOf(channels, s) === '韩国'))
+  assert.equal(dashboardPopulation(lineRows, null, true, '', [], channels).length, 8, 'empty selection means all authorized lines, with user deduplication')
+  assert.deepEqual(dashboardPopulation(lineRows, ['越南'], true, '', ['韩国'], channels), [], 'line selection never grants permissions')
+  assert.deepEqual(dashboardPopulation(lineRows, [], true, '', [], channels), [], 'empty permission scope never means all')
+  assert.deepEqual(dashboardPopulation(lineRows, null, true, '', ['nonexistent'], channels), [], 'invalid selected line must fail closed')
+  assert(!dashboardPopulation(lineRows, ['韩国'], false, 'another-cc', [], channels).some(s => s.studentId === 'kr'), 'owner restrictions still apply across business lines')
+  const { cohortFunnel, followupMetrics, outcomeReasonGroups } = require(join(tmp, 'dashboard43.js'))
+  const crossCalls = [{ studentId: 'a', result: '已接通', time: '2026-09-02 01:00:00' }, { studentId: 'kr', result: '已接通', time: '2026-09-02 01:00:00' }]
+  const crossOrders = ['a', 'other'].map((id, i) => ({ orderId: id, studentId: id, orderStatus: '已支付', paidAmount: 100 + i, paidTime: '2026-09-02 02:00:00', currency: 'KRW' }))
+  const crossFilters = { mode: 'period', start: '', end: '', owner: '', userType: '正式用户' }
+  assert.deepEqual(cohortFunnel(korean, crossCalls, [], crossOrders, crossFilters).connected.map(s => s.studentId), ['kr'])
+  const crossFollow = followupMetrics(korean, crossCalls, [], crossOrders, crossFilters)
+  assert.deepEqual(crossFollow.current['已拒绝'].map(s => s.studentId), ['kr'])
+  assert.equal(outcomeReasonGroups(crossFollow.current['已拒绝'])[0].users.length, 1)
+  assert.deepEqual(dashboardPaymentOrders(crossOrders, korean, crossFilters).map(o => o.studentId), ['other'])
+  const cc = (email, extra = {}) => ({ email, status: '启用', isSalesMember: true, businessLines: ['韩国'], roleId: 'cc-role', ...extra })
+  assert.deepEqual(dashboardCCAccounts([
+    cc('kr-cc'), cc('zero-record-cc'), cc('not-marked', { isSalesMember: false }),
+    cc('disabled', { status: '停用' }), cc('vn-cc', { businessLines: ['越南'] }), cc('test-only'),
+  ], [], ['韩国'], [...korean, user('test-cc', { salesOwner: 'test-only', userType: '测试用户' })]).map(account => account.email), ['kr-cc', 'zero-record-cc'], 'CC options use system member markings and business-line membership, excluding disabled and test-only members')
+  assert.deepEqual(dashboardCCAccounts([cc('kr-cc')], [], [], korean), [], 'no authorized line gives no CC options')
   const filters = { mode: 'current', start: '', end: '', owner: '', userType: '正式用户' }
   const current = dashboardMetrics(population, [], [], filters)
   assert.deepEqual(current.total.map(s => s.studentId), ['a', 'b', 'pool'])
@@ -303,6 +348,7 @@ try {
   assert.deepEqual(dashboardSalesRows(rows, historicalSelection, null, true, '').map(s => s.studentId), ['a', 'b', 'pool', 'paid'], 'sales drilldown preserves paid and unassigned cohort members without duplicates')
   assert.deepEqual(dashboardSalesRows(rows, historicalSelection, ['越南'], false, 'a@example.com').map(s => s.studentId), ['a', 'pool', 'paid'], 'snapshot cannot bypass current owner permissions')
   assert.deepEqual(dashboardSalesRows(rows, historicalSelection, ['韩国'], true, ''), [], 'snapshot cannot bypass current business-line permissions')
+  assert.deepEqual(dashboardSalesRows(lineRows, dashboardListScope('Korean users', korean), ['韩国'], true, '', channels).map(s => s.studentId), ['other', 'kr', 'attributed'], 'cross-line drilldown preserves the exact set and channel attribution')
   assert.deepEqual(dashboardSalesRows(rows, dashboardListScope('Zero', []), null, true, ''), [], 'a zero count cannot open an unrestricted sales list')
   for (const metric of ['leads', 'connected', 'booked', 'attended']) {
     const recorded = dashboardCohortMetrics(demo.students, demo.callRecords, { ...filters, owner: ccSelection }, demo.orders)[metric]

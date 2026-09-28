@@ -1,6 +1,11 @@
 import { BUSINESS_LINES } from './types'
 import type { ChannelLevelNode, ChannelLine } from './types'
 
+/** Shared option source for Sales Center and Management Dashboard. */
+export function salesBusinessLineOptions(channels: ChannelLine[], students: ChannelUser[]): string[] {
+  return [...new Set([...channels.map(c => c.name), ...students.map(s => businessLineOf(channels, s))].filter(Boolean))]
+}
+
 // 依据渠道 code，返回其在渠道树中的完整路径（渠道类型 / 一级 / 二级…），
 // 即该 code 归因到的「最低级别渠道」。找不到返回 null。
 export function channelPathByCode(channels: ChannelLine[], code?: string): string | null {
