@@ -2,7 +2,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import type { Account, CallRecord, ModuleKey, PermLevel, Role, Student } from './types'
 import type { AppState } from './store'
-import { matchesCallback, matchesLocalDateRange, validCallback } from './salesReporting'
+import { matchesLocalDateRange, validCallback } from './salesReporting'
 import { businessLineOf } from './channel'
 import { isSalesMember } from './phase5'
 import { consultationStage, CONSULTATION_STAGES, currentAppointment } from './salesLifecycle'
@@ -90,10 +90,9 @@ export type SalesTimeQuery5 = {
   kind: 'register' | 'follow' | 'appointment' | 'callback'
   range: [Dayjs | null, Dayjs | null] | null
   noAppointment: boolean
-  callback: 'all' | 'due' | 'upcoming'
 }
-export const defaultSalesTime5 = (): SalesTimeQuery5 => ({ kind: 'follow', range: null, noAppointment: false, callback: 'all' })
-export function matchesSalesTime5(student: Student, query: SalesTimeQuery5, now = dayjs.utc()) {
+export const defaultSalesTime5 = (): SalesTimeQuery5 => ({ kind: 'follow', range: null, noAppointment: false })
+export function matchesSalesTime5(student: Student, query: SalesTimeQuery5) {
   if (query.noAppointment && currentAppointment(student)) return false
   if (query.kind === 'appointment') {
     const appointment = currentAppointment(student)
@@ -101,7 +100,6 @@ export function matchesSalesTime5(student: Student, query: SalesTimeQuery5, now 
   }
   if (query.kind === 'callback') {
     if (!validCallback(student.landingCallbackAt)) return false
-    if (query.callback !== 'all') return matchesCallback(student.landingCallbackAt, query.callback, now)
     return matchesLocalDateRange(student.landingCallbackAt, query.range, student.country || student.businessLine)
   }
   return matchesLocalDateRange(query.kind === 'register' ? student.registerTime : student.salesUpdatedAt, query.range, student.country || student.businessLine)

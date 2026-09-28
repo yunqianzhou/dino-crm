@@ -2787,11 +2787,7 @@ Object.assign(zh, {
   "sales.time5.today": "今天",
   "sales.time5.last7": "近 7 天",
   "sales.time5.last30": "近 30 天",
-  "sales.time5.window": "外呼时间条件",
-  "sales.time5.all": "不限时间",
-  "sales.time5.due": "已到时间",
-  "sales.time5.upcoming": "未来 24 小时",
-  "sales.time5.noAppointment": "无销售预约",
+  "sales.time5.noAppointment": "仅看暂无销售咨询预约的用户",
   "sales.time5.appointmentHint": "仅查看有销售预约的用户；日期按预约时区。",
   "sales.time5.callbackHint": "仅查看已填写预约外呼的用户；日期按用户所在时区。"
 })
@@ -2807,11 +2803,7 @@ Object.assign(en, {
   "sales.time5.today": "Today",
   "sales.time5.last7": "Last 7 days",
   "sales.time5.last30": "Last 30 days",
-  "sales.time5.window": "Callback window",
-  "sales.time5.all": "Any time",
-  "sales.time5.due": "Due now",
-  "sales.time5.upcoming": "Next 24 hours",
-  "sales.time5.noAppointment": "No sales appointment",
+  "sales.time5.noAppointment": "Only users without a sales consultation appointment",
   "sales.time5.appointmentHint": "Only users with a sales appointment; dates use the appointment timezone.",
   "sales.time5.callbackHint": "Only users with a scheduled callback; dates use the user’s timezone."
 })
@@ -2827,11 +2819,7 @@ Object.assign(ko, {
   "sales.time5.today": "오늘",
   "sales.time5.last7": "최근 7일",
   "sales.time5.last30": "최근 30일",
-  "sales.time5.window": "콜백 시간 조건",
-  "sales.time5.all": "전체 기간",
-  "sales.time5.due": "예약 시간 도래",
-  "sales.time5.upcoming": "향후 24시간",
-  "sales.time5.noAppointment": "영업 상담 예약 없음",
+  "sales.time5.noAppointment": "영업 상담 예약이 없는 사용자만",
   "sales.time5.appointmentHint": "영업 상담 예약이 있는 사용자만 표시합니다. 날짜는 예약 시간대 기준입니다.",
   "sales.time5.callbackHint": "콜백 예약이 있는 사용자만 표시합니다. 날짜는 사용자 시간대 기준입니다."
 })

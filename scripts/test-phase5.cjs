@@ -101,11 +101,6 @@ try {
   assert(!matchesSalesTime5({...timed,landingCallbackAt:'invalid'},callbackQuery))
   assert(matchesSalesTime5(timed,{...callbackQuery,range:dayRange}), 'callback date uses the user timezone')
   assert(!matchesSalesTime5({...timed,landingCallbackAt:'2026-09-30 17:00:00'},{...callbackQuery,range:dayRange}))
-  const clock = dayjs.utc('2026-09-30 12:00:00')
-  assert(matchesSalesTime5({...timed,landingCallbackAt:'2026-09-30 12:00:00'},{...callbackQuery,callback:'due'},clock))
-  assert(!matchesSalesTime5({...timed,landingCallbackAt:'2026-09-30 12:00:00'},{...callbackQuery,callback:'upcoming'},clock))
-  assert(matchesSalesTime5({...timed,landingCallbackAt:'2026-10-01 12:00:00'},{...callbackQuery,callback:'upcoming'},clock))
-  assert(!matchesSalesTime5({...timed,landingCallbackAt:'2026-10-01 12:00:01'},{...callbackQuery,callback:'upcoming'},clock))
   assert(matchesSalesTime5(timed,{...callbackQuery,noAppointment:true}), 'no sales booking can combine with a scheduled callback')
   const beforeBooking = {...booked,salesAppointments:[],salesLifecycleEvents:[]}
   assert.equal(outcomeAction5(beforeBooking),'reject')
