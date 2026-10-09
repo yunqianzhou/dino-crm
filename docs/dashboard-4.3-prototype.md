@@ -12,6 +12,7 @@ Updated 2026-10-09. Current product rules are maintained in [management-dashboar
 - Closed and rejected reason panels reconcile with their respective current user sets. Activity dates affect closed reasons only.
 - The shared currency selector offers Local currency and USD only. Both convert the same orders. Different local currencies remain separate; USD aggregates converted amounts. Rates are explicitly synthetic demo values; original amounts and currency are retained.
 - Exact user/order drilldowns, shared permissions, totals, sorting, date memory, grouping memory, and raw XLSX downloads remain. Downloads include business-date and original/converted payment evidence.
+- Payment results summarize amount, users, paid order count, AOV and amount per payer in five top cards. The grouped payment detail table has no duplicate total row. Other tables keep their existing totals.
 
 ## Regression coverage
 

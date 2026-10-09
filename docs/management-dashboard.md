@@ -53,7 +53,9 @@ The prototype uses fixed synthetic rates (`demo-2026-10-09`), not market quotes:
 
 Orders must be currently paid, have a valid payment timestamp and finite positive paid amount. Refunds, cancelled, pending and zero-value orders are excluded. A profile's paid flag cannot substitute for order evidence. Original orders and amounts are unchanged.
 
-Money/AOV sorting uses the displayed converted values. Multiple local currencies cannot form one ranking; switch to USD for that comparison. Unavailable values sort last in either direction. Pinned totals are recalculated from the full selected population, outside sorting and pagination.
+Payment results show five top-level cards: amount paid, paid users, paid orders, AOV, and amount per payer. The paid-orders card opens the same qualifying order set in Order Center. The payment detail table shows grouped records only, with no repeated total row; the cards summarize the full selection independently of sorting, expansion and pagination.
+
+Money/AOV sorting uses the displayed converted values. Multiple local currencies cannot form one ranking; switch to USD for that comparison. Unavailable values sort last in either direction. Other dashboard tables retain their pinned totals, recalculated from the full selected population outside sorting and pagination.
 
 ## Details and raw downloads
 

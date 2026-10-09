@@ -100,7 +100,7 @@
 .dashboard-money-cell span{font-weight:500;font-size:12px;color:#2e6055}
 .dashboard-money-cell small{font-size:11px;color:#778498}
 
-.dashboard-payment-totals{grid-template-columns:repeat(4,minmax(0,1fr))}
+.dashboard-payment-totals{grid-template-columns:repeat(5,minmax(0,1fr))}
 .dashboard-payment-totals .dashboard-count{font-size:20px}
 @media(max-width:1100px){.dashboard-payment-totals{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.dashboard-payment-totals{grid-template-columns:1fr}}

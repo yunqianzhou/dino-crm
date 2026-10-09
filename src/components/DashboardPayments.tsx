@@ -59,6 +59,7 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
   <div className="dashboard-payment-totals">
    <div><span>{d('revenue')}</span>{link(d('revenue'),<DashboardMoneyCell orders={matchingOrders} metric="amount"/>,()=>open('orders',matchingOrders))}<small>{rangeLabel}</small></div>
    <div><span>{d('paidUsers')}</span>{link(d('paidUsers'),users(matchingOrders),()=>open('users',matchingOrders),'usersV2')}<small>{d('paidPeriod')}</small></div>
+   <div><span>{text('已支付订单数','Paid orders')}</span>{link(text('已支付订单数','Paid orders'),matchingOrders.length,()=>open('orders',matchingOrders))}<small>{text('按支付日期 · 有效已支付订单','By payment date · valid paid orders')}</small></div>
    <div><span>{d('orderAverage')}</span>{link(d('orderAverage'),<DashboardMoneyCell orders={matchingOrders} metric="averagePerOrder"/>,()=>open('orders',matchingOrders))}<small>{d('orderAverageHelp')}</small></div>
    <div><span>{d('aov')}</span>{link(d('aov'),<DashboardMoneyCell orders={matchingOrders} metric="averagePerUser"/>,()=>open('orders',matchingOrders))}<small>{d('averageHelp')}</small></div>
   </div>
@@ -69,8 +70,6 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
    {title:d('revenue'),width:240,sorter:comparable?(a,b,order)=>dashboardNumberCompare(currency.sortValue(a.orders,'amount'),currency.sortValue(b.orders,'amount'),order):undefined,render:(_,row)=>link(`${name(row)} · ${d('revenue')}`,<DashboardMoneyCell orders={row.orders} metric="amount"/>,()=>open('orders',row.orders,name(row)))},
    {title:d('orderAverage'),width:200,sorter:comparable?(a,b,order)=>dashboardNumberCompare(currency.sortValue(a.orders,'averagePerOrder'),currency.sortValue(b.orders,'averagePerOrder'),order):undefined,render:(_,row)=><DashboardMoneyCell orders={row.orders} metric="averagePerOrder"/>},
    {title:d('aov'),width:240,sorter:comparable?(a,b,order)=>dashboardNumberCompare(currency.sortValue(a.orders,'averagePerUser'),currency.sortValue(b.orders,'averagePerUser'),order):undefined,render:(_,row)=><DashboardMoneyCell orders={row.orders} metric="averagePerUser"/>},
-  ]} summary={()=><Table.Summary fixed="top"><Table.Summary.Row>
-   <Table.Summary.Cell index={0}>{d('paymentTotal')}</Table.Summary.Cell><Table.Summary.Cell index={1}>{link(d('paidOrders'),matchingOrders.length,()=>open('orders',matchingOrders))}</Table.Summary.Cell><Table.Summary.Cell index={2}>{link(d('paidUsers'),users(matchingOrders),()=>open('users',matchingOrders),'usersV2')}</Table.Summary.Cell><Table.Summary.Cell index={3}><DashboardMoneyCell orders={matchingOrders} metric="amount"/></Table.Summary.Cell><Table.Summary.Cell index={4}><DashboardMoneyCell orders={matchingOrders} metric="averagePerOrder"/></Table.Summary.Cell><Table.Summary.Cell index={5}><DashboardMoneyCell orders={matchingOrders} metric="averagePerUser"/></Table.Summary.Cell>
-  </Table.Summary.Row></Table.Summary>}/>
+  ]}/>
  </Card>
 }
