@@ -4,7 +4,7 @@ Updated 2026-10-09. Route: `#/management-dashboard`. Shared synthetic prototype 
 
 ## Views and shared filters
 
-Three views: registration-cohort conversion, sales follow-up, and payments. Business line, current CC multi-select, permissions and display currency are shared. Each view remembers its own date range; grouping and currency survive list drilldown and return. Source, purchase-intent, age and registration-age grouping controls are hidden.
+Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a searchable, clearable single selection; current CC remains multi-select. Clearing business line selects all permitted lines, and changing it clears the selected CCs. Legacy links with multiple business lines use only the first specified line. Business line, current CC, permissions and display currency are shared. Each view remembers its own date range; grouping and currency survive list drilldown and return. Source, purchase-intent, age and registration-age grouping controls are hidden.
 
 All business dates use UTC+7 after interpreting the record's timezone. Current CC means current ownership, not historical operator attribution. Formal eligible users and current permissions determine the population; test users are excluded.
 
