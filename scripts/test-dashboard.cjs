@@ -4,6 +4,7 @@ const { tmpdir } = require('node:os')
 const { resolve, join } = require('node:path')
 const { execFileSync } = require('node:child_process')
 execFileSync(process.execPath, [resolve('scripts/test-dashboard43.cjs')], { stdio: 'inherit' })
+execFileSync(process.execPath, [resolve('scripts/test-dashboard-current-dates.cjs')], { stdio: 'inherit' })
 const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/dashboard43.ts', 'src/dashboardPermissions.ts', 'src/managementDemo.ts', 'src/dashboardView.ts', 'src/dashboardNavigation.ts', 'src/dashboardSort.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })

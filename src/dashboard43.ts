@@ -142,6 +142,65 @@ export function metricGroups(metrics: PeopleMetrics, dimension: 'cc' | 'date', s
 export type FollowupComparisonRow = {
   id: string; value: string; metrics: PeopleMetrics; activityDate?: string; children?: FollowupComparisonRow[]
 }
+/** Business date follows the current stage; historical stages are never counted again. */
+export function followupStateEvidence(student: Student, calls: CallRecord[], stage = currentFollowStage(student, calls)) {
+  const validPast = (time?: string) => !!time && dayjs.utc(time).isValid() && dayjs.utc(time).valueOf() <= Date.now()
+  const events = (student.salesLifecycleEvents || []).filter(e => validPast(e.occurredAt || e.reportedAt)).sort((a,b) => dayjs.utc(b.occurredAt || b.reportedAt).valueOf() - dayjs.utc(a.occurredAt || a.reportedAt).valueOf())
+  const histories = (student.salesHistory || []).filter(h => h.stage5 && validPast(h.time)).sort((a,b) => dayjs.utc(b.time).valueOf() - dayjs.utc(a.time).valueOf())
+  const stageName = stage === '已关闭' ? 'Closed' : stage
+  // Repeated notes within a stage do not reset the stage-entry date.
+  const run = [] as typeof histories
+  for (const history of histories) { if (history.stage5 !== stageName) break; run.push(history) }
+  let time: string | undefined
+  let source = ''
+  let appointmentId = ''
+  if (['已预约','未出勤待跟进','咨询未完成待跟进','咨询完成待支付'].includes(stage)) {
+    const appointment = currentAppointment(student) || student.salesAppointments?.[0]
+    time = appointment ? scheduledInstant(appointment)?.toISOString() : undefined
+    appointmentId = appointment?.appointmentId || ''
+    source = '预约上课时间'
+  } else if (stage === '已关闭') {
+    const event = events.find(e => e.node === 'lead' && e.result === '已关闭')
+    time = event ? event.occurredAt || event.reportedAt : run[run.length - 1]?.time
+    source = '最近一次结束时间'
+  } else if (stage === '已接通待预约') {
+    const entry = events.find(e => ['已取消预约','已取消','已重新激活','重新跟进','恢复跟进'].includes(e.result))
+    const connected = calls.filter(c => c.studentId === student.studentId && isCompletedCall(c) && c.result === '已接通' && validPast(c.time)).sort((a,b) => dayjs.utc(a.time).valueOf() - dayjs.utc(b.time).valueOf())
+    // A history row is a confirmed transition only when preceded by a different stage.
+    // Otherwise the first contact is earlier evidence than a subsequently added note.
+    const transition = run.length && histories.length > run.length ? run[run.length - 1].time : undefined
+    const reset = entry ? entry.occurredAt || entry.reportedAt : undefined
+    time = [transition,reset].filter((v): v is string => !!v).sort((a,b)=>dayjs.utc(b).valueOf()-dayjs.utc(a).valueOf())[0]
+      || connected[0]?.time || run[run.length - 1]?.time
+    source = '最近一次进入待预约时间'
+  }
+  return { stage, time, source, appointmentId, date: time && dayjs.utc(time).isValid() ? dayjs.utc(time).utcOffset(420).format('YYYY-MM-DD') : '__unknown_date__' }
+}
+export function datedFollowupMetrics(current: PeopleMetrics, calls: CallRecord[], filters: DashboardFilters): PeopleMetrics {
+  return Object.fromEntries(CURRENT_FOLLOW_KEYS.map(key => [key, (current[key] || []).filter(s => {
+    const date = followupStateEvidence(s,calls,key).date
+    return !filters.start && !filters.end || date !== '__unknown_date__' && (!filters.start || date >= filters.start) && (!filters.end || date <= filters.end)
+  })]))
+}
+/** Current stages use their own business date; payments use each order's payment date. */
+export function datedFollowupRows(current: PeopleMetrics, paidOrders: Order[], people: Student[], calls: CallRecord[], primary: 'cc' | 'date', secondary = true): FollowupComparisonRow[] {
+  type Evidence = { student: Student; metric: string; date: string }
+  const byId = new Map(people.map(s => [s.studentId,s]))
+  const evidence: Evidence[] = CURRENT_FOLLOW_KEYS.flatMap(metric => (current[metric] || []).map(student => ({student,metric,date:followupStateEvidence(student,calls,metric).date})))
+  paidOrders.forEach(o => { const student=byId.get(o.studentId); if (student) evidence.push({student,metric:'paid',date:dayjs.utc(o.paidTime).utcOffset(420).format('YYYY-MM-DD')}) })
+  const group = (records: Evidence[], dimension: 'cc' | 'date', parent = '', date?: string): FollowupComparisonRow[] => {
+    const groupOf = (r: Evidence) => dimension === 'cc' ? r.student.salesOwner || '__unassigned__' : r.date
+    const values = [...new Set(records.map(groupOf))].sort((a,b) => dimension==='cc' ? a.localeCompare(b) : Number(a.startsWith('__'))-Number(b.startsWith('__')) || b.localeCompare(a))
+    return values.map(value => {
+      const subset = records.filter(r => groupOf(r) === value)
+      const activityDate = dimension === 'date' ? value : date
+      return {id:JSON.stringify([parent,dimension,value]),value,activityDate,
+        metrics:Object.fromEntries([...CURRENT_FOLLOW_KEYS,'paid'].map(key => [key,uniquePeople(subset.filter(r=>r.metric===key).map(r=>r.student))])),
+        children:!parent && secondary ? group(subset,dimension==='cc'?'date':'cc',value,activityDate) : undefined}
+    })
+  }
+  return group(evidence,primary)
+}
 /** One current appointment per user keeps all status and payment totals additive. */
 export function followupAppointmentDate(student: Student) {
   const appointment = currentAppointment(student)

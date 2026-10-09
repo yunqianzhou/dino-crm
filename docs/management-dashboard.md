@@ -1,87 +1,66 @@
 # Management dashboard
 
-Route: `#/management-dashboard`. Uses the shared prototype store, not a test or production database. No real customer records or business screenshot figures are bundled into the site.
+Updated 2026-10-09. Route: `#/management-dashboard`. Shared synthetic prototype data; no production database integration.
 
-## Business purpose
+## Views and shared filters
 
-The supplied business dashboard and follow-up conversation establish the priorities:
+Three views: registration-cohort conversion, sales follow-up, and payments. Business line, current CC multi-select, permissions and display currency are shared. Each view remembers its own date range; grouping and currency survive list drilldown and return. Source, purchase-intent, age and registration-age grouping controls are hidden.
 
-1. Compare CC conversion at each step: lead, contact, appointment, attendance and payment.
-2. Combine date and CC to examine daily CC activity and the outcomes of a registration group.
-3. Include amount paid and AOV in the corresponding detail table, not just a separate payment page.
-4. Source analysis is deferred at the user’s request. Source filters, grouping choices and source comparison matrices are hidden. Existing source data is preserved; legacy source-filter URL parameters do not narrow the dashboard.
+All business dates use UTC+7 after interpreting the record's timezone. Current CC means current ownership, not historical operator attribution. Formal eligible users and current permissions determine the population; test users are excluded.
 
-## Reading the page
+## Conversion overview
 
-Four always-visible question buttons keep all content in the same dashboard. Each view has one date filter with an explicit meaning. The repeated reading-guide section is removed from all four views; the metric cards and tables follow the filters directly. Dates are remembered separately for each view. Current CC is shared. Counting rules include an example of one user registering, being contacted and paying on three different dates.
+Registration dates select one cohort. Six milestones count distinct CRM users: leads, valid completed calls, connections, bookings ever created, completed trial lessons, and valid paid orders. Outcomes must occur between registration and now. Trial completion requires an explicit completed trial lesson, not appointment attendance. Only overall L2S is shown; independent milestone bars allow skipped steps.
 
-| View | Date meaning | Content |
-| --- | --- | --- |
-| Conversion overview (default) | Registration dates select the same lead group; recorded outcomes and valid orders are followed to date | Five step counts, five reference rates, date-to-CC hierarchy and amount/AOV column |
-| Current leads | Registration dates select users whose stages are shown now | Lead/assigned/unassigned/paid cards, all nine current stages, all 11 metrics, amount/AOV, follow-up reasons |
-| Sales activity | Each metric uses its activity date | Seven distinct-user activity metrics, daily rows expandable by CC, amount/AOV by payment date, recorded follow-up reasons |
-| Payments | Payment dates | Amount, payers, AOV, amount per payer, paid orders and exact user/order details; dates expandable by CC |
+Money includes qualifying payments after registration through now for the same cohort. It does not mean cash received on the registration date.
 
-The five current/activity breakdowns remain equally visible: CC, date, intent, age and time since registration. All metrics are shown by default. Optional column choices persist; Show all metrics restores them.
+## Sales follow-up: current state first, business date second
 
-Conversion overview defaults to registration date then current CC. Both hierarchy levels offer date and CC only. Legacy source hierarchy selections fall back to date/CC.
+Current lead overview and Calling current-state columns remain current snapshots independent of activity dates. Calling period counts use actual call dates. Calling date rows show a dash for current-state columns.
 
-## Definitions and limitations
+Follow-up first resolves the same current status as Sales Center, then filters and groups by the business date for that status:
 
-- Vietnam formal users only; exclude test users. Preserve the existing country scope and current-owner access rules. Missing current owner is shown as Unassigned.
-- All date boundaries use Vietnam UTC+7. CC attribution is current ownership, not the historical operator or assignment at the event time.
-- Current stages use the shared `consultationStage` definition. The nine stages partition current sales leads; their percentages mean stage / current leads, not conversion.
-- Activity counts deduplicate each metric independently. Registration uses registration time; calls use call time; bookings use creation time; attendance/completion use explicit lifecycle `reportedAt`. Daily counts may include the same user on several dates. Grand totals deduplicate the whole period.
-- Registered lead groups include phone-bearing eligible users who later paid. Contact requires a valid dated call or contact event; booking requires a created appointment or booking event (cancellation does not erase a past booking); attendance requires attendance/consultation events. Current appointment status alone does not reconstruct history.
-- Missing historical records do not prove an outcome never occurred. Conversion percentages are explicitly **reference ratios from available records**, not verified complete-history performance rates.
-
-| Reference rate | Formula |
+| Column | Business date |
 | --- | --- |
-| Contact | Reached users / leads |
-| Booking | Booked users / reached users |
-| Attendance | Attended users / booked users |
-| Attendance-to-payment | Paid users / attended users |
-| Lead-to-payment | Paid users / leads |
+| Waiting to book | Most recent entry into this stage |
+| Booked | Current appointment's scheduled lesson date |
+| No-show | Scheduled date of the session associated with the current no-show state |
+| Consultation incomplete / complete | Scheduled date of the session associated with the current state |
+| Closed | Most recent closure date; reopening removes the user |
+| Paid | Each qualifying order's payment date |
 
-A rate is unavailable when its denominator is zero, or its numerator contains users absent from the preceding-step evidence. Valid zero numerators display 0%. Totals are calculated from the total selected user sets, not averaged from row percentages. Independent activity counts are never divided into these ratios.
+Example: a user misses the lesson on the 10th. Before rebooking, selecting the 10th shows no-show. After rebooking to the 12th, the 10th shows nothing and the 12th shows booked. Selecting both days counts the user once as booked. The old absence remains in user history; this table does not accumulate historical states.
 
-## Amounts and AOV
+Repeated notes or connections do not reset waiting-entry time. Production needs actual stage-transition timestamps. Prototype evidence uses confirmed transitions in consecutive stage-history records, explicit cancellation/reactivation events, and first completed connected calls. It never substitutes registration time, arbitrary last-update time, or today. Missing business dates appear only under All dates in a separate missing-date group. Future scheduled dates are eligible; an elapsed appointment alone does not establish a no-show.
 
-A qualifying order must currently be Paid, have a finite positive paidAmount and a valid paidTime. Pending, cancelled, refunded and zero-value orders are excluded. A profile payment flag is not a substitute for an order.
+Both comparison tables independently support CC → activity date, activity date → CC, only CC, and only date. Follow-up date rows contain actual matching current-state counts. Each user belongs to one current follow-up state/date. Paid users are independently deduplicated per day and across the selected period; the same payer can appear on multiple payment dates. Amounts and order counts sum by payment date. Do not add status and paid columns horizontally.
 
-- Amount paid is the sum of qualifying orders in one currency.
-- AOV (average order value) is amount paid / paid order count.
-- Amount per paying user is amount paid / distinct paying users. It remains a separate payment metric.
-- Registration-group/current-stage tables include valid payments to date for the users registered in that row's date range. These are not cash receipts on the registration day.
-- Activity/payment tables use payment dates. A date-to-CC child row matches both that date and current owner.
-- Currencies are never summed together. Missing currency remains separate. Refunds restate the original paid period; these are not reconciled accounting net-revenue figures.
+Closed reasons use the same date-filtered current closed users as the table. Rejected reasons remain attached to the date-independent current rejected users. Changing grouping does not change either population.
 
-## Details and navigation
+## Display currency and payment results
 
-Non-payment user counts (leads, contact, booking, attendance, sales activity, stages and reasons) open Sales Center with the exact clicked user set. Only paid-user counts open User Center. This rule applies to headline cards, breakdown rows, hierarchy children and totals across every question view. Sales Center reuses its existing follow-up table as Dashboard results while a dashboard selection is active, retaining unassigned and subsequently paid cohort members; normal pool/follow routing resumes when the selection is cleared. Paid historical rows remain viewable without lead mutation actions; unassigned leads retain their claim action. Payment order counts and amounts open the existing Order Center list with the exact paid-order set, currency, date and CC scope. No aggregate detail modals are used. Destination lists show a removable dashboard selection and a return-to-dashboard button. Existing module and data permissions still apply; empty clicked sets remain empty. Browser history retains the selection, and returning restores the selected dashboard question, dates and CCs.
+The shared selector has exactly two choices: Local currency and US dollar (USD), default Local currency. It converts the same qualifying orders; it never filters by original payment currency. Payer and order counts remain unchanged across currency switches.
 
-Payment rows open exact paid orders or distinct payers; date-plus-CC payment details preserve both constraints. Users can open their qualifying orders and the existing Phase 3 order detail/transactions. Legacy current/activity and detail URLs remain readable after introduction of the four question views.
+Local currency follows the user's business line: VND, KRW, MYR, IDR, THB, SGD, SAR or USD. Multiple local currencies remain separate. USD converts and aggregates all selected orders. Unconfigured mappings or unknown source currency are unavailable, not an extra selector option.
 
-Chinese and English are supported through the existing language menu. Explanations, formulas, examples and date semantics switch with the rest of the page.
+The prototype uses fixed synthetic rates (`demo-2026-10-09`), not market quotes: USD 1, VND 25000, KRW 1400, MYR 4.5, IDR 16000, THB 35, SGD 1.35, SAR 3.75 per USD. Conversion is original amount ÷ source rate × target rate. Sum unrounded converted values before display rounding. Production must supply an approved, versioned rate table with effective timestamps.
 
-## Other retained dimensions
+- Amount paid: sum of qualifying converted order amounts.
+- AOV: converted amount / paid order count.
+- Amount per payer: converted amount / distinct payer count.
+- No orders: amount 0 and averages unavailable.
+- Missing rates: affected currency total and averages unavailable, with missing-order count; payer/order counts remain. Never show a partial sum as a complete total.
 
-Purchase intent uses current CRM values; it does not recreate business PL 50%/80%/deposit labels. Registration age uses elapsed calendar days as of today, not time in stage or Old Lead. Follow-up reasons retain no-show, incomplete consultation, pause and close categories, with missing reasons separately identified. Current reasons use the latest matching record; activity reasons use recorded dates and deduplicate within each reason.
+Orders must be currently paid, have a valid payment timestamp and finite positive paid amount. Refunds, cancelled, pending and zero-value orders are excluded. A profile's paid flag cannot substitute for order evidence. Original orders and amounts are unchanged.
 
-Appointment confirmation, city, deposit/balance and more detailed business-specific rejection categories remain outside the verified field mapping.
+Money/AOV sorting uses the displayed converted values. Multiple local currencies cannot form one ranking; switch to USD for that comparison. Unavailable values sort last in either direction. Pinned totals are recalculated from the full selected population, outside sorting and pagination.
 
-## Demo and verification
+## Details and raw downloads
 
-The existing additive demo dataset remains unchanged: 204 Vietnam users, six CCs, 180 current leads and 24 paid users, plus orders, appointments and events. Browser sessions can contain additional prototype records or edits. Source data is preserved but hidden from the dashboard; business screenshot values are not copied in as data.
+Ordinary lead/status counts open Sales Center with exact clicked user IDs; paid-user counts open User Center. Payment order counts, amount and averages open Order Center with exact original order IDs. Display currency is retained on return and is never imposed as an original-order currency filter. Existing module permissions still apply; empty selections stay empty.
 
-`npm run test:dashboard` verifies UTC+7 boundaries, permissions, deduplication, shared stages, paid-order evidence, currency separation, refunds, registration cohorts, step-rate denominators and missing preceding-step records, AOV versus amount per payer, table payment-date semantics, source matrix totals, independent view dates and legacy URL interpretation. `npm run build` checks types and produces the site. Browser verification covers all four questions, date retention, reference-rate rows, date-to-CC expansion, direct user/order list navigation and return navigation.
+Downloads require the dashboard's independent export permission. Follow-up exports contain filtered current users and their business-date evidence, relevant current appointments, period users, payment evidence, and scope. Payment exports across all three views preserve original currency/amount, target currency, rate, converted amount and rate version. Reason exports use the same user sets as the displayed distribution. UTC export timestamps and scope allow reconciliation.
 
-## CC selection
+## Verification
 
-The shared CC filter supports multiple selections and name search. An empty selection means all permitted CCs; clear restores that scope. Current leads, daily activity, cohort conversion, reasons, revenue and AOV use the union of selected CCs, without double counting. Unassigned can be selected alongside named CCs. Repeated `cc` URL parameters retain the selection across views, reloads and detail-return navigation; legacy single-CC links remain valid. Detail headers list the selected CCs unless a more specific row was opened.
-
-## Table totals and sorting
-
-Current/activity, cohort, payment and reason tables pin their totals below the column header, outside sorting and pagination. Every numeric column supports ascending and descending sorting within each hierarchy level. Combined revenue/AOV columns offer a sorting metric and, when needed, one currency; different currencies are never added for ranking. Missing rates/AOV remain last in either direction. Reason totals count distinct users even when historical reasons overlap.
-
-L2S (lead-to-paid conversion) is the final top-level KPI next to paid users and also a sortable column in the date/CC table. It uses paid users divided by the same registered cohort; the four intermediate step rates remain together below.
+`pnpm run test:dashboard` covers existing dashboard regressions plus current-stage date rules, rebooking, waiting history, missing dates, UTC+7, future appointments, closure/reopening, both grouping directions, payment dates, same-order currency conversion and missing rates. `pnpm run build` checks types and builds. The deployment workflow also runs App A/B, Phase 5 and outbound checks.

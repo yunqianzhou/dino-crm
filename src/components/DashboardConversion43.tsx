@@ -4,12 +4,14 @@ import dayjs from 'dayjs'
 import type { CallRecord, LessonRecord, Order, Student } from '../types'
 import { cohortFunnel, FUNNEL_KEYS, l2s, metricGroups } from '../dashboard43'
 import { dashboardPaymentOrders, type DashboardFilters } from '../dashboardData'
+import { useDashboardCurrency, currencyExportHeaders, currencyExportRow } from './DashboardCurrency'
 import { Export43, MetricTable43, rateText, useDashboard43, type MetricRow43 } from './Dashboard43Shared'
 
 type Props = { population:Student[]; calls:CallRecord[]; lessons:LessonRecord[]; orders:Order[]; filters:DashboardFilters; rangeLabel:string }
 export default function DashboardConversion43({ population,calls,lessons,orders,filters,rangeLabel }: Props) {
  const { text,label,count,ownerName } = useDashboard43()
  const [query,setQuery] = useSearchParams()
+ const currencyConfig=useDashboardCurrency()
  const metrics = cohortFunnel(population,calls,lessons,orders,filters)
  const primary = query.get('conversionPrimary') === 'cc' ? 'cc' : 'date'
  const secondary = query.get('conversionSecondary') !== ''
@@ -26,7 +28,7 @@ export default function DashboardConversion43({ population,calls,lessons,orders,
   {name:text('通话','Calls'),headers:['CRM ID','Call ID','Result','Time UTC','Agent'],rows:calls.filter(c=>evidence(c.studentId,c.time)).map(c=>[c.studentId,c.id,c.result,c.time,c.agent])},
   {name:text('预约','Bookings'),headers:['CRM ID','Appointment ID','Created UTC','Scheduled local','Timezone','Status','Attendance'],rows:metrics.leads.flatMap(s=>(s.salesAppointments||[]).filter(a=>evidence(s.studentId,a.createdAt)).map(a=>[s.studentId,a.appointmentId,a.createdAt,a.scheduledStartAt,a.timezone,a.appointmentStatus,a.attendanceStatus]))},
   {name:text('体验课','Trial lessons'),headers:['CRM ID','Lesson ID','Course','Status','Completed UTC'],rows:lessons.filter(l=>l.lessonType==='体验课'&&l.status==='已完课'&&evidence(l.studentId,l.completedAt)).map(l=>[l.studentId,l.id,l.courseLabel,l.status,l.completedAt])},
-  {name:text('支付','Payments'),headers:['CRM ID','Order ID','Paid UTC','Currency','Amount'],rows:paidOrders.map(o=>[o.studentId,o.orderId,o.paidTime,o.currency,o.paidAmount])},
+  {name:text('支付','Payments'),headers:['CRM ID','Order ID','Paid UTC',...currencyExportHeaders],rows:paidOrders.map(o=>[o.studentId,o.orderId,o.paidTime,...currencyExportRow(o,currencyConfig)])},
   {name:text('统计范围','Scope'),headers:['Scope','Value'],rows:[['Section',section==='details'?'Conversion details':'Registration cohort funnel'],['First grouping',dimension(primary)],['Second grouping',secondary?dimension(primary==='cc'?'date':'cc'):text('不再细分','No subgroup')],['Export range','All matching records, independent of pagination, sorting and expanded rows'],['Registration dates UTC+7',rangeLabel],['CC',Array.isArray(filters.owner)?filters.owner.join(','):filters.owner],['User type','Formal'],['Deduplication','CRM user ID; each step independent'],['L2S','Paid users / Leads'],['Exported UTC',dayjs.utc().toISOString()]]},
  ]} />
  return <>

@@ -1,22 +1,18 @@
 # Management dashboard 4.3 prototype
 
-Updated 2026-09-21. Demo data only; no production integration.
+Updated 2026-10-09. Current product rules are maintained in [management-dashboard.md](management-dashboard.md). This prototype uses synthetic data shared with Sales, User and Order Centers.
+
+## Current scope
 
 - Three views: registration-cohort conversion, sales follow-up, payments.
-- Six cohort facts: leads, valid completed calls, connections, bookings ever created, completed trial lessons, valid paid orders. All deduplicate by CRM user ID within the same registration cohort. Outcomes must be at/after registration and no later than now. The demo model links lessons directly to the CRM user; production must resolve student-to-CRM-user mapping.
-- Trial completion uses `LessonRecord.lessonType=体验课`, `status=已完课`, and a valid `completedAt`. Appointment attendance cannot substitute for it. Independent bar heights allow skipped steps; only overall L2S is shown.
-- Sales follow-up contains Calling and Follow-up sections. Current workload ignores activity dates. Period activity uses call times, booking creation times, result registration times and payment times. Current CC is the grouping owner, not a claim of historical performance attribution.
-- Phone-stage rejected counts, reason breakdown panels and scheduled-date detail reporting are deferred and hidden, including their controls, exports and explanatory copy. Their data helpers remain for future use; they are not current product capabilities.
-- Existing stages remain visible. Follow-up uses the existing Sales Center stages; it does not introduce a separate attended/awaiting-consultation stage. Payment concerns do not close a lead. Explicit closure types separate phone rejection from post-consultation closure; unclassified legacy records remain separate in the data model. The prototype recognizes optional closure event `closureType` and explicit `sale/待支付` concern events; this dashboard change does not implement the new Sales Center data-entry actions or production fields.
-- CC multi-select, independent date memory per view, top totals, numeric sorting, currency-specific amount/AOV sorting and direct scoped list navigation are retained. Grouping selections survive list drilldown/back navigation. Download buttons produce XLSX raw evidence with section scope and timestamp, subject to existing export permission.
-- Existing synthetic fixtures gain separate trial lesson records and payment concern events once. Existing real records, edited reasons, subsequent deletions and unrelated browser storage are preserved.
+- Conversion uses six independent recorded milestones and overall L2S. Trial completion requires a completed trial lesson.
+- Current lead overview and Calling current states ignore activity dates. Calling period activity follows recorded call/payment dates.
+- Follow-up resolves current status first, then filters by that status's business date. Waiting uses stage-entry date; booked/no-show/consultation use the associated session's scheduled date; closed uses the latest closure date. Rebooking moves the user to the new booked date and removes the old date/state from this table.
+- Both follow-up tables support CC/date hierarchies independently. Follow-up date rows show matching current-state counts; Calling date rows show dashes for current snapshots. Payment counts and amounts use payment dates throughout.
+- Closed and rejected reason panels reconcile with their respective current user sets. Activity dates affect closed reasons only.
+- The shared currency selector offers Local currency and USD only. Both convert the same orders. Different local currencies remain separate; USD aggregates converted amounts. Rates are explicitly synthetic demo values; original amounts and currency are retained.
+- Exact user/order drilldowns, shared permissions, totals, sorting, date memory, grouping memory, and raw XLSX downloads remain. Downloads include business-date and original/converted payment evidence.
 
-Validation: `npm run test:dashboard` runs legacy regression checks plus `scripts/test-dashboard43.cjs`; `npm run build` type-checks and builds. Browser checks are recorded separately in the delivery notes; build success alone is not proof of browser interaction verification.
+## Regression coverage
 
-## Unified follow-up comparison tables
-
-Calling and Sales follow-up each use one table and one raw download entry. Two grouped headers distinguish current workload from activity in the selected period. A single grouping control applies to both groups of columns. The default row is current CC; expanding it shows daily activity. Daily rows display a dash for current workload, rather than fabricating historical snapshots. Daily payment amounts/AOV use only payments on that date. Parent and total user counts remain independently deduplicated across dates. Downloads include current snapshot, period users and raw evidence as separate sheets in the same workbook.
-
-## Core follow-up fields
-
-The follow-up table now keeps six user-count columns: 待预约, 已预约, 未出勤, 咨询未完成, 咨询已完成, 已支付. The first five reuse the existing current Sales Center stages; 咨询已完成 is the existing 咨询完成待支付 stage, without a separate 待支付 column. Paid users and retained amount/AOV still use the selected payment dates. Expanded rows therefore show daily payments, leaving current-stage cells blank/dash. Extra paused/pending-consultation, new booking, attendance, consultation activity and closure count columns are hidden. Exports use the same simplified metrics and keep only relevant call/payment records. The conversion overview remains unchanged.
+`pnpm run test:dashboard` runs legacy checks, `scripts/test-dashboard43.cjs`, and `scripts/test-dashboard-current-dates.cjs`. The latter verifies the 10th-to-12th rebooking example, current-state date selection, stage-entry history, missing dates, future appointments, UTC+7, closure/reactivation, CC/date hierarchies, same-order local/USD conversion, and unavailable-rate handling. Build/type checks and actual browser interactions supplement these data-rule tests.
