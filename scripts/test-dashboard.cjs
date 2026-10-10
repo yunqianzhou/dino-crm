@@ -120,7 +120,26 @@ try {
   const edited = { ...demo.students[0], name: 'Existing user edit' }
   const existing = { students: [edited, user('existing')], accounts: [], orders: [], callRecords: [], lessons: [] }
   const migrated = withManagementDemo(existing, '2026-09-16T08:00:00Z')
-  assert.equal(migrated.students.length, 229)
+  assert.equal(migrated.students.length, 425)
+  for (const [prefix, line, currency, count, paidCount] of [
+    ['991000000000000', '越南', 'VND', 96, 18],
+    ['992000000000000', '马来', 'MYR', 100, 20],
+  ]) {
+    const people = migrated.students.filter(s => s.studentId.startsWith(prefix))
+    const personIds = new Set(people.map(s => s.studentId))
+    const countryOrders = migrated.orders.filter(o => personIds.has(o.studentId))
+    assert.equal(people.length, count)
+    assert(people.every(s => businessLineOf([], s) === line), 'country fixtures resolve to the intended business line')
+    assert(countryOrders.every(o => o.currency === currency), 'country fixtures only use local currency')
+    assert.equal(countryOrders.filter(o => o.orderStatus === '已支付').length, paidCount)
+    const result = cohortFunnel(people, migrated.callRecords, migrated.lessons, migrated.orders, { ...filters, start: '', end: '' }, '2026-09-17T00:00:00Z')
+    assert.equal(result.leads.length, count)
+    for (const key of ['called', 'connected', 'booked', 'trialCompleted', 'paid']) assert(result[key].length > 0, `${line} ${key} has examples`)
+    assert.equal(result.paid.length, paidCount)
+    const current = require(join(tmp, 'dashboard43.js')).followupMetrics(people, migrated.callRecords, migrated.lessons, migrated.orders, { ...filters, start: '', end: '' }).current
+    for (const key of ['待外呼', '未接通待跟进', '已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '暂不跟进', '已拒绝', '已关闭']) assert(current[key].length > 0, `${line} ${key} has examples`)
+  }
+  for (const [rows, key] of [[migrated.students, 'studentId'], [migrated.orders, 'orderId'], [migrated.callRecords, 'id'], [migrated.lessons, 'id'], [migrated.accounts, 'email']]) assert.equal(new Set(rows.map(row => row[key])).size, rows.length, 'fixture IDs must not collide')
   assert.equal(migrated.students[0].name, 'Existing user edit')
   assert(migrated.students.some(s => s.studentId === 'existing'))
   assert.equal(withManagementDemo(migrated, '2026-10-16T08:00:00Z'), migrated, 'reload must not replace dates or edits')
@@ -186,7 +205,7 @@ try {
   assert.equal(dashboardReasonRows([crmNoShow], [], [], { ...filters, mode: 'period' }, 'noShow')[0].users.length, 1)
   const oldDemo = { ...demo, students: demo.students.map(s => ({ ...s, salesLifecycleEvents: s.salesLifecycleEvents?.map(e => ({ ...e, reason: undefined })) })) }
   const enriched = withManagementDemo(oldDemo)
-  assert.equal(enriched.students.length, oldDemo.students.length + 24)
+  assert.equal(enriched.students.length, oldDemo.students.length + 24 + 196)
   assert(enriched.students.flatMap(s => s.salesLifecycleEvents || []).some(e => e.reason))
   assert.equal(withManagementDemo(enriched), enriched)
   // Payment evidence comes from orders, independent of the profile flag and funnel history.

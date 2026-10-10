@@ -25,27 +25,46 @@ type DemoState = {
 
 /** Synthetic prototype fixtures only. Stable IDs keep links intact across reloads. */
 export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState {
+  return createManagementFixtures(now, {
+    prefix: 'management-demo', studentPrefix: '990000000000000', orderPrefix: 'VN-DEMO',
+    businessLine: '越南', country: '越南', dialCode: '+84', currency: 'VND',
+    timezone: 'Asia/Ho_Chi_Minh', offsetMinutes: 420,
+    ccNames: ['Chloe', 'Linh', 'Thy', 'Thư', 'Thảo', 'Macie'],
+    names: ['Minh Nguyen', 'An Tran', 'Bao Le', 'Linh Pham', 'Mai Hoang', 'Nam Vu', 'Lan Do', 'Khanh Bui'],
+    counts: [42, 30, 24, 24, 12, 12, 18, 12, 6], paidCount: 24, unassignedCount: 24,
+    baseAmount: 1790000, amountStep: 600000, discount: 300000, legacy: true,
+  })
+}
+
+type FixtureConfig = {
+  prefix: string; studentPrefix: string; orderPrefix: string; businessLine: NonNullable<Student['businessLine']>; country: string
+  dialCode: string; currency: string; timezone: string; offsetMinutes: number
+  ccNames: string[]; names: string[]; counts: number[]; paidCount: number; unassignedCount: number
+  baseAmount: number; amountStep: number; discount: number; legacy?: boolean
+}
+
+function createManagementFixtures(now: string, config: FixtureConfig): DemoState {
   const base = dayjs.utc(now).startOf('day')
   const fmt = (time: dayjs.Dayjs) => time.format('YYYY-MM-DD HH:mm:ss')
-  const accounts: Account[] = ['Chloe', 'Linh', 'Thy', 'Thư', 'Thảo', 'Macie'].map((name, i) => ({
-    id: `management-demo-cc-${i + 1}`, name,
-    email: `cc${i + 1}@demo.example.invalid`, roleId: 'role_support',
-    businessLines: ['越南'], status: '启用', outboundSeatBound: true,
+  const accounts: Account[] = config.ccNames.map((name, i) => ({
+    id: `${config.prefix}-cc-${i + 1}`, name,
+    email: config.legacy ? `cc${i + 1}@demo.example.invalid` : `${config.prefix}-cc${i + 1}@example.invalid`, roleId: 'role_support',
+    businessLines: [config.businessLine], status: '启用', outboundSeatBound: true,
   }))
   const students: Student[] = []
   const callRecords: CallRecord[] = []
   const orders: Order[] = []
   const lessons: LessonRecord[] = []
-  const counts = [42, 30, 24, 24, 12, 12, 18, 12, 6]
+  const counts = config.counts
   const stages: string[] = CONSULTATION_STAGES.flatMap((stage, index) => Array(counts[index]).fill(stage))
-  stages.push(...Array(24).fill('付费'))
-  const names = ['Minh Nguyen', 'An Tran', 'Bao Le', 'Linh Pham', 'Mai Hoang', 'Nam Vu', 'Lan Do', 'Khanh Bui']
+  stages.push(...Array(config.paidCount).fill('付费'))
+  const names = config.names
 
   stages.forEach((stage, i) => {
     const sequence = String(i + 1).padStart(4, '0')
-    const studentId = `990000000000000${sequence}`
+    const studentId = `${config.studentPrefix}${sequence}`
     const owner = accounts[(i + Math.floor(i / 7)) % accounts.length]
-    const unassigned = i < 24
+    const unassigned = i < config.unassignedCount
     const registered = base.subtract(4 + i % 18, 'day').add(i % 8, 'hour')
     const called = registered.add(2, 'hour')
     const booked = called.add(1, 'hour')
@@ -57,9 +76,9 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
     const completed = ['咨询完成待支付', '付费'].includes(stage)
     const student: Student = {
       studentId, name: `${names[i % names.length]} ${sequence}`, localName: `${names[i % names.length]} ${sequence}`,
-      userType: '正式用户', loginMethod: 'AppID', account: `demo-user-${sequence}@example.invalid`,
+      userType: '正式用户', loginMethod: 'AppID', account: config.legacy ? `demo-user-${sequence}@example.invalid` : `${config.prefix}-${sequence}@example.invalid`,
       // Deliberately invalid contact numbers; AppID accounts use the explicit userType field.
-      phone: `+8400000${sequence}`, countryCode: '+84', businessLine: '越南', country: '越南',
+      phone: `${config.dialCode}00000${sequence}`, countryCode: config.dialCode, businessLine: config.businessLine, country: config.country,
       registerChannel: '演示 / Demo', channelCode: '', registerTime: fmt(registered),
       status: stage === '付费' ? '付费' : '未付费-未体验',
       paymentStatusStr: stage === '付费' ? '已付费' : '未付费',
@@ -74,13 +93,13 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
       landingEnglishLevel: 'Beginner', landingLearningGoal: 'Speaking practice',
     }
     const event = (node: SalesLifecycleEvent['node'], result: string, time: dayjs.Dayjs, appointmentId?: string) => {
-      student.salesLifecycleEvents!.push({ eventId: `management-demo-event-${sequence}-${student.salesLifecycleEvents!.length}`,
+      student.salesLifecycleEvents!.push({ eventId: `${config.prefix}-event-${sequence}-${student.salesLifecycleEvents!.length}`,
         node, result, reason: demoReasons[result]?.[i % 3], description: '演示 / Demo', appointmentId,
         occurredAt: fmt(time), reportedAt: fmt(time), reportedBy: owner.email, source: 'CC手动' })
     }
     if (stage !== '待外呼') {
-      const call: CallRecord = { id: `management-demo-call-${sequence}`, studentId, customer: student.name,
-        phone: student.phone!, businessLine: '越南', result: connected ? '已接通' : '无人接听',
+      const call: CallRecord = { id: `${config.prefix}-call-${sequence}`, studentId, customer: student.name,
+        phone: student.phone!, businessLine: config.businessLine, result: connected ? '已接通' : '无人接听',
         duration: connected ? `0${2 + i % 6}:${String(i % 60).padStart(2, '0')}` : '—',
         note: '演示通话 / Demo call', agent: owner.email, time: fmt(called) }
       callRecords.push(call)
@@ -89,10 +108,10 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
       student.landingCallbackAt = fmt(base.add(1, 'day').add(i % 8, 'hour'))
     }
     if (hasAppointment) {
-      const appointmentId = `management-demo-appointment-${sequence}`
+      const appointmentId = `${config.prefix}-appointment-${sequence}`
       const scheduled = stage === '已预约' ? base.add(1 + i % 3, 'day').add(3, 'hour') : consulted
       student.salesAppointments!.push({ appointmentId,
-        scheduledStartAt: scheduled.utcOffset(7 * 60).format('YYYY-MM-DD HH:mm:ss'), timezone: 'Asia/Ho_Chi_Minh',
+        scheduledStartAt: scheduled.utcOffset(config.offsetMinutes).format('YYYY-MM-DD HH:mm:ss'), timezone: config.timezone,
         appointmentStatus: '已预约', attendanceStatus: attended ? '已出勤' : stage === '未出勤待跟进' ? 'No Show' : '待标记',
         consultationStatus: completed ? '已完成' : stage === '咨询未完成待跟进' ? '未完成' : '待标记',
         createdBy: owner.email, createdAt: fmt(booked), updatedBy: owner.email,
@@ -106,11 +125,11 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
     student.salesHistory = [{ progress: student.salesProgress!, note: student.salesLatestNote!, time: student.salesUpdatedAt!, owner: unassigned ? '系统 / System' : owner.email }]
     const orderStatus = stage === '付费' ? '已支付' : stage === '咨询完成待支付' ? '待支付' : stage === '暂不跟进' ? (i % 2 ? '已取消' : '已退款') : undefined
     if (orderStatus) {
-      const orderId = `VN-DEMO-${sequence}`
-      const amount = 1790000 + (i % 3) * 600000
+      const orderId = `${config.orderPrefix}-${sequence}`
+      const amount = config.baseAmount + (i % 3) * config.amountStep
       const order: Order = { orderId, productName: 'Dino English · 12 weeks (Demo)', studentId,
-        userStatus: student.status, orderStatus, originalPrice: amount + 300000, paidAmount: orderStatus === '已支付' ? amount : 0,
-        payMethod: 'Airwallex - Card', currency: 'VND',
+        userStatus: student.status, orderStatus, originalPrice: amount + config.discount, paidAmount: orderStatus === '已支付' ? amount : 0,
+        payMethod: 'Airwallex - Card', currency: config.currency,
         transactions: [{ id: `${orderId}-1`, time: fmt(booked), event: '创建订单 / Order created', status: '待支付', amount: 0 }] }
       if (orderStatus === '已支付' || orderStatus === '已退款') {
         order.paidTime = fmt(paid)
@@ -121,7 +140,7 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
         student.ccName = owner.name
         student.expireTime = order.validUntil = fmt(paid.add(84, 'day'))
         event('sale', '已付费', paid)
-        lessons.push({ id: `management-demo-lesson-${sequence}`, studentId, courseLabel: `L${i % 3 + 1}-U1-L1`, courseName: 'Hello, Dino! (Demo)',
+        lessons.push({ id: `${config.prefix}-lesson-${sequence}`, studentId, courseLabel: `L${i % 3 + 1}-U1-L1`, courseName: 'Hello, Dino! (Demo)',
           lessonType: '正式课', status: '进行中', teacher: 'Alex (Demo)', startedAt: fmt(base.subtract(1, 'hour')) })
       }
       orders.push(order)
@@ -133,7 +152,7 @@ export function createManagementDemo(now = dayjs.utc().toISOString()): DemoState
 
 /** One-time additive migration: preserve existing users, edits, deletes and dates. */
 export function withManagementDemo<T extends DemoState>(state: T, now?: string): T {
-  return withDashboard5OutcomeDemo(withBaseManagementDemo(state, now), now)
+  return withRegionalManagementDemo(withDashboard5OutcomeDemo(withBaseManagementDemo(state, now), now), now)
 }
 
 function withBaseManagementDemo<T extends DemoState>(state: T, now?: string): T {
@@ -245,4 +264,55 @@ function withDashboard43Demo<T extends DemoState>(state: T): T {
     return { ...student, salesLifecycleEvents: events.map(event => event.eventId.startsWith('management-demo-event-') && event.result === '已关闭' && !('closureType' in event) ? { ...event, closureType:'phone' } : event) }
   })
   return { ...state,students,lessons,demoDatasets:[...(state.demoDatasets || []),marker] }
+}
+
+/** Add current Vietnam and Malaysia examples once without overwriting saved prototype work. */
+function withRegionalManagementDemo<T extends DemoState>(state: T, now = dayjs.utc().toISOString()): T {
+  const marker = 'management-vn-my-oct2026-v1'
+  if (state.demoDatasets?.includes(marker)) return state
+  const configs: FixtureConfig[] = [
+    { prefix: 'management-vn-oct26', studentPrefix: '991000000000000', orderPrefix: 'VN-OCT26-DEMO',
+      businessLine: '越南', country: '越南', dialCode: '+84', currency: 'VND', timezone: 'Asia/Ho_Chi_Minh', offsetMinutes: 420,
+      ccNames: ['Hanh (Demo)', 'Duc (Demo)', 'Vy (Demo)'], names: ['An Nguyen (Demo)', 'Minh Tran (Demo)', 'Linh Le (Demo)', 'Bao Pham (Demo)'],
+      counts: [12, 12, 12, 12, 6, 6, 6, 6, 6], paidCount: 18, unassignedCount: 6,
+      baseAmount: 1590000, amountStep: 500000, discount: 200000 },
+    { prefix: 'management-my-oct26', studentPrefix: '992000000000000', orderPrefix: 'MY-OCT26-DEMO',
+      businessLine: '马来', country: '马来西亚', dialCode: '+60', currency: 'MYR', timezone: 'Asia/Kuala_Lumpur', offsetMinutes: 480,
+      ccNames: ['Aina (Demo)', 'Amir (Demo)', 'Mei (Demo)', 'Sara (Demo)'], names: ['Adam Tan (Demo)', 'Alya Lim (Demo)', 'Ryan Lee (Demo)', 'Sofia Wong (Demo)'],
+      counts: [18, 12, 10, 10, 6, 6, 8, 6, 4], paidCount: 20, unassignedCount: 8,
+      baseAmount: 399, amountStep: 150, discount: 80 },
+  ]
+  const append = <R,>(existing: R[], additions: R[], id: (row: R) => string) => {
+    const ids = new Set(existing.map(id))
+    return [...existing, ...additions.filter(row => !ids.has(id(row)))]
+  }
+  let result = state
+  for (const config of configs) {
+    const demo = createManagementFixtures(now, config)
+    demo.students.forEach((student, index) => {
+      if (index % 4 === 0) demo.lessons.push({
+        id: `${config.prefix}-trial-${index}`, studentId: student.studentId,
+        courseLabel: 'TRIAL-DEMO-01', courseName: 'My first English class (Demo)',
+        lessonType: '体验课', status: '已完课',
+        startedAt: dayjs.utc(student.registerTime).add(1, 'day').format('YYYY-MM-DD HH:mm:ss'),
+        completedAt: dayjs.utc(student.registerTime).add(1, 'day').add(30, 'minute').format('YYYY-MM-DD HH:mm:ss'),
+      })
+      if (student.salesLifecycleStatus === '已关闭') {
+        const rejected = index % 2 === 0
+        const reason = rejected ? '无需求' : '费用高'
+        student.salesOutcome5 = { stage: rejected ? 'rejected' : 'closed', reason }
+        student.salesLifecycleStatus = rejected ? '进行中' : '已关闭'
+        const event = student.salesLifecycleEvents?.find(event => event.result === '已关闭')
+        if (event) { event.result = rejected ? '已拒绝' : '已关闭'; event.reason = reason }
+      }
+    })
+    result = { ...result,
+      students: append(result.students, demo.students, s => s.studentId),
+      accounts: append(result.accounts, demo.accounts, a => a.email),
+      callRecords: append(result.callRecords, demo.callRecords, c => c.id),
+      orders: append(result.orders, demo.orders, o => o.orderId),
+      lessons: append(result.lessons, demo.lessons, l => l.id),
+    }
+  }
+  return { ...result, demoDatasets: [...(result.demoDatasets || []), marker] }
 }

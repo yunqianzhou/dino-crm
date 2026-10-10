@@ -64,3 +64,7 @@ Downloads require the dashboard's independent export permission. Follow-up expor
 ## Verification
 
 `pnpm run test:dashboard` covers existing dashboard regressions plus current-stage date rules, rebooking, waiting history, missing dates, UTC+7, future appointments, closure/reopening, both grouping directions, payment dates, local-currency totals, per-currency averages, mixed-currency sorting and raw payment exports. `pnpm run build` checks types and builds. The deployment workflow also runs App A/B, Phase 5 and outbound checks.
+
+## Vietnam and Malaysia demonstration records
+
+A one-time additive fixture update provides 96 additional Vietnamese users and 100 Malaysian users, with assigned CCs, unassigned leads, calls, bookings, completed trial lessons and current follow-up outcomes. It adds 18 paid Vietnamese orders in VND and 20 paid Malaysian orders in MYR, plus pending, canceled and refunded examples. All contacts are synthetic, records are marked Demo, and linked evidence is shared with the other CRM pages and raw downloads. Existing records, edits and deliberate deletions remain intact on refresh. Dates are anchored to the first load of this fixture update.
