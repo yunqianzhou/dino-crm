@@ -11,6 +11,11 @@ export type DashboardFilters = { mode: 'current' | 'period'; start: string; end:
 export function dashboardOwnerIds(owner: DashboardFilters['owner']): string[] {
   return [...new Set((Array.isArray(owner) ? owner : [owner]).map(value => value.trim()).filter(Boolean))]
 }
+/** Default to the first permitted option; keep explicit requests so invalid scope stays empty. */
+export function dashboardSelectedLines(requested: string[], permittedOptions: string[]): string[] {
+  const explicit = dashboardOwnerIds(requested).slice(0, 1)
+  return explicit.length ? explicit : permittedOptions.slice(0, 1)
+}
 function matchesOwner(student: Student, owner: DashboardFilters['owner']) {
   const ids = dashboardOwnerIds(owner)
   return !ids.length || ids.includes(student.salesOwner || '__unassigned__')

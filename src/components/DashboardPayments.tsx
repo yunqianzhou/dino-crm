@@ -36,7 +36,7 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
  const changeGroup=(value:string)=>{const next=new URLSearchParams(query);clear(next);next.set('revenueGroup',value);setQuery(next)}
  const comparable=localMoneySortable(matchingOrders)
  return <Card title={d('revenueTitle')} className="dashboard-payments" extra={<span className="dashboard-section-note">{d('paidDate')} · {rangeLabel} · UTC+7</span>}>
-  <p className="dashboard-help">{text('按支付日期统计有效订单，直接展示本地货币实付金额；不同币种分别汇总金额和均值。','Valid orders are selected by payment date. Recorded local amounts and averages are shown separately for each currency.')}</p>
+  <p className="dashboard-help">{text('按支付日期统计当前业务线的有效订单，展示本地货币实付金额及均值。','Valid orders in the selected business line are counted by payment date, with amounts and averages in local currency.')}</p>
   <div className="dashboard-table-tools">
    <Export43 name="payments" disabled={!matchingOrders.length} sheets={()=>[
     {name:'Paid orders',headers:['Order ID','CRM ID','Current CC','Paid UTC',...currencyExportHeaders],rows:matchingOrders.map(o=>[o.orderId,o.studentId,ownerName(ownerKey(o)),o.paidTime,...currencyExportRow(o)])},

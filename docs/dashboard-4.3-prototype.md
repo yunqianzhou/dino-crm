@@ -4,7 +4,7 @@ Updated 2026-10-10. Current product rules are maintained in [management-dashboar
 
 ## Current scope
 
-- Three views: registration-cohort conversion, sales follow-up, payments.
+- Three views: registration-cohort conversion, sales follow-up, payments. They share a required single business line, defaulting to the first permitted option in Sales Center option order. Reset restores this line; no All/clear selection. Downloads resolve the same default line.
 - Conversion uses six independent recorded milestones and overall L2S. Trial completion requires a completed trial lesson.
 - Current lead overview and Calling current states ignore activity dates. Calling period activity follows recorded call/payment dates.
 - Follow-up resolves current status first, then filters by that status's business date. Waiting uses stage-entry date; booked/no-show/consultation use the associated session's scheduled date; closed uses the latest closure date. Rebooking moves the user to the new booked date and removes the old date/state from this table.
@@ -12,7 +12,7 @@ Updated 2026-10-10. Current product rules are maintained in [management-dashboar
 - Closed and rejected reason panels reconcile with their respective current user sets. Activity dates affect closed reasons only.
 - Amounts use recorded local currency and paid amount. There is no currency selector or currency conversion. Different currencies have separate totals and averages; mixed-currency monetary sorting is disabled.
 - All metric numbers are display-only, including totals, child rows, reasons and calling-route counts. Numeric drilldowns and detail modals are removed. Shared permissions, totals, sorting, date memory, grouping memory, and each section’s raw XLSX downloads remain. Downloads include business-date and recorded currency/amount payment evidence.
-- Payment results summarize amount, users, paid order count, AOV and amount per payer in five top cards. The grouped payment detail table has no duplicate total row. Other tables keep their existing totals.
+- Payment results summarize amount, users, paid order count, AOV and amount per payer in five top cards. Use large, bold figures and smaller currency codes/help to make these metrics prominent. The grouped payment detail table has no duplicate total row. Other tables keep their existing totals.
 
 ## Regression coverage
 

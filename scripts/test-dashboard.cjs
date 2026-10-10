@@ -9,8 +9,14 @@ const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/dashboard43.ts', 'src/dashboardPermissions.ts', 'src/managementDemo.ts', 'src/dashboardView.ts', 'src/dashboardNavigation.ts', 'src/dashboardSort.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
-  const { dashboardCCAccounts, dashboardOwnerIds, dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, dashboardBreakdownPayments, dashboardCohortRates, dashboardCohortMetrics, dashboardCohortRows, COHORT_METRICS, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
+  const { dashboardCCAccounts, dashboardOwnerIds, dashboardSelectedLines, dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, dashboardBreakdownPayments, dashboardCohortRates, dashboardCohortMetrics, dashboardCohortRows, COHORT_METRICS, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
   const { dashboardPermission, dashboardExportPermission, withDashboardPermission } = require(join(tmp, 'dashboardPermissions.js'))
+  assert.deepEqual(dashboardSelectedLines([], ['韩国', '越南']), ['韩国'], 'default to the first permitted option in UI order')
+  assert.deepEqual(dashboardSelectedLines(['', '  '], ['越南']), ['越南'], 'empty legacy selection defaults to an authorized line')
+  assert.deepEqual(dashboardSelectedLines(['越南'], ['韩国', '越南']), ['越南'], 'keep explicit single selection across tabs')
+  assert.deepEqual(dashboardSelectedLines(['韩国', '越南'], ['韩国', '越南']), ['韩国'], 'legacy multi-line links select only their first line')
+  assert.deepEqual(dashboardSelectedLines([], []), [], 'no permitted options means no default')
+  assert.deepEqual(dashboardSelectedLines(['越南'], ['韩国']), ['越南'], 'invalid explicit scope must not silently broaden to a default')
   const salesOnlyRole = { id: 'sales', builtin: false, perms: { salesV3: 'operate', salesV3_reassign: 'operate', usersV2_export: 'operate', ordersV3_export: 'operate' } }
   const dashboardOnlyRole = { ...salesOnlyRole, perms: { managementDashboard: 'view', salesV3: 'none' } }
   assert.equal(dashboardPermission(salesOnlyRole, null), 'none', 'sales rights must not grant dashboard view')
@@ -61,6 +67,8 @@ try {
   assert(!dashboardPopulation(lineRows, ['韩国'], false, 'another-cc', [], channels).some(s => s.studentId === 'kr'), 'owner restrictions still apply across business lines')
   const { cohortFunnel, followupMetrics, outcomeReasonGroups } = require(join(tmp, 'dashboard43.js'))
   const crossCalls = [{ studentId: 'a', result: '已接通', time: '2026-09-02 01:00:00' }, { studentId: 'kr', result: '已接通', time: '2026-09-02 01:00:00' }]
+  const firstPermitted = dashboardSelectedLines([], ['韩国', '越南'])
+  assert(dashboardPopulation(lineRows, null, true, '', firstPermitted, channels).every(s => businessLineOf(channels, s) === '韩国'), 'default data population must stay in one business line')
   const crossOrders = ['a', 'other'].map((id, i) => ({ orderId: id, studentId: id, orderStatus: '已支付', paidAmount: 100 + i, paidTime: '2026-09-02 02:00:00', currency: 'KRW' }))
   const crossFilters = { mode: 'period', start: '', end: '', owner: '', userType: '正式用户' }
   assert.deepEqual(cohortFunnel(korean, crossCalls, [], crossOrders, crossFilters).connected.map(s => s.studentId), ['kr'])

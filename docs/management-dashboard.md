@@ -4,7 +4,7 @@ Updated 2026-10-10. Route: `#/management-dashboard`. Shared synthetic prototype 
 
 ## Views and shared filters
 
-Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a searchable, clearable single selection; current CC remains multi-select. Clearing business line selects all permitted lines, and changing it clears the selected CCs. Legacy links with multiple business lines use only the first specified line. Business line, current CC and permissions are shared. Each view remembers its own date range; grouping is retained across view switches. Source, purchase-intent, age and registration-age grouping controls are hidden.
+Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a required searchable single selection; current CC remains multi-select. When no business line is supplied, select the first option after filtering the existing Sales Center option order by the account’s data permissions. There is no All business lines or clear option. Reset selects that first permitted line and clears CC and current-view dates; changing the line clears selected CCs. An explicit invalid or unauthorized URL selection produces empty data, never a broader default. No permitted options means an empty disabled selector and no data. Legacy links with multiple business lines use only the first specified line. Page data and export scope use the same resolved single line, including when the URL initially has no line parameter. Business line, current CC and permissions are shared. Each view remembers its own date range; grouping is retained across view switches. Source, purchase-intent, age and registration-age grouping controls are hidden.
 
 All business dates use UTC+7 after interpreting the record's timezone. Current CC means current ownership, not historical operator attribution. Formal eligible users and current permissions determine the population; test users are excluded.
 
@@ -39,7 +39,7 @@ Closed reasons use the same date-filtered current closed users as the table. Rej
 
 ## Local currency and payment results
 
-Amounts use the currency and paid amount recorded on each order. There is no currency selector or exchange-rate calculation. Legacy `moneyCurrency=USD` links have no effect on amounts. Different local currencies are shown separately and never added into a single total. USD appears only when the underlying order is already denominated in USD; amounts are never relabeled to the business line's currency.
+Amounts use the currency and paid amount recorded on each order. There is no currency selector or exchange-rate calculation. Legacy `moneyCurrency=USD` links have no effect on amounts. Normal reporting is for one selected business line and its local currency. Different countries are not combined. Unexpected mixed currencies in source orders are kept separate rather than relabeled or converted. USD appears only when the underlying order is already denominated in USD; amounts are never relabeled to the business line's currency.
 
 - Amount paid: sum of qualifying paid amounts within each currency.
 - AOV: that currency's amount / that currency's paid order count.
@@ -49,7 +49,7 @@ Amounts use the currency and paid amount recorded on each order. There is no cur
 
 Orders must be currently paid, have a valid payment timestamp and finite positive paid amount. Refunds, cancelled, pending and zero-value orders are excluded. A profile's paid flag cannot substitute for order evidence. Original orders and amounts are unchanged.
 
-Payment results show five top-level cards: amount paid, paid users, paid orders, AOV, and amount per payer. All five card values are plain display text; the payment download contains the qualifying order details. The payment detail table shows grouped records only, with no repeated total row; the cards summarize the full selection independently of sorting, expansion and pagination.
+Payment results show five top-level cards: amount paid, paid users, paid orders, AOV, and amount per payer. All five card values are prominent (26–32 px, bold, high contrast), with smaller currency codes and secondary labels/help. The amount-paid card has a light green emphasis. All values remain plain display text; the payment download contains the qualifying order details. The payment detail table shows grouped records only, with no repeated total row; the cards summarize the full selection independently of sorting, expansion and pagination.
 
 Money/AOV sorting uses unrounded recorded values within a single known currency. Multiple currencies cannot form one ranking, so monetary sorting is disabled in mixed-currency selections. Unavailable values sort last in either direction. Other dashboard tables retain their pinned totals, recalculated from the full selected population outside sorting and pagination.
 

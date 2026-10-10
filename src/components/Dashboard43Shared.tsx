@@ -8,7 +8,7 @@ import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
 import { useStore } from '../store'
 import type { Order, Student } from '../types'
-import { inVietnamRange } from '../dashboardData'
+import { inVietnamRange, dashboardSelectedLines } from '../dashboardData'
 import { dashboardNumberCompare } from '../dashboardSort'
 import { l2s, type PeopleMetrics } from '../dashboard43'
 import DashboardMoneyCell from './DashboardMoneyCell'
@@ -65,13 +65,13 @@ export function Export43({ name, sheets, disabled = false }: { name: string; she
  const channels = useStore(s => s.channels)
  const students = useStore(s => s.students)
  const scope = allowedLines()
- const selectedLines = query.getAll('line').filter(Boolean)
  const permittedLines = salesBusinessLineOptions(channels, students).filter(line => scope === null || scope.includes(line))
- const exportLines = permittedLines.filter(line => !selectedLines.length || selectedLines.includes(line))
+ const selectedLines = dashboardSelectedLines(query.getAll('line'), permittedLines)
+ const exportLines = permittedLines.filter(line => selectedLines.includes(line))
  if (can('managementDashboard_export') !== 'operate') return null
  return <Button size="small" icon={<DownloadOutlined />} disabled={disabled} onClick={() => {
   const workbook = XLSX.utils.book_new()
-  const businessRows = [['Selected business lines', selectedLines.length ? selectedLines.join(', ') : 'All permitted business lines'], ['Permitted business lines in selection', exportLines.join(', ') || 'None'], ['User type', 'Formal'], ['Reporting timezone', 'UTC+7']]
+  const businessRows = [['Selected business lines', selectedLines.join(', ') || 'None'], ['Permitted business lines in selection', exportLines.join(', ') || 'None'], ['User type', 'Formal'], ['Reporting timezone', 'UTC+7']]
   sheets().map(sheet => sheet.headers[0] === 'Scope' ? { ...sheet, rows: [...sheet.rows, ...businessRows] } : sheet).forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(() => ({wch:24})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
   XLSX.writeFile(workbook,`${name}.xlsx`)
  }}>{text('下载原始数据','Download raw data')}</Button>
