@@ -8,14 +8,13 @@ import dayjs from 'dayjs'
 import type { CallRecord, LessonRecord, Order, Student } from '../types'
 import { ACTIVITY_CALL_KEYS, ACTIVITY_FOLLOW_KEYS, CURRENT_INVENTORY_KEYS, CURRENT_CALL_KEYS, CURRENT_FOLLOW_KEYS, followupMetrics, followupComparisonRows, datedFollowupRows, datedFollowupMetrics, followupStateEvidence, scopedPeople, uniquePeople } from '../dashboard43'
 import { dashboardGroupRows, dashboardPaymentOrders, inVietnamRange, type DashboardFilters } from '../dashboardData'
-import { useDashboardCurrency, currencyExportHeaders, currencyExportRow } from './DashboardCurrency'
+import { currencyExportHeaders, currencyExportRow } from '../dashboardCurrency'
 import { Export43, MetricTable43, useDashboard43, type MetricRow43 } from './Dashboard43Shared'
 
 type Props = { population:Student[]; calls:CallRecord[]; lessons:LessonRecord[]; orders:Order[]; filters:DashboardFilters; rangeLabel:string }
 export default function DashboardFollowup43(props:Props) {
  const { population,calls,lessons,orders,filters,rangeLabel } = props
  const { text,label,count,ownerName } = useDashboard43()
- const currencyConfig = useDashboardCurrency()
  const followupLabels:Record<string,string> = {
   '已接通待预约':text('待预约','Appointment pending'),
   '已预约':text('已预约','Appointment booked'),
@@ -59,9 +58,9 @@ export default function DashboardFollowup43(props:Props) {
    {name:'Period user metrics',headers:['CRM ID','Name','Current CC',...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(followupLabel)],rows:uniquePeople((section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).flatMap(k=>metrics.activity[k])).map(s=>[s.studentId,s.name,ownerName(s.salesOwner||'__unassigned__'),...(section==='calls'?ACTIVITY_CALL_KEYS:ACTIVITY_FOLLOW_KEYS).map(k=>Number(metrics.activity[k].some(u=>u.studentId===s.studentId)))])},
    ...(section==='calls'?[{name:'Calls',headers:structuredCallHeaders,rows:calls.filter(c=>allowed.has(c.studentId)&&activityTime(c.time)).map(structuredCallRow)}]:[
     {name:'Appointments',headers:['CRM ID','Appointment ID','Status','Scheduled start','Timezone','Business date UTC+7'],rows:users.flatMap(s=>{const e=followupStateEvidence(s,calls);const a=(s.salesAppointments||[]).find(a=>a.appointmentId===e.appointmentId);return a?[[s.studentId,a.appointmentId,a.appointmentStatus,a.scheduledStartAt,a.timezone,e.date]]:[]})},
-    {name:'Payments',headers:['CRM ID','Order ID','Paid UTC','Paid date UTC+7',...currencyExportHeaders],rows:paidOrders.map(o=>[o.studentId,o.orderId,o.paidTime,dayjs.utc(o.paidTime).utcOffset(420).format('YYYY-MM-DD'),...currencyExportRow(o,currencyConfig)])},
+    {name:'Payments',headers:['CRM ID','Order ID','Paid UTC','Paid date UTC+7',...currencyExportHeaders],rows:paidOrders.map(o=>[o.studentId,o.orderId,o.paidTime,dayjs.utc(o.paidTime).utcOffset(420).format('YYYY-MM-DD'),...currencyExportRow(o)])},
    ]),
-   {name:'Scope',headers:['Scope','Value'],rows:[['Current workload',section==='followup'?'Current state, filtered by its business date':'Current snapshot; activity dates do not apply'],['First grouping',groupLabel(primary(section),section)],['Second grouping',secondary(section)?groupLabel(primary(section)==='cc'?'date':'cc',section):text('不再细分','No subgroup')],['Activity dates UTC+7',rangeLabel],['Date rules','Waiting: latest stage entry; booked/no-show/consultation: current session scheduled date; closed: latest closure; paid: order payment date'],['Rebooking','Only latest current stage and new scheduled date; previous stage/date removed'],['Missing business dates','Included only with no date filter; no inferred registration or update date'],['Money display',currencyConfig.mode],['FX','Fixed demo rates, not market quotes; raw and converted amounts preserved'],['CC',Array.isArray(filters.owner)?filters.owner.join(','):filters.owner],['Deduplication','Unique CRM users per metric; paid totals deduplicate across dates'],['Exported UTC',dayjs.utc().toISOString()]]},
+   {name:'Scope',headers:['Scope','Value'],rows:[['Current workload',section==='followup'?'Current state, filtered by its business date':'Current snapshot; activity dates do not apply'],['First grouping',groupLabel(primary(section),section)],['Second grouping',secondary(section)?groupLabel(primary(section)==='cc'?'date':'cc',section):text('不再细分','No subgroup')],['Activity dates UTC+7',rangeLabel],['Date rules','Waiting: latest stage entry; booked/no-show/consultation: current session scheduled date; closed: latest closure; paid: order payment date'],['Rebooking','Only latest current stage and new scheduled date; previous stage/date removed'],['Missing business dates','Included only with no date filter; no inferred registration or update date'],['Money display','Recorded local amounts; separate totals per currency'],['CC',Array.isArray(filters.owner)?filters.owner.join(','):filters.owner],['Deduplication','Unique CRM users per metric; paid totals deduplicate across dates'],['Exported UTC',dayjs.utc().toISOString()]]},
   ]
  }} />
  const block = (section:'calls'|'followup') => {

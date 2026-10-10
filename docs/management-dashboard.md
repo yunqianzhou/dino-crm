@@ -1,10 +1,10 @@
 # Management dashboard
 
-Updated 2026-10-09. Route: `#/management-dashboard`. Shared synthetic prototype data; no production database integration.
+Updated 2026-10-10. Route: `#/management-dashboard`. Shared synthetic prototype data; no production database integration.
 
 ## Views and shared filters
 
-Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a searchable, clearable single selection; current CC remains multi-select. Clearing business line selects all permitted lines, and changing it clears the selected CCs. Legacy links with multiple business lines use only the first specified line. Business line, current CC, permissions and display currency are shared. Each view remembers its own date range; grouping and currency survive list drilldown and return. Source, purchase-intent, age and registration-age grouping controls are hidden.
+Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a searchable, clearable single selection; current CC remains multi-select. Clearing business line selects all permitted lines, and changing it clears the selected CCs. Legacy links with multiple business lines use only the first specified line. Business line, current CC and permissions are shared. Each view remembers its own date range; grouping survives list drilldown and return. Source, purchase-intent, age and registration-age grouping controls are hidden.
 
 All business dates use UTC+7 after interpreting the record's timezone. Current CC means current ownership, not historical operator attribution. Formal eligible users and current permissions determine the population; test users are excluded.
 
@@ -37,32 +37,28 @@ Both comparison tables independently support CC → activity date, activity date
 
 Closed reasons use the same date-filtered current closed users as the table. Rejected reasons remain attached to the date-independent current rejected users. Changing grouping does not change either population.
 
-## Display currency and payment results
+## Local currency and payment results
 
-The shared selector has exactly two choices: Local currency and US dollar (USD), default Local currency. It converts the same qualifying orders; it never filters by original payment currency. Payer and order counts remain unchanged across currency switches.
+Amounts use the currency and paid amount recorded on each order. There is no currency selector or exchange-rate calculation. Legacy `moneyCurrency=USD` links have no effect on amounts. Different local currencies are shown separately and never added into a single total. USD appears only when the underlying order is already denominated in USD; amounts are never relabeled to the business line's currency.
 
-Local currency follows the user's business line: VND, KRW, MYR, IDR, THB, SGD, SAR or USD. Multiple local currencies remain separate. USD converts and aggregates all selected orders. Unconfigured mappings or unknown source currency are unavailable, not an extra selector option.
-
-The prototype uses fixed synthetic rates (`demo-2026-10-09`), not market quotes: USD 1, VND 25000, KRW 1400, MYR 4.5, IDR 16000, THB 35, SGD 1.35, SAR 3.75 per USD. Conversion is original amount ÷ source rate × target rate. Sum unrounded converted values before display rounding. Production must supply an approved, versioned rate table with effective timestamps.
-
-- Amount paid: sum of qualifying converted order amounts.
-- AOV: converted amount / paid order count.
-- Amount per payer: converted amount / distinct payer count.
+- Amount paid: sum of qualifying paid amounts within each currency.
+- AOV: that currency's amount / that currency's paid order count.
+- Amount per payer: that currency's amount / its distinct payer count.
 - No orders: amount 0 and averages unavailable.
-- Missing rates: affected currency total and averages unavailable, with missing-order count; payer/order counts remain. Never show a partial sum as a complete total.
+- Missing currency: retain the order and payer counts, show an explicitly labeled unknown-currency group with unavailable money/averages, and preserve the recorded amount in the export for reconciliation.
 
 Orders must be currently paid, have a valid payment timestamp and finite positive paid amount. Refunds, cancelled, pending and zero-value orders are excluded. A profile's paid flag cannot substitute for order evidence. Original orders and amounts are unchanged.
 
 Payment results show five top-level cards: amount paid, paid users, paid orders, AOV, and amount per payer. The paid-orders card opens the same qualifying order set in Order Center. The payment detail table shows grouped records only, with no repeated total row; the cards summarize the full selection independently of sorting, expansion and pagination.
 
-Money/AOV sorting uses the displayed converted values. Multiple local currencies cannot form one ranking; switch to USD for that comparison. Unavailable values sort last in either direction. Other dashboard tables retain their pinned totals, recalculated from the full selected population outside sorting and pagination.
+Money/AOV sorting uses unrounded recorded values within a single known currency. Multiple currencies cannot form one ranking, so monetary sorting is disabled in mixed-currency selections. Unavailable values sort last in either direction. Other dashboard tables retain their pinned totals, recalculated from the full selected population outside sorting and pagination.
 
 ## Details and raw downloads
 
-Ordinary lead/status counts open Sales Center with exact clicked user IDs; paid-user counts open User Center. Payment order counts, amount and averages open Order Center with exact original order IDs. Display currency is retained on return and is never imposed as an original-order currency filter. Existing module permissions still apply; empty selections stay empty.
+Ordinary lead/status counts open Sales Center with exact clicked user IDs; paid-user counts open User Center. Payment order counts, amount and averages open Order Center with exact original order IDs. No display-currency filter is imposed on the order population. Existing module permissions still apply; empty selections stay empty.
 
-Downloads require the dashboard's independent export permission. Follow-up exports contain filtered current users and their business-date evidence, relevant current appointments, period users, payment evidence, and scope. Payment exports across all three views preserve original currency/amount, target currency, rate, converted amount and rate version. Reason exports use the same user sets as the displayed distribution. UTC export timestamps and scope allow reconciliation.
+Downloads require the dashboard's independent export permission. Follow-up exports contain filtered current users and their business-date evidence, relevant current appointments, period users, payment evidence, and scope. Payment exports across all three views preserve currency and paid amount, with no target currency, exchange rate, converted amount or rate version. Reason exports use the same user sets as the displayed distribution. UTC export timestamps and scope allow reconciliation.
 
 ## Verification
 
-`pnpm run test:dashboard` covers existing dashboard regressions plus current-stage date rules, rebooking, waiting history, missing dates, UTC+7, future appointments, closure/reopening, both grouping directions, payment dates, same-order currency conversion and missing rates. `pnpm run build` checks types and builds. The deployment workflow also runs App A/B, Phase 5 and outbound checks.
+`pnpm run test:dashboard` covers existing dashboard regressions plus current-stage date rules, rebooking, waiting history, missing dates, UTC+7, future appointments, closure/reopening, both grouping directions, payment dates, local-currency totals, per-currency averages, mixed-currency sorting and raw payment exports. `pnpm run build` checks types and builds. The deployment workflow also runs App A/B, Phase 5 and outbound checks.

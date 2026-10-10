@@ -13,7 +13,7 @@ import { inVietnamRange } from '../dashboardData'
 import { dashboardNumberCompare } from '../dashboardSort'
 import { l2s, type PeopleMetrics } from '../dashboard43'
 import DashboardMoneyCell from './DashboardMoneyCell'
-import { useDashboardCurrency } from './DashboardCurrency'
+import { localMoneySortable, localMoneySortValue } from '../dashboardCurrency'
 
 const copy: Record<string, [string, string]> = {
  leads:['线索数（含已付费）','Leads (including paid)'], called:['外呼人数','Users called'], connected:['接通人数','Users connected'], booked:['预约人数','Users with bookings'], trialCompleted:['体验课完成人数','Trial completed'], paid:['已支付人数','Paid users'], attended:['预约出席人数','Appointment attended'], completed:['咨询完成人数','Consultation completed'], rejected:['电话拒绝人数','Phone-stage rejected'], closedAfter:['咨询后关闭人数','Closed after consultation'], closedUnknown:['历史关闭 · 环节未知','Legacy closure · stage unknown'],
@@ -40,8 +40,7 @@ export type MetricRow43 = { id: string; name: string; metrics: PeopleMetrics; ac
 export function MetricTable43({ rows, total, keys, firstTitle, context, conversion = false, orders, labels = {}, currentKeys, datedCurrent = false }: { rows: MetricRow43[]; total: PeopleMetrics; keys: readonly string[]; firstTitle: string; context: string; conversion?: boolean; orders?: Order[]; labels?: Record<string,string>; currentKeys?: readonly string[]; datedCurrent?:boolean }) {
  const { text, label, count } = useDashboard43()
  const [sortBy, setSortBy] = useState<'amount' | 'averagePerOrder'>('amount')
- const { summary, sortValue } = useDashboardCurrency()
- const moneySortable = summary(orders || []).length <= 1
+ const moneySortable = localMoneySortable(orders || [])
  const rowOrders = (metrics: PeopleMetrics, date?: string) => { const ids = new Set((metrics.leads || metrics.paid || []).map(s => s.studentId)); return (orders || []).filter(o => ids.has(o.studentId) && (!date || inVietnamRange(o.paidTime,date,date))) }
  const metricLabel = (key:string) => labels[key] || label(key)
  const numeric = (metrics: PeopleMetrics, key: string, name = '', date?: string) => date && !datedCurrent && currentKeys?.includes(key) ? <span className="dashboard-not-applicable" title={text('当前快照不按历史日期重复展示','Current snapshot is not repeated for historical dates')}>—</span> : count(metrics[key] || [], `${currentKeys?.includes(key) ? datedCurrent ? `${text('当前状态 · 活动日期','Current status · activity dates')}: ${date || context}` : text('当前状态 · 截至当前','Current status · as of now') : date ? text('活动日期','Activity date') + ': ' + date : context} · ${name} · ${metricLabel(key)}`, key)
@@ -51,7 +50,7 @@ export function MetricTable43({ rows, total, keys, firstTitle, context, conversi
   sorter:(a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(a.activityDate && !datedCurrent && currentKeys?.includes(key) ? null : a.metrics[key]?.length || 0,b.activityDate && !datedCurrent && currentKeys?.includes(key) ? null : b.metrics[key]?.length || 0,order),
   render:(_:unknown,row:MetricRow43) => numeric(row.metrics,key,row.scopeName || row.name,row.activityDate),
  }))
- const moneyColumns = orders ? [{title:moneyTitle,key:'money',width:210,sorter:moneySortable ? (a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(sortValue(rowOrders(a.metrics,a.activityDate),sortBy),sortValue(rowOrders(b.metrics,b.activityDate),sortBy),order) : undefined,render:(_:unknown,row:MetricRow43) => <DashboardMoneyCell orders={rowOrders(row.metrics,row.activityDate)} />}] : []
+ const moneyColumns = orders ? [{title:moneyTitle,key:'money',width:210,sorter:moneySortable ? (a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(localMoneySortValue(rowOrders(a.metrics,a.activityDate),sortBy),localMoneySortValue(rowOrders(b.metrics,b.activityDate),sortBy),order) : undefined,render:(_:unknown,row:MetricRow43) => <DashboardMoneyCell orders={rowOrders(row.metrics,row.activityDate)} />}] : []
  return <Table<MetricRow43> rowKey="id" size="middle" sticky={{ offsetHeader: 94 }} dataSource={rows} pagination={rows.length > 12 ? { pageSize:12,showSizeChanger:false } : false} scroll={{x:190 + keys.length * 135 + (conversion ? 135 : 0) + (orders ? 210 : 0)}} locale={{emptyText:<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={text('当前范围暂无数据','No data in this scope')} />}} columns={[
   {title:firstTitle,dataIndex:'name',fixed:'left',width:190},
   ...(currentKeys ? [

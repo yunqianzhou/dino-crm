@@ -8,7 +8,7 @@ try {
  execFileSync(resolve('node_modules/.bin/tsc'),['src/dashboard43.ts','src/dashboardCurrency.ts','--outDir',tmp,'--module','commonjs','--moduleResolution','node','--target','ES2020','--esModuleInterop','--skipLibCheck'],{stdio:'inherit'})
  symlinkSync(resolve('node_modules'),join(tmp,'node_modules'),'dir')
  const {followupMetrics,datedFollowupMetrics,datedFollowupRows,followupStateEvidence}=require(join(tmp,'dashboard43.js'))
- const {convertedPayment,convertedSummary,convertedSortValue,localCurrency}=require(join(tmp,'dashboardCurrency.js'))
+ const {localPaymentSummary,localMoneySortValue,localMoneySortable,currencyExportHeaders,currencyExportRow}=require(join(tmp,'dashboardCurrency.js'))
  const base={studentId:'a',name:'a',phone:'+84000',account:'a',userType:'正式用户',businessLine:'越南',status:'未付费-未体验',registerTime:'2026-09-01T00:00:00Z',salesOwner:'cc-a'}
  const ap=(id,date,extra={})=>({appointmentId:id,scheduledStartAt:date+' 10:00:00',timezone:'Asia/Ho_Chi_Minh',appointmentStatus:'已预约',attendanceStatus:'待标记',consultationStatus:'待标记',createdAt:'2026-09-08T00:00:00Z',...extra})
  const filters={mode:'period',start:'2026-09-10',end:'2026-09-10',owner:[],userType:'正式用户'}
@@ -52,20 +52,30 @@ try {
    assert.equal(dates.filter(r=>r.metrics.paid.length).length,2,'payment rows use payment dates and retain repeated payer across dates')
   }
  }
- const usd=convertedSummary(paidOrders,'USD',{paid:'VND'})[0]
- assert.equal(usd.amount,2);assert.equal(usd.averagePerOrder,1);assert.equal(usd.averagePerUser,2);assert.equal(usd.users,1);assert.equal(usd.orders.length,2)
- const local=convertedSummary(paidOrders,'local',{paid:'VND'})[0]
- assert.equal(local.amount,50000);assert.equal(local.averagePerOrder,25000);assert.deepEqual(local.orders,usd.orders)
- assert.equal(convertedPayment(paidOrders[1],'local',{paid:'VND'}).rate,25000)
+ const local=localPaymentSummary(paidOrders)
+ assert.equal(local.length,2,'preserve both recorded currencies without conversion')
+ assert.equal(local.find(r=>r.currency==='VND').amount,25000)
+ assert.equal(local.find(r=>r.currency==='USD').amount,1,'original USD remains USD, never relabeled or converted')
  const multi=[...paidOrders,{orderId:'k',studentId:'k',currency:'KRW',paidAmount:1400}]
- assert.equal(convertedSummary(multi,'local',{paid:'VND',k:'KRW'}).length,2)
- assert.equal(convertedSummary(multi,'USD',{paid:'VND',k:'KRW'})[0].amount,3)
- assert.equal(convertedSortValue(multi,'local',{paid:'VND',k:'KRW'},'amount'),null,'never sort by sum of unlike local currencies')
- assert.equal(convertedSortValue(multi,'USD',{},'amount'),3)
- const unknown=convertedSummary([...paidOrders,{orderId:'x',studentId:'paid',currency:'XXX',paidAmount:10}],'USD',{})[0]
- assert.equal(unknown.amount,null);assert.equal(unknown.orders.length,3);assert.equal(unknown.users,1);assert.equal(unknown.missing,1,'missing rate must not hide order or produce partial total')
- assert.equal(localCurrency('越南'),'VND');assert.equal(localCurrency('韩国'),'KRW');assert.equal(localCurrency('未知'),undefined)
- assert.equal(convertedPayment(paidOrders[0],'USD',{}, {USD:1,VND:0}).amount,null)
- assert.equal(paidOrders[0].paidAmount,25000,'conversion never mutates raw money')
- console.log('Current-stage business dates, rebooking, missing dates, UTC+7, payment grouping and local/USD conversion checks passed.')
+ assert.equal(localPaymentSummary(multi).length,3)
+ assert.equal(localMoneySortValue(multi,'amount'),null,'never add unlike local currencies for sorting')
+ assert.equal(localMoneySortable(multi),false)
+ const same=[paidOrders[0],{...paidOrders[0],orderId:'p3',paidAmount:75000}]
+ const vnd=localPaymentSummary(same)[0]
+ assert.equal(vnd.amount,100000);assert.equal(vnd.averagePerOrder,50000);assert.equal(vnd.averagePerUser,100000)
+ assert.equal(vnd.orders.length,2);assert.equal(vnd.users,1)
+ assert.equal(localMoneySortable(same),true);assert.equal(localMoneySortValue(same,'amount'),100000)
+ assert.equal(localMoneySortValue(same,'averagePerOrder'),50000)
+ assert.equal(localMoneySortValue(same,'averagePerUser'),100000)
+ const unknownOrder={...paidOrders[0],orderId:'missing',currency:''}
+ const unknown=localPaymentSummary([unknownOrder])[0]
+ assert.equal(unknown.amount,null);assert.equal(unknown.averagePerOrder,null);assert.equal(unknown.orders.length,1)
+ assert.equal(localMoneySortable([unknownOrder]),false)
+ assert.equal(localMoneySortValue([],'amount'),0);assert.equal(localMoneySortValue([],'averagePerUser'),null)
+ assert.deepEqual(currencyExportHeaders,['Currency','Paid amount'])
+ assert.deepEqual(currencyExportRow(paidOrders[0]),['VND',25000])
+ assert.deepEqual(currencyExportRow(paidOrders[1]),['USD',1])
+ assert.deepEqual(currencyExportRow(unknownOrder),['Currency not recorded',25000])
+ assert.equal(paidOrders[0].paidAmount,25000,'display never mutates raw money')
+ console.log('Current-stage dates, rebooking, UTC+7, payment grouping, local-currency totals, averages, sorting and exports passed.')
 }finally{rmSync(tmp,{recursive:true,force:true})}
