@@ -3,6 +3,8 @@ const { mkdtempSync, symlinkSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
 const { resolve, join } = require('node:path')
 const { execFileSync } = require('node:child_process')
+// These date-boundary fixtures model a browser in Vietnam.
+process.env.TZ = 'Asia/Ho_Chi_Minh'
 const temp = mkdtempSync(join(tmpdir(), 'crm-outbound-'))
 try {
   execFileSync(resolve('node_modules/.bin/tsc'), ['src/outbound.ts','src/dashboard43.ts','--outDir',temp,'--module','commonjs','--moduleResolution','node','--target','ES2020','--esModuleInterop','--skipLibCheck'], {stdio:'inherit'})
