@@ -9,7 +9,7 @@ import { useDashboardText } from '../dashboardText'
 import { useStore } from '../store'
 import { Export43, useDashboard43 } from './Dashboard43Shared'
 import DashboardMoneyCell from './DashboardMoneyCell'
-import { exportMoney, exportMoneyHeaders } from '../dashboardExport'
+import { orderDetailSheet } from '../dashboardDetailExport'
 import { localMoneySortable, localMoneySortValue } from '../dashboardCurrency'
 
 type Props = { population: Student[]; orders: Order[]; filters: DashboardFilters; rangeLabel: string }
@@ -38,12 +38,7 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
  return <Card title={d('revenueTitle')} className="dashboard-payments" extra={<span className="dashboard-section-note">{d('paidDate')} · {rangeLabel} · {dashboardTimeZone()}</span>}>
   <p className="dashboard-help">{text('按支付日期统计当前业务线的有效订单，展示本地货币实付金额及均值。','Valid orders in the selected business line are counted by payment date, with amounts and averages in local currency.')}</p>
   <div className="dashboard-table-tools">
-   <Export43 name="payments" disabled={!matchingOrders.length} scope={[[text('支付日期范围','Payment dates'),rangeLabel],[text('分组方式','Grouping'),grouping==='date'?text('支付日期 → 当前 CC','Payment date → Current CC'):text('当前 CC','Current CC')]]} sheets={()=>{
-    const values=(subset:Order[])=>exportMoney(subset,text,true).map(m=>[subset.length,users(subset),...m])
-    const data:unknown[][]=values(matchingOrders).map(v=>[text('整体汇总','Overall summary'),text('所选范围','Selected scope'),text('所选范围','Selected scope'),...v])
-    for(const row of rows){data.push(...values(row.orders).map(v=>[text('一级分组','Primary group'),grouping==='date'?row.name:'—',grouping==='cc'?row.name:'—',...v]));for(const child of row.children||[])data.push(...values(child.orders).map(v=>[text('二级分组','Secondary group'),row.name,child.name,...v]))}
-    return [{name:text('支付结果','Payment results'),headers:[text('行类型','Row type'),d('paidDate'),d('currentCC'),d('paidOrders'),d('paidUsers'),...exportMoneyHeaders(text,true)],rows:data}]
-   }}/>
+   <Export43 name="payments" disabled={!matchingOrders.length} scope={[[text('支付日期范围','Payment dates'),rangeLabel],[text('分组方式','Grouping'),grouping==='date'?text('支付日期 → 当前 CC','Payment date → Current CC'):text('当前 CC','Current CC')]]} sheets={()=>[orderDetailSheet(population,matchingOrders,{text,ownerName,calls:[]})]}/>
    <Segmented value={grouping} onChange={v=>changeGroup(String(v))} options={[{value:'cc',label:d('ccTitle')},{value:'date',label:d('paidDate')}]}/>
   </div>
   <div className="dashboard-payment-totals">

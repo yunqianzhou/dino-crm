@@ -16,6 +16,6 @@ Updated 2026-10-10. Current product rules are maintained in [management-dashboar
 
 ## Regression coverage
 
-`pnpm run test:dashboard` runs legacy checks, `scripts/test-dashboard43.cjs`, and `scripts/test-dashboard-current-dates.cjs`. The latter verifies the 10th-to-12th rebooking example, current-state date selection, stage-entry history, missing dates, future appointments, browser timezones and daylight-saving changes, closure/reactivation, CC/date hierarchies, local-currency totals and averages, mixed-currency sorting, and statistical exports. Build/type checks and actual browser interactions supplement these data-rule tests.
+`pnpm run test:dashboard` runs legacy checks, `scripts/test-dashboard43.cjs`, and `scripts/test-dashboard-current-dates.cjs`. The latter verifies the 10th-to-12th rebooking example, current-state date selection, stage-entry history, missing dates, future appointments, browser timezones and daylight-saving changes, closure/reactivation, CC/date hierarchies, local-currency totals and averages, mixed-currency sorting, and user/event detail exports. Build/type checks and actual browser interactions supplement these data-rule tests.
 
 All date filters, daily grouping, presets and exported timestamps use the browser timezone, including daylight saving. See `management-dashboard.md` for exact download headers.

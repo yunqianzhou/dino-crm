@@ -87,11 +87,11 @@ export function Export43({ name, sheets, disabled = false, scope: scopeRows = []
    [text('统计时区','Reporting timezone'),dashboardTimeZone()],
    [text('页面统计时间','Page calculated time'),dashboardTimestamp(snapshotAt)],
    [text('导出时间','Exported time'),dashboardTimestamp(dayjs.utc().toISOString())],
-   [text('下载范围','Export range'),text('全部分组及子行，不受分页、展开或排序截断','All groups and children, independent of pagination, expansion and sorting')],
-   [text('合计核对','Reconciliation'),text('各指标独立去重；合计、父行、子行不能一起累加；比例及均值不得相加','Metrics deduplicate independently; never add totals, parent rows and children together, or sum rates and averages')],
+   [text('下载范围','Export range'),text('当前权限与筛选范围内的全部用户和业务记录，不受分页、展开或排序截断','All matching users and business records within permissions, independent of pagination, expansion and sorting')],
+   [text('合计核对','Reconciliation'),text('用户指标 0/1 求和核对人数；业务记录按用户 ID 去重核对人数，订单实付金额求和核对金额；禁止跨明细表直接联表累加','Sum user 0/1 flags for counts; deduplicate record users for people counts and sum order amounts for revenue; never multiply totals by joining detail sheets')],
   ]
   const allSheets = [...sheets(),{name:text('筛选条件','Filters'),headers:[text('项目','Item'),text('内容','Value')],rows:businessRows}]
-  allSheets.forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(() => ({wch:24})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
+  allSheets.forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(header => ({wch:/时间|time|until/i.test(header)?32:/备注|note|内容|value/i.test(header)?48:/ID|账号|account/i.test(header)?30:26})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
   XLSX.writeFile(workbook,`${name}.xlsx`)
- }}>{text('下载数据','Download data')}</Button>
+ }}>{text('下载明细','Download details')}</Button>
 }
