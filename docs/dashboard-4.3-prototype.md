@@ -11,7 +11,7 @@ Updated 2026-10-10. Current product rules are maintained in [management-dashboar
 - Both follow-up tables support CC/date hierarchies independently. Follow-up date rows show matching current-state counts; Calling date rows show dashes for current snapshots. Payment counts and amounts use payment dates throughout.
 - Closed and rejected reason panels reconcile with their respective current user sets. Activity dates affect closed reasons only.
 - Amounts use recorded local currency and paid amount. There is no currency selector or currency conversion. Different currencies have separate totals and averages; mixed-currency monetary sorting is disabled.
-- Exact user/order drilldowns, shared permissions, totals, sorting, date memory, grouping memory, and raw XLSX downloads remain. Downloads include business-date and recorded currency/amount payment evidence.
+- All metric numbers are display-only, including totals, child rows, reasons and calling-route counts. Numeric drilldowns and detail modals are removed. Shared permissions, totals, sorting, date memory, grouping memory, and each section’s raw XLSX downloads remain. Downloads include business-date and recorded currency/amount payment evidence.
 - Payment results summarize amount, users, paid order count, AOV and amount per payer in five top cards. The grouped payment detail table has no duplicate total row. Other tables keep their existing totals.
 
 ## Regression coverage

@@ -2,13 +2,12 @@ import { salesBusinessLineOptions } from '../channel'
 import { useState } from 'react'
 import { Button, Empty, Select, Table } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
 import { useStore } from '../store'
 import type { Order, Student } from '../types'
-import { dashboardListScope, dashboardMetricDestination } from '../dashboardNavigation'
 import { inVietnamRange } from '../dashboardData'
 import { dashboardNumberCompare } from '../dashboardSort'
 import { l2s, type PeopleMetrics } from '../dashboard43'
@@ -25,15 +24,12 @@ export function useDashboard43() {
  const { lang, t } = useI18n()
  const { can } = usePerm()
  const accounts = useStore(s => s.accounts)
- const navigate = useNavigate()
- const location = useLocation()
  const text = (zh: string, en: string) => lang === 'zh' || lang === 'zhTW' ? zh : en
  const label = (key: string) => copy[key] ? text(...copy[key]) : key
  const ownerName = (id: string) => id === '__unassigned__' ? text('未分配','Unassigned') : accounts.find(a => a.email === id)?.name || id
- const open = (users: Student[], description: string, metric = 'leads') => navigate(dashboardMetricDestination(metric).path, { state: { dashboardReturn: location.pathname + location.search, dashboardScope: dashboardListScope(description, users) } })
- const count = (users: Student[], description: string, metric = 'leads') => can(dashboardMetricDestination(metric).module) === 'none' ? <span>{users.length}</span> : <button className="dashboard-count" aria-label={`${description} · ${users.length}`} onClick={() => open(users, description, metric)}>{users.length.toLocaleString()}</button>
+ const count = (users: Student[]) => <span className="dashboard-value">{users.length.toLocaleString()}</span>
  const reason = (id: string) => id === '__unknown__' ? text('未记录 / 历史未知','Not recorded / legacy unknown') : t(`sales.consultation.reasonOption.${id}`) === `sales.consultation.reasonOption.${id}` ? id : t(`sales.consultation.reasonOption.${id}`)
- return { text, label, ownerName, open, count, reason, can }
+ return { text, label, ownerName, count, reason, can }
 }
 export const rateText = (value: number | null) => value === null ? '—' : `${Number(value.toFixed(1))}%`
 export type MetricRow43 = { id: string; name: string; metrics: PeopleMetrics; activityDate?: string; scopeName?: string; children?: MetricRow43[] }
@@ -43,12 +39,12 @@ export function MetricTable43({ rows, total, keys, firstTitle, context, conversi
  const moneySortable = localMoneySortable(orders || [])
  const rowOrders = (metrics: PeopleMetrics, date?: string) => { const ids = new Set((metrics.leads || metrics.paid || []).map(s => s.studentId)); return (orders || []).filter(o => ids.has(o.studentId) && (!date || inVietnamRange(o.paidTime,date,date))) }
  const metricLabel = (key:string) => labels[key] || label(key)
- const numeric = (metrics: PeopleMetrics, key: string, name = '', date?: string) => date && !datedCurrent && currentKeys?.includes(key) ? <span className="dashboard-not-applicable" title={text('当前快照不按历史日期重复展示','Current snapshot is not repeated for historical dates')}>—</span> : count(metrics[key] || [], `${currentKeys?.includes(key) ? datedCurrent ? `${text('当前状态 · 活动日期','Current status · activity dates')}: ${date || context}` : text('当前状态 · 截至当前','Current status · as of now') : date ? text('活动日期','Activity date') + ': ' + date : context} · ${name} · ${metricLabel(key)}`, key)
+ const numeric = (metrics: PeopleMetrics, key: string, date?: string) => date && !datedCurrent && currentKeys?.includes(key) ? <span className="dashboard-not-applicable" title={text('当前快照不按历史日期重复展示','Current snapshot is not repeated for historical dates')}>—</span> : count(metrics[key] || [])
  const moneyTitle = <div className="dashboard-money-header"><span>{text('实付金额 / AOV','Amount paid / AOV')}</span><div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}><Select aria-label={text('金额排序依据','Money sort metric')} size="small" value={sortBy} onChange={setSortBy} options={[{ value:'amount', label:text('按金额','By revenue') },{value:'averagePerOrder',label:text('按 AOV','By AOV')}]} /></div></div>
  const metricColumns = (selectedKeys: readonly string[]) => selectedKeys.map(key => ({
   title:metricLabel(key), key, width:135,
   sorter:(a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(a.activityDate && !datedCurrent && currentKeys?.includes(key) ? null : a.metrics[key]?.length || 0,b.activityDate && !datedCurrent && currentKeys?.includes(key) ? null : b.metrics[key]?.length || 0,order),
-  render:(_:unknown,row:MetricRow43) => numeric(row.metrics,key,row.scopeName || row.name,row.activityDate),
+  render:(_:unknown,row:MetricRow43) => numeric(row.metrics,key,row.activityDate),
  }))
  const moneyColumns = orders ? [{title:moneyTitle,key:'money',width:210,sorter:moneySortable ? (a:MetricRow43,b:MetricRow43,order?:'ascend'|'descend'|null) => dashboardNumberCompare(localMoneySortValue(rowOrders(a.metrics,a.activityDate),sortBy),localMoneySortValue(rowOrders(b.metrics,b.activityDate),sortBy),order) : undefined,render:(_:unknown,row:MetricRow43) => <DashboardMoneyCell orders={rowOrders(row.metrics,row.activityDate)} />}] : []
  return <Table<MetricRow43> rowKey="id" size="middle" sticky={{ offsetHeader: 94 }} dataSource={rows} pagination={rows.length > 12 ? { pageSize:12,showSizeChanger:false } : false} scroll={{x:190 + keys.length * 135 + (conversion ? 135 : 0) + (orders ? 210 : 0)}} locale={{emptyText:<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={text('当前范围暂无数据','No data in this scope')} />}} columns={[

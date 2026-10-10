@@ -10,13 +10,12 @@ type Props = {
   sources: string[]
   rowName: (row: CohortRow) => string
   sourceName: (source: string) => string
-  onOpen: (row: CohortRow) => void
 }
 
-export default function DashboardCohortMatrix({ title, help, rowTitle, rows, sources, rowName, sourceName, onOpen }: Props) {
+export default function DashboardCohortMatrix({ title, help, rowTitle, rows, sources, rowName, sourceName }: Props) {
   const d = useDashboardText()
   const cell = (row?: CohortRow) => row
-    ? <button className="dashboard-count" onClick={() => onOpen(row)} aria-label={`${title} · ${rowName(row)} · ${row.metrics.leads.length}`}>{row.metrics.leads.length}</button>
+    ? <span className="dashboard-value">{row.metrics.leads.length.toLocaleString()}</span>
     : <span className="dashboard-zero">0</span>
   return <Card title={title} className="dashboard-source-matrix">
     <p className="dashboard-help">{help}</p>

@@ -35,7 +35,7 @@ export default function DashboardConversion43({ population,calls,lessons,orders,
   <div className="dashboard-funnel-meta"><Tag color="blue">{context}</Tag><span>{text('截至当前 · 各环节按用户去重','As of now · unique users at each step')}</span></div>
   <div className="dashboard-funnel-layout"><div className="dashboard-funnel-bars">{FUNNEL_KEYS.map((key,index)=><div className={`dashboard-funnel-step step-${index}`} key={key}>
    <div className="dashboard-funnel-label"><small>{String(index+1).padStart(2,'0')}</small><span>{label(key)}</span></div>
-   {count(metrics[key],`${context} · ${label(key)}`,key)}
+   {count(metrics[key])}
    <div className="dashboard-funnel-track"><div style={{height:`${metrics.leads.length?metrics[key].length/metrics.leads.length*100:0}%`}} /></div>
   </div>)}</div><aside className="dashboard-l2s-panel"><span>{text('线索 → 付费转化率','Lead-to-paid conversion')}</span><strong>{rateText(l2s(metrics))}</strong><b>L2S</b><small>{metrics.paid.length} / {metrics.leads.length}</small><span>{text('已支付人数 ÷ 线索数','Paid users ÷ leads')}</span></aside></div>
   <p className="dashboard-help dashboard-bottom-note">{text('同一注册批次可跳过部分环节，人数不强制递减。体验课完成来自课程记录，与销售预约出席分别统计。','Users in the same cohort may skip steps. Trial completion comes from lesson records; appointment attendance is counted separately.')}</p>

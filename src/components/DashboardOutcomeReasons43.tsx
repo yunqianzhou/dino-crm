@@ -26,8 +26,8 @@ export default function DashboardOutcomeReasons43({ users, metric, dateScope }: 
   <p className="dashboard-help">{dateScope ? text(`按上方已结束人数拆分，按最近结束日期筛选：${dateScope}；每人一个当前原因。`,`Breakdown of current closed users by latest closure date: ${dateScope}; one current reason per user.`) : text('按上方当前状态人数拆分，沿用当前 CC 筛选，不受活动日期影响；每人计入一个原因，未记录原因单独列出。', 'Breakdown of the current status count, using the current CC filter regardless of activity dates. Each user has one reason; missing reasons are listed separately.')}</p>
   <Table rowKey="reason" size="small" pagination={false} dataSource={rows} scroll={{ x: 480 }} locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={text('当前范围暂无对应用户', 'No matching users in this scope')} /> }} columns={[
    { title: text('原因', 'Reason'), dataIndex: 'reason', width: '45%', render: reasonLabel },
-   { title: text('人数', 'Users'), key: 'users', width: 100, sorter: (a, b) => a.users.length - b.users.length, render: (_, row) => count(row.users, `${title} · ${reasonLabel(row.reason)}`, metric) },
+   { title: text('人数', 'Users'), key: 'users', width: 100, sorter: (a, b) => a.users.length - b.users.length, render: (_, row) => count(row.users) },
    { title: text('占比', 'Share'), key: 'share', render: (_, row) => <div className="dashboard-reason-share"><Progress percent={row.share} showInfo={false} size="small" strokeColor={metric === '已拒绝' ? '#d99545' : '#8091a8'} /><span>{rateText(row.share)}</span></div> },
-  ]} summary={() => <Table.Summary.Row><Table.Summary.Cell index={0}>{text('合计（去重）', 'Total (unique users)')}</Table.Summary.Cell><Table.Summary.Cell index={1}>{count(people, title, metric)}</Table.Summary.Cell><Table.Summary.Cell index={2}>{people.length ? '100%' : '—'}</Table.Summary.Cell></Table.Summary.Row>} />
+  ]} summary={() => <Table.Summary.Row><Table.Summary.Cell index={0}>{text('合计（去重）', 'Total (unique users)')}</Table.Summary.Cell><Table.Summary.Cell index={1}>{count(people)}</Table.Summary.Cell><Table.Summary.Cell index={2}>{people.length ? '100%' : '—'}</Table.Summary.Cell></Table.Summary.Row>} />
  </section>
 }

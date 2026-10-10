@@ -4,7 +4,7 @@ Updated 2026-10-10. Route: `#/management-dashboard`. Shared synthetic prototype 
 
 ## Views and shared filters
 
-Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a searchable, clearable single selection; current CC remains multi-select. Clearing business line selects all permitted lines, and changing it clears the selected CCs. Legacy links with multiple business lines use only the first specified line. Business line, current CC and permissions are shared. Each view remembers its own date range; grouping survives list drilldown and return. Source, purchase-intent, age and registration-age grouping controls are hidden.
+Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a searchable, clearable single selection; current CC remains multi-select. Clearing business line selects all permitted lines, and changing it clears the selected CCs. Legacy links with multiple business lines use only the first specified line. Business line, current CC and permissions are shared. Each view remembers its own date range; grouping is retained across view switches. Source, purchase-intent, age and registration-age grouping controls are hidden.
 
 All business dates use UTC+7 after interpreting the record's timezone. Current CC means current ownership, not historical operator attribution. Formal eligible users and current permissions determine the population; test users are excluded.
 
@@ -49,13 +49,15 @@ Amounts use the currency and paid amount recorded on each order. There is no cur
 
 Orders must be currently paid, have a valid payment timestamp and finite positive paid amount. Refunds, cancelled, pending and zero-value orders are excluded. A profile's paid flag cannot substitute for order evidence. Original orders and amounts are unchanged.
 
-Payment results show five top-level cards: amount paid, paid users, paid orders, AOV, and amount per payer. The paid-orders card opens the same qualifying order set in Order Center. The payment detail table shows grouped records only, with no repeated total row; the cards summarize the full selection independently of sorting, expansion and pagination.
+Payment results show five top-level cards: amount paid, paid users, paid orders, AOV, and amount per payer. All five card values are plain display text; the payment download contains the qualifying order details. The payment detail table shows grouped records only, with no repeated total row; the cards summarize the full selection independently of sorting, expansion and pagination.
 
 Money/AOV sorting uses unrounded recorded values within a single known currency. Multiple currencies cannot form one ranking, so monetary sorting is disabled in mixed-currency selections. Unavailable values sort last in either direction. Other dashboard tables retain their pinned totals, recalculated from the full selected population outside sorting and pagination.
 
-## Details and raw downloads
+## Display-only metrics and raw downloads
 
-Ordinary lead/status counts open Sales Center with exact clicked user IDs; paid-user counts open User Center. Payment order counts, amount and averages open Order Center with exact original order IDs. No display-currency filter is imposed on the order population. Existing module permissions still apply; empty selections stay empty.
+Every business metric is display-only, including funnel counts, summary cards, table totals and child rows, reason counts and shares, order counts, money/averages, and calling system/route counts and durations. Metric values have no link, button, click handler, keyboard action or detail modal, regardless of access to Sales, User or Order Centers. Sorting, expansion, pagination, filters and view selection remain interactive.
+
+Details are available through each section’s existing downloads: conversion funnel/details, current lead inventory, calling, follow-up, rejection/closure reasons, payments, and the calling-system/route call-detail download. Downloads reconcile with the same metric populations and scopes; sorting, pagination and expansion do not truncate them.
 
 Downloads require the dashboard's independent export permission. Follow-up exports contain filtered current users and their business-date evidence, relevant current appointments, period users, payment evidence, and scope. Payment exports across all three views preserve currency and paid amount, with no target currency, exchange rate, converted amount or rate version. Reason exports use the same user sets as the displayed distribution. UTC export timestamps and scope allow reconciliation.
 
