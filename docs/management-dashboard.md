@@ -6,7 +6,7 @@ Updated 2026-10-10. Route: `#/management-dashboard`. Shared synthetic prototype 
 
 Three views: registration-cohort conversion, sales follow-up, and payments. Business line is a required searchable single selection; current CC remains multi-select. When no business line is supplied, select the first option after filtering the existing Sales Center option order by the account’s data permissions. There is no All business lines or clear option. Reset selects that first permitted line and clears CC and current-view dates; changing the line clears selected CCs. An explicit invalid or unauthorized URL selection produces empty data, never a broader default. No permitted options means an empty disabled selector and no data. Legacy links with multiple business lines use only the first specified line. Page data and export scope use the same resolved single line, including when the URL initially has no line parameter. Business line, current CC and permissions are shared. Each view remembers its own date range; grouping is retained across view switches. Source, purchase-intent, age and registration-age grouping controls are hidden.
 
-All business dates use UTC+7 after interpreting the record's timezone. Current CC means current ownership, not historical operator attribution. Formal eligible users and current permissions determine the population; test users are excluded.
+All dashboard dates, date presets, filters, grouping and exported timestamps use the signed-in user’s browser timezone, including daylight-saving rules. Interpret the record’s original timezone/offset before converting the instant; do not infer the reporting timezone from its business line. Current CC means current ownership, not historical operator attribution. Formal eligible users and current permissions determine the population; test users are excluded.
 
 ## Conversion overview
 
@@ -18,11 +18,11 @@ Money includes qualifying payments after registration through now for the same c
 
 Current lead overview and Calling current-state columns remain current snapshots independent of activity dates. Calling period counts use actual call dates. Calling date rows show a dash for current-state columns.
 
-Follow-up first resolves the same current status as Sales Center, then filters and groups by the business date for that status:
+Waiting is the only Current status column and is independent of activity dates. The other columns belong to Selected period; they resolve the same current status as Sales Center, then filter and group by the applicable business date:
 
 | Column | Business date |
 | --- | --- |
-| Waiting to book | Most recent entry into this stage |
+| Waiting to book | Current snapshot; no date filtering or date grouping |
 | Booked | Current appointment's scheduled lesson date |
 | No-show | Scheduled date of the session associated with the current no-show state |
 | Consultation incomplete / complete | Scheduled date of the session associated with the current state |
@@ -31,9 +31,9 @@ Follow-up first resolves the same current status as Sales Center, then filters a
 
 Example: a user misses the lesson on the 10th. Before rebooking, selecting the 10th shows no-show. After rebooking to the 12th, the 10th shows nothing and the 12th shows booked. Selecting both days counts the user once as booked. The old absence remains in user history; this table does not accumulate historical states.
 
-Repeated notes or connections do not reset waiting-entry time. Production needs actual stage-transition timestamps. Prototype evidence uses confirmed transitions in consecutive stage-history records, explicit cancellation/reactivation events, and first completed connected calls. It never substitutes registration time, arbitrary last-update time, or today. Missing business dates appear only under All dates in a separate missing-date group. Future scheduled dates are eligible; an elapsed appointment alone does not establish a no-show.
+Waiting does not require a stage-entry date. Missing business dates for period states appear only under All dates in a separate missing-date group. Future scheduled dates are eligible; an elapsed appointment alone does not establish a no-show.
 
-Both comparison tables independently support CC → activity date, activity date → CC, only CC, and only date. Follow-up date rows contain actual matching current-state counts. Each user belongs to one current follow-up state/date. Paid users are independently deduplicated per day and across the selected period; the same payer can appear on multiple payment dates. Amounts and order counts sum by payment date. Do not add status and paid columns horizontally.
+Both comparison tables independently support CC → activity date, activity date → CC, only CC, and only date. Follow-up date rows show a dash for waiting and actual values for period columns. Each user belongs to one current follow-up state; waiting is not repeated by date. Paid users are independently deduplicated per day and across the selected period; the same payer can appear on multiple payment dates. Amounts and order counts sum by payment date. Do not add status and paid columns horizontally.
 
 Closed reasons use the same date-filtered current closed users as the table. Rejected reasons remain attached to the date-independent current rejected users. Changing grouping does not change either population.
 
@@ -53,18 +53,31 @@ Payment results show five top-level cards: amount paid, paid users, paid orders,
 
 Money/AOV sorting uses unrounded recorded values within a single known currency. Multiple currencies cannot form one ranking, so monetary sorting is disabled in mixed-currency selections. Unavailable values sort last in either direction. Other dashboard tables retain their pinned totals, recalculated from the full selected population outside sorting and pagination.
 
-## Display-only metrics and raw downloads
+## Display-only metrics and statistical downloads
 
-Every business metric is display-only, including funnel counts, summary cards, table totals and child rows, reason counts and shares, order counts, money/averages, and calling system/route counts and durations. Metric values have no link, button, click handler, keyboard action or detail modal, regardless of access to Sales, User or Order Centers. Sorting, expansion, pagination, filters and view selection remain interactive.
+All metric numbers remain display-only. The funnel has no download button; conversion details is the only conversion download entry. Every download now contains the same statistics as its page table, plus a Filters sheet (Item, Value). Raw user, call, booking, lesson and order evidence sheets are no longer exported. Downloading includes all filtered primary groups and enabled secondary groups regardless of sorting, pagination or expansion.
 
-Details are available through each section’s existing downloads: conversion funnel/details, current lead inventory, calling, follow-up, rejection/closure reasons, payments, and the calling-system/route call-detail download. Downloads reconcile with the same metric populations and scopes; sorting, pagination and expansion do not truncate them.
+Group tables identify Total, Primary group and Secondary group rows; never sum them together. Date and Current CC columns stay in that order for either grouping direction. Waiting is the only current snapshot in the follow-up table; its total and CC rows ignore date filters, and dated rows show a dash. All other follow-up columns belong to Selected period and use their existing business dates; payments always use payment dates.
 
-Downloads require the dashboard's independent export permission. Follow-up exports contain filtered current users and their business-date evidence, relevant current appointments, period users, payment evidence, and scope. Payment exports across all three views preserve currency and paid amount, with no target currency, exchange rate, converted amount or rate version. Reason exports use the same user sets as the displayed distribution. UTC export timestamps and scope allow reconciliation.
+Filters record business line, permission intersection, CC names/accounts, date scope, grouping, formal-user scope, browser IANA timezone, local calculation/export timestamps and reconciliation rules. Downloads keep the independent dashboard export permission.
 
 ## Verification
 
-`pnpm run test:dashboard` covers existing dashboard regressions plus current-stage date rules, rebooking, waiting history, missing dates, UTC+7, future appointments, closure/reopening, both grouping directions, payment dates, local-currency totals, per-currency averages, mixed-currency sorting and raw payment exports. `pnpm run build` checks types and builds. The deployment workflow also runs App A/B, Phase 5 and outbound checks.
+`pnpm run test:dashboard` covers existing dashboard regressions plus current-stage date rules, rebooking, waiting history, missing dates, browser timezones and daylight-saving changes, future appointments, closure/reopening, both grouping directions, payment dates, local-currency totals, per-currency averages, mixed-currency sorting, statistical exports and page-value reconciliation. `pnpm run build` checks types and builds. The deployment workflow also runs App A/B, Phase 5 and outbound checks.
 
 ## Vietnam and Malaysia demonstration records
 
-A one-time additive fixture update provides 96 additional Vietnamese users and 100 Malaysian users, with assigned CCs, unassigned leads, calls, bookings, completed trial lessons and current follow-up outcomes. It adds 18 paid Vietnamese orders in VND and 20 paid Malaysian orders in MYR, plus pending, canceled and refunded examples. All contacts are synthetic, records are marked Demo, and linked evidence is shared with the other CRM pages and raw downloads. Existing records, edits and deliberate deletions remain intact on refresh. Dates are anchored to the first load of this fixture update.
+A one-time additive fixture update provides 96 additional Vietnamese users and 100 Malaysian users, with assigned CCs, unassigned leads, calls, bookings, completed trial lessons and current follow-up outcomes. It adds 18 paid Vietnamese orders in VND and 20 paid Malaysian orders in MYR, plus pending, canceled and refunded examples. All contacts are synthetic, records are marked Demo, and linked evidence is shared with the other CRM pages and the dashboard statistics. Existing records, edits and deliberate deletions remain intact on refresh. Dates are anchored to the first load of this fixture update.
+
+## Download column templates
+
+Each file contains the named data sheet and Filters. Headers below are in exact Chinese export order. Dates use the browser timezone. Missing/non-applicable values use —; actual zeros remain 0.
+
+- **转化明细** (`conversion-details.xlsx`): 行类型、注册日期、当前 CC、线索数（含已付费）、外呼人数、接通人数、预约人数、体验课完成人数、已支付人数、L2S、币种、实付金额、平均订单金额（AOV）。
+- **当前线索概况** (`followup-current.xlsx`): 当前 CC、当前销售线索、已分配、未分配、已拒绝、已结束、暂不跟进。
+- **外呼情况** (`followup-calls.xlsx`): 行类型、活动日期、当前 CC、待外呼、未接通 · 待跟进、已拒绝、外呼人数、接通人数。
+- **跟进情况** (`followup-followup.xlsx`): 行类型、活动日期、当前 CC、待预约、已预约、未出勤、咨询未完成、咨询已完成、已结束、已支付、币种、实付金额、平均订单金额（AOV）。
+- **支付结果** (`payments.xlsx`): 行类型、支付日期、当前 CC、已支付订单、已支付用户、币种、实付金额、平均订单金额（AOV）、人均支付金额。
+- **已拒绝原因分布** (`rejection-reasons.xlsx`): 原因、人数、占比。
+- **已结束原因分布** (`closure-reasons.xlsx`): 原因、人数、占比。
+- **外呼系统与线路** (`calling-routes.xlsx`): 外呼系统、线路、通话次数、外呼人数、接通次数、接通人数、接通时长（秒）。

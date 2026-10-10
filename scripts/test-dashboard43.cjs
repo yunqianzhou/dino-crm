@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Ho_Chi_Minh' // Explicit viewer timezone for these fixed-date fixtures.
 const assert = require('node:assert/strict')
 const { mkdtempSync, symlinkSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')

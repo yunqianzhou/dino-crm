@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Ho_Chi_Minh' // Explicit viewer timezone for these fixed-date fixtures.
 const assert=require('node:assert/strict')
 const {mkdtempSync,symlinkSync,rmSync}=require('node:fs')
 const {tmpdir}=require('node:os')
@@ -22,7 +23,8 @@ try {
  const waiting={...base,salesHistory:[{stage5:'已接通待预约',time:'2026-09-09T00:00:00Z'},{stage5:'已接通待预约',time:'2026-09-08T00:00:00Z'},{stage5:'已预约',time:'2026-09-07T00:00:00Z'}]}
  const calls=[{studentId:'a',result:'已接通',time:'2026-09-02T00:00:00Z'},{studentId:'a',result:'已接通',time:'2026-09-09T00:00:00Z'}]
  assert.equal(filtered(waiting,'2026-09-08',calls)['已接通待预约'].length,1,'latest stage entry, not last follow-up note')
- assert.equal(filtered(waiting,'2026-09-09',calls)['已接通待预约'].length,0)
+ assert.equal(filtered(waiting,'2026-09-09',calls)['已接通待预约'].length,1,'waiting snapshot does not follow activity date filters')
+ assert.equal(filtered(waiting,'2026-10-01',calls)['已接通待预约'].length,1,'waiting remains visible outside its entry date')
  assert.equal(followupStateEvidence(base,calls,'已接通待预约').date,'2026-09-02','repeated connections do not reset uninterrupted waiting')
  assert.equal(followupStateEvidence({...base,salesHistory:waiting.salesHistory.slice(0,2)},calls,'已接通待预约').date,'2026-09-02','notes without a previous different stage cannot override the original connected date')
  const cancel={...base,salesLifecycleEvents:[{node:'appointment',result:'已取消预约',occurredAt:'2026-09-08T17:00:00Z',reportedAt:'2026-09-09T00:00:00Z'}]}
@@ -52,6 +54,12 @@ try {
    assert.equal(dates.filter(r=>r.metrics.paid.length).length,2,'payment rows use payment dates and retain repeated payer across dates')
   }
  }
+ const waitingCurrent={'已接通待预约':[waiting]}
+ const waitingCC=datedFollowupRows(waitingCurrent,[],[waiting],calls,'cc',true)
+ assert.equal(waitingCC.length,1,'CC with only waiting users is retained')
+ assert.equal(waitingCC[0].metrics['已接通待预约'].length,1)
+ assert.deepEqual(waitingCC[0].children,[],'waiting must not create dated child rows')
+ assert.deepEqual(datedFollowupRows(waitingCurrent,[],[waiting],calls,'date',true),[],'waiting creates no historical date groups')
  const local=localPaymentSummary(paidOrders)
  assert.equal(local.length,2,'preserve both recorded currencies without conversion')
  assert.equal(local.find(r=>r.currency==='VND').amount,25000)

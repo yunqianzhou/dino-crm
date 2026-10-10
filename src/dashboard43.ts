@@ -1,9 +1,10 @@
+import { dashboardTimeZone } from './dashboardTime'
 import { isCompletedCall } from './outbound'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
 import type { CallRecord, LessonRecord, Order, SalesAppointment, SalesLifecycleEvent, Student } from './types'
-import { dashboardOwnerIds, dashboardGroupRows, inVietnamRange, isDashboardPaidOrder, type DashboardFilters, type DashboardGrouping } from './dashboardData'
+import { dashboardOwnerIds, dashboardGroupRows, inDashboardRange, isDashboardPaidOrder, type DashboardFilters, type DashboardGrouping } from './dashboardData'
 import { currentAppointment, followStage5, followReason5 } from './salesLifecycle'
 import { isSalesLead } from './funnel'
 import { resolveUserType } from './userType'
@@ -21,7 +22,7 @@ export function scopedPeople(population: Student[], filters: DashboardFilters) {
   return uniquePeople(population.filter(s => resolveUserType(s) === '正式用户' && (!owners.length || owners.includes(s.salesOwner || '__unassigned__'))))
 }
 export function cohortFunnel(population: Student[], calls: CallRecord[], lessons: LessonRecord[], orders: Order[], filters: DashboardFilters, now = dayjs.utc().toISOString()): FunnelMetrics {
-  const leads = scopedPeople(population, filters).filter(s => !!s.phone?.trim() && inVietnamRange(s.registerTime, filters.start, filters.end) && dayjs.utc(s.registerTime).valueOf() <= dayjs.utc(now).valueOf())
+  const leads = scopedPeople(population, filters).filter(s => !!s.phone?.trim() && inDashboardRange(s.registerTime, filters.start, filters.end) && dayjs.utc(s.registerTime).valueOf() <= dayjs.utc(now).valueOf())
   const valid = (s: Student, time?: string) => !!time && dayjs.utc(time).isValid() && dayjs.utc(time).valueOf() >= dayjs.utc(s.registerTime).valueOf() && dayjs.utc(time).valueOf() <= dayjs.utc(now).valueOf()
   return {
     leads,
@@ -38,6 +39,7 @@ export const CURRENT_CALL_KEYS = ['待外呼', '未接通待跟进', '已拒绝'
 export const CURRENT_FOLLOW_KEYS = ['已接通待预约', '已预约', '未出勤待跟进', '咨询未完成待跟进', '咨询完成待支付', '已关闭']
 export const ACTIVITY_CALL_KEYS = ['called', 'connected']
 export const ACTIVITY_FOLLOW_KEYS = ['paid']
+export const SNAPSHOT_FOLLOW_KEYS = ['已接通待预约']
 export function closureKind(event: FollowEvent) {
   if (event.node !== 'lead' || event.result !== '已关闭') return undefined
   return event.closureType === 'phone' ? 'rejected' : event.closureType === 'consultation' ? 'closedAfter' : 'closedUnknown'
@@ -67,7 +69,7 @@ export function followupMetrics(population: Student[], calls: CallRecord[], less
   current.assigned = currentRows.filter(s => s.salesOwner)
   current.unassigned = currentRows.filter(s => !s.salesOwner)
   currentRows.forEach(s => (current[currentFollowStage(s, calls)] ??= []).push(s))
-  const range = (time?: string) => inVietnamRange(time, filters.start, filters.end) && dayjs.utc(time).valueOf() <= Date.now()
+  const range = (time?: string) => inDashboardRange(time, filters.start, filters.end) && dayjs.utc(time).valueOf() <= Date.now()
   const eventUsers = (predicate: (e: FollowEvent) => boolean) => rows.filter(s => s.salesLifecycleEvents?.some(e => range(e.reportedAt) && predicate(e)))
   const activity: PeopleMetrics = {
     called: rows.filter(s => calls.some(c => c.studentId === s.studentId && isCompletedCall(c) && range(c.time))),
@@ -97,7 +99,7 @@ export function reasonEvidence(population: Student[], calls: CallRecord[], lesso
   const stage = { rejected: '已关闭', closedAfter: '已关闭', closedUnknown: '已关闭', noShow: '未出勤待跟进', incomplete: '咨询未完成待跟进', paused: '暂不跟进', paymentConcern: '咨询完成待支付' }[kind]
   const currentIds = new Set(currentMetrics[stage]?.map(s => s.studentId))
   return rows.flatMap(student => {
-    let events = (student.salesLifecycleEvents || []).filter(e => inVietnamRange(e.reportedAt, '', '') && dayjs.utc(e.reportedAt).valueOf() <= Date.now()).sort((a, b) => dayjs.utc(b.reportedAt).valueOf() - dayjs.utc(a.reportedAt).valueOf()) as FollowEvent[]
+    let events = (student.salesLifecycleEvents || []).filter(e => inDashboardRange(e.reportedAt, '', '') && dayjs.utc(e.reportedAt).valueOf() <= Date.now()).sort((a, b) => dayjs.utc(b.reportedAt).valueOf() - dayjs.utc(a.reportedAt).valueOf()) as FollowEvent[]
     if (current) {
       if (!currentIds.has(student.studentId)) return []
       // Do not reuse a reason from before the most recent restart/resume or another appointment.
@@ -110,13 +112,13 @@ export function reasonEvidence(population: Student[], calls: CallRecord[], lesso
       if (!matching && ['rejected', 'closedAfter'].includes(kind)) return []
       return [{ student, event: matching, reason: matching?.reason || matching?.paymentConcern || '__unknown__' }]
     }
-    return events.filter(e => reasonMatches(e, kind) && inVietnamRange(e.reportedAt, filters.start, filters.end)).map(event => ({ student, event, reason: event.reason || event.paymentConcern || '__unknown__' }))
+    return events.filter(e => reasonMatches(e, kind) && inDashboardRange(e.reportedAt, filters.start, filters.end)).map(event => ({ student, event, reason: event.reason || event.paymentConcern || '__unknown__' }))
   })
 }
 export function scheduledInstant(a: SalesAppointment) {
   if (!a.scheduledStartAt) return null
   try {
-    const date = /(?:Z|[+-]\d{2}:?\d{2})$/.test(a.scheduledStartAt) ? dayjs.utc(a.scheduledStartAt) : dayjs.tz(a.scheduledStartAt, a.timezone || 'Asia/Ho_Chi_Minh')
+    const date = /(?:Z|[+-]\d{2}:?\d{2})$/.test(a.scheduledStartAt) ? dayjs.utc(a.scheduledStartAt) : dayjs.tz(a.scheduledStartAt, a.timezone || dashboardTimeZone())
     return date.isValid() ? date : null
   } catch { return null }
 }
@@ -126,15 +128,15 @@ export function scheduledAppointments(population: Student[], filters: DashboardF
   const seen = new Set<string>()
   return scopedPeople(population, filters).flatMap(student => (student.salesAppointments || []).flatMap(appointment => {
     const instant = scheduledInstant(appointment)
-    if (!instant || !inVietnamRange(instant.toISOString(), start, end) || seen.has(appointment.appointmentId)) return []
+    if (!instant || !inDashboardRange(instant.toISOString(), start, end) || seen.has(appointment.appointmentId)) return []
     seen.add(appointment.appointmentId)
     const bucket: AppointmentBucket = appointment.appointmentStatus === '已取消' ? 'cancelled' : appointment.appointmentStatus === '已改期' ? 'rescheduled' : appointment.attendanceStatus === '已出勤' ? 'attended' : appointment.attendanceStatus === 'No Show' ? 'noShow' : instant.valueOf() > dayjs.utc(now).valueOf() ? 'future' : 'unconfirmed'
-    const result = student.salesLifecycleEvents?.filter(e => e.appointmentId === appointment.appointmentId && ['attendance', 'consultation'].includes(e.node) && inVietnamRange(e.reportedAt, '', '')).sort((a, b) => dayjs.utc(b.reportedAt).valueOf() - dayjs.utc(a.reportedAt).valueOf())[0]
+    const result = student.salesLifecycleEvents?.filter(e => e.appointmentId === appointment.appointmentId && ['attendance', 'consultation'].includes(e.node) && inDashboardRange(e.reportedAt, '', '')).sort((a, b) => dayjs.utc(b.reportedAt).valueOf() - dayjs.utc(a.reportedAt).valueOf())[0]
     return [{ id: appointment.appointmentId, student, appointment, instant: instant.toISOString(), bucket, result }]
   }))
 }
 export function metricGroups(metrics: PeopleMetrics, dimension: 'cc' | 'date', secondary = false) {
-  const key = (s: Student) => dimension === 'cc' ? s.salesOwner || '__unassigned__' : dayjs.utc(s.registerTime).utcOffset(420).format('YYYY-MM-DD')
+  const key = (s: Student) => dimension === 'cc' ? s.salesOwner || '__unassigned__' : dayjs.utc(s.registerTime).local().format('YYYY-MM-DD')
   const values = [...new Set(Object.values(metrics).flat().map(key))].sort((a, b) => dimension === 'date' ? b.localeCompare(a) : a.localeCompare(b))
   return values.map(value => ({ id: value, name: value, metrics: Object.fromEntries(Object.entries(metrics).map(([k, users]) => [k, users.filter(s => key(s) === value)])), secondary }))
 }
@@ -174,28 +176,30 @@ export function followupStateEvidence(student: Student, calls: CallRecord[], sta
       || connected[0]?.time || run[run.length - 1]?.time
     source = '最近一次进入待预约时间'
   }
-  return { stage, time, source, appointmentId, date: time && dayjs.utc(time).isValid() ? dayjs.utc(time).utcOffset(420).format('YYYY-MM-DD') : '__unknown_date__' }
+  return { stage, time, source, appointmentId, date: time && dayjs.utc(time).isValid() ? dayjs.utc(time).local().format('YYYY-MM-DD') : '__unknown_date__' }
 }
 export function datedFollowupMetrics(current: PeopleMetrics, calls: CallRecord[], filters: DashboardFilters): PeopleMetrics {
   return Object.fromEntries(CURRENT_FOLLOW_KEYS.map(key => [key, (current[key] || []).filter(s => {
+    if (SNAPSHOT_FOLLOW_KEYS.includes(key)) return true
     const date = followupStateEvidence(s,calls,key).date
     return !filters.start && !filters.end || date !== '__unknown_date__' && (!filters.start || date >= filters.start) && (!filters.end || date <= filters.end)
   })]))
 }
-/** Current stages use their own business date; payments use each order's payment date. */
+/** Waiting is a current snapshot; other states use business dates and payments use payment dates. */
 export function datedFollowupRows(current: PeopleMetrics, paidOrders: Order[], people: Student[], calls: CallRecord[], primary: 'cc' | 'date', secondary = true): FollowupComparisonRow[] {
   type Evidence = { student: Student; metric: string; date: string }
   const byId = new Map(people.map(s => [s.studentId,s]))
-  const evidence: Evidence[] = CURRENT_FOLLOW_KEYS.flatMap(metric => (current[metric] || []).map(student => ({student,metric,date:followupStateEvidence(student,calls,metric).date})))
-  paidOrders.forEach(o => { const student=byId.get(o.studentId); if (student) evidence.push({student,metric:'paid',date:dayjs.utc(o.paidTime).utcOffset(420).format('YYYY-MM-DD')}) })
+  const evidence: Evidence[] = CURRENT_FOLLOW_KEYS.filter(key=>!SNAPSHOT_FOLLOW_KEYS.includes(key)).flatMap(metric => (current[metric] || []).map(student => ({student,metric,date:followupStateEvidence(student,calls,metric).date})))
+  paidOrders.forEach(o => { const student=byId.get(o.studentId); if (student) evidence.push({student,metric:'paid',date:dayjs.utc(o.paidTime).local().format('YYYY-MM-DD')}) })
   const group = (records: Evidence[], dimension: 'cc' | 'date', parent = '', date?: string): FollowupComparisonRow[] => {
     const groupOf = (r: Evidence) => dimension === 'cc' ? r.student.salesOwner || '__unassigned__' : r.date
-    const values = [...new Set(records.map(groupOf))].sort((a,b) => dimension==='cc' ? a.localeCompare(b) : Number(a.startsWith('__'))-Number(b.startsWith('__')) || b.localeCompare(a))
+    const snapshotOwners = dimension === 'cc' && !parent ? (current['已接通待预约'] || []).map(s=>s.salesOwner || '__unassigned__') : []
+    const values = [...new Set([...records.map(groupOf),...snapshotOwners])].sort((a,b) => dimension==='cc' ? a.localeCompare(b) : Number(a.startsWith('__'))-Number(b.startsWith('__')) || b.localeCompare(a))
     return values.map(value => {
       const subset = records.filter(r => groupOf(r) === value)
       const activityDate = dimension === 'date' ? value : date
       return {id:JSON.stringify([parent,dimension,value]),value,activityDate,
-        metrics:Object.fromEntries([...CURRENT_FOLLOW_KEYS,'paid'].map(key => [key,uniquePeople(subset.filter(r=>r.metric===key).map(r=>r.student))])),
+        metrics:Object.fromEntries([...CURRENT_FOLLOW_KEYS,'paid'].map(key => [key,key === '已接通待预约' ? (!activityDate ? uniquePeople((current[key]||[]).filter(s=>(s.salesOwner||'__unassigned__')===value)) : []) : uniquePeople(subset.filter(r=>r.metric===key).map(r=>r.student))])),
         children:!parent && secondary ? group(subset,dimension==='cc'?'date':'cc',value,activityDate) : undefined}
     })
   }
@@ -206,7 +210,7 @@ export function followupAppointmentDate(student: Student) {
   const appointment = currentAppointment(student)
   if (!appointment) return '__unbooked__'
   const instant = scheduledInstant(appointment)
-  return instant ? instant.utcOffset(420).format('YYYY-MM-DD') : '__unknown_date__'
+  return instant ? instant.local().format('YYYY-MM-DD') : '__unknown_date__'
 }
 export function appointmentFollowupRows(current: PeopleMetrics, activity: PeopleMetrics, primary: 'cc' | 'date', secondary = true): FollowupComparisonRow[] {
   const metrics = Object.fromEntries([...CURRENT_FOLLOW_KEYS, ...ACTIVITY_FOLLOW_KEYS].map(key => [key, uniquePeople((key === 'paid' ? activity : current)[key] || [])]))

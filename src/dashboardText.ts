@@ -28,7 +28,7 @@ const words = {
  datePeriodMeaning: ['日期选择的是活动发生的期间；可以包含更早注册的用户。', 'Dates select the activity period; users may have registered earlier.'],
  dateCohortMeaning: ['日期选择的是同一批注册线索；后续跟进记录一直看到现在。', 'Dates select one group of registered leads; follow-up records include later activity to date.'],
  datePaymentsMeaning: ['日期选择的是订单支付时间；不按用户注册时间筛选。', 'Dates select when orders were paid, regardless of user registration dates.'],
- overview: ['整体情况', 'Overview'], scope: ['越南 · 正式用户 · UTC+7', 'Vietnam · Production users · UTC+7'],
+ overview: ['整体情况', 'Overview'], scope: ['正式用户 · 浏览器时区', 'Production users · Browser timezone'],
  demoTag: ['演示数据', 'Demo data'], rules: ['统计说明', 'Counting rules'],
  resetFilters: ['重置筛选', 'Reset filters'], today: ['今天', 'Today'], last7: ['近 7 天', 'Last 7 days'], thisMonth: ['本月', 'This month'],
  groupIntent: ['按购买意向', 'By purchase intent'], groupAge: ['按年龄段', 'By age group'], groupRegistrationAge: ['按注册时长', 'By time since registration'],

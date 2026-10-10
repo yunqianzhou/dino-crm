@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
+import { dashboardDate } from './dashboardTime'
 import { businessLineOf } from './channel'
 import type { Account, CallRecord, ChannelLine, LessonRecord, Order, Role, Student } from './types'
 import { isSalesLead } from './funnel'
@@ -36,9 +37,9 @@ export function isDashboardPaidOrder(order: Order) {
   return order.orderStatus === '已支付' && Number.isFinite(order.paidAmount) && order.paidAmount > 0 &&
     !!order.paidTime && dayjs.utc(order.paidTime).isValid()
 }
-export function inVietnamRange(time: string | undefined, start: string, end: string) {
+export function inDashboardRange(time: string | undefined, start: string, end: string) {
   if (!time || !dayjs.utc(time).isValid()) return false
-  const date = dayjs.utc(time).utcOffset(7 * 60).format('YYYY-MM-DD')
+  const date = dashboardDate(time)
   return (!start || date >= start) && (!end || date <= end)
 }
 export function dashboardPopulation(students: Student[], scope: string[] | null, seeAll: boolean, actor: string, selectedLines: string[] = [], channels: ChannelLine[] = []) {
@@ -49,7 +50,7 @@ export function dashboardPopulation(students: Student[], scope: string[] | null,
   }).map(s => [s.studentId, s])).values()]
 }
 export function dashboardMetrics(population: Student[], calls: CallRecord[], lessons: LessonRecord[], filters: DashboardFilters, orders: Order[] = []) {
-  const range = (time?: string) => inVietnamRange(time, filters.start, filters.end)
+  const range = (time?: string) => inDashboardRange(time, filters.start, filters.end)
   const rows = population.filter(s => matchesOwner(s, filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType))
   const current = rows.filter(s => isSalesLead(s, lessons) && range(s.registerTime))
@@ -75,11 +76,11 @@ export function dashboardMetrics(population: Student[], calls: CallRecord[], les
   return metrics
 }
 
-/** Payment activity uses the same successful orders and UTC+7 dates as paid-user counts. */
+/** Payment activity uses the same successful orders and browser-local dates as paid-user counts. */
 export function dashboardPaymentOrders(orders: Order[], students: Student[], filters: DashboardFilters) {
   const allowed = new Set(students.filter(s => matchesOwner(s, filters.owner) &&
     (!filters.userType || resolveUserType(s) === filters.userType)).map(s => s.studentId))
-  return orders.filter(o => allowed.has(o.studentId) && isDashboardPaidOrder(o) && inVietnamRange(o.paidTime, filters.start, filters.end))
+  return orders.filter(o => allowed.has(o.studentId) && isDashboardPaidOrder(o) && inDashboardRange(o.paidTime, filters.start, filters.end))
 }
 
 /** Never sum unlike currencies. A user with several paid orders is one payer in that currency. */
@@ -107,8 +108,8 @@ export function dashboardDateRows(population: Student[], calls: CallRecord[], le
       s.salesLifecycleEvents?.forEach(e => times.push(e.reportedAt))
     })
   }
-  const dates = [...new Set(times.filter(time => inVietnamRange(time, filters.start, filters.end))
-    .map(time => dayjs.utc(time).utcOffset(7 * 60).format('YYYY-MM-DD')))].sort().reverse()
+  const dates = [...new Set(times.filter(time => inDashboardRange(time, filters.start, filters.end))
+    .map(time => dayjs.utc(time).local().format('YYYY-MM-DD')))].sort().reverse()
   return dates.map(date => ({ id: date, name: date, metrics: dashboardMetrics(rows, calls, lessons, { ...filters, start: date, end: date }, orders) }))
     .filter(row => Object.values(row.metrics).some(users => users.length > 0))
 }
@@ -144,7 +145,7 @@ export function dashboardCohortRates(metrics: CohortMetrics) {
 export function dashboardBreakdownPayments(orders: Order[], population: Student[], filters: DashboardFilters, group?: DashboardGrouping, value?: string, owner?: string) {
   const rows = population.filter(s => (!owner || (s.salesOwner || '__unassigned__') === owner) &&
     (!group || group === 'date' || !value || dashboardGroupKey(s, group) === value) &&
-    (filters.mode !== 'current' || inVietnamRange(s.registerTime, group === 'date' && value ? value : filters.start, group === 'date' && value ? value : filters.end)))
+    (filters.mode !== 'current' || inDashboardRange(s.registerTime, group === 'date' && value ? value : filters.start, group === 'date' && value ? value : filters.end)))
   return dashboardPaymentOrders(orders, rows, { ...filters,
     start: filters.mode === 'current' ? '' : group === 'date' && value ? value : filters.start,
     end: filters.mode === 'current' ? '' : group === 'date' && value ? value : filters.end,
@@ -157,16 +158,16 @@ export function dashboardBreakdownPayments(orders: Order[], population: Student[
  */
 export function dashboardCohortMetrics(population: Student[], calls: CallRecord[], filters: DashboardFilters, orders: Order[] = []): CohortMetrics {
   const eligible = population.filter(s => matchesOwner(s, filters.owner) &&
-    (!filters.userType || resolveUserType(s) === filters.userType) && !!s.phone?.trim() && inVietnamRange(s.registerTime, filters.start, filters.end))
-  const connected = new Set(calls.filter(c => c.result === '已接通' && inVietnamRange(c.time, '', '')).map(c => c.studentId))
+    (!filters.userType || resolveUserType(s) === filters.userType) && !!s.phone?.trim() && inDashboardRange(s.registerTime, filters.start, filters.end))
+  const connected = new Set(calls.filter(c => c.result === '已接通' && inDashboardRange(c.time, '', '')).map(c => c.studentId))
   const paid = new Set(orders.filter(isDashboardPaidOrder).map(o => o.studentId))
   const hasEvent = (s: Student, node: string, results: string[]) => (s.salesLifecycleEvents || []).some(e =>
-    e.node === node && results.includes(e.result) && inVietnamRange(e.reportedAt, '', ''))
+    e.node === node && results.includes(e.result) && inDashboardRange(e.reportedAt, '', ''))
   return {
     leads: eligible,
     connected: eligible.filter(s => connected.has(s.studentId) || hasEvent(s, 'contact', ['已接通'])),
     // A cancelled appointment still proves that a booking was created in the past.
-    booked: eligible.filter(s => (s.salesAppointments || []).some(a => inVietnamRange(a.createdAt, '', '')) || hasEvent(s, 'appointment', ['已预约', '已改期'])),
+    booked: eligible.filter(s => (s.salesAppointments || []).some(a => inDashboardRange(a.createdAt, '', '')) || hasEvent(s, 'appointment', ['已预约', '已改期'])),
     attended: eligible.filter(s => hasEvent(s, 'attendance', ['已出勤']) || hasEvent(s, 'consultation', ['咨询完成', '咨询未完成'])),
     paid: eligible.filter(s => paid.has(s.studentId)),
   }
@@ -174,7 +175,7 @@ export function dashboardCohortMetrics(population: Student[], calls: CallRecord[
 
 export function dashboardCohortRows(metrics: CohortMetrics, primary: CohortDimension, secondary: CohortDimension | ''): CohortRow[] {
   const key = (s: Student, dimension: CohortDimension) => dimension === 'date'
-    ? dayjs.utc(s.registerTime).utcOffset(420).format('YYYY-MM-DD') : dashboardGroupKey(s, dimension)
+    ? dayjs.utc(s.registerTime).local().format('YYYY-MM-DD') : dashboardGroupKey(s, dimension)
   const group = (source: CohortMetrics, dimension: CohortDimension, path: string[][], nested: boolean): CohortRow[] => {
     const values = [...new Set(source.leads.map(s => key(s, dimension)))].sort((a, b) => dimension === 'date' ? b.localeCompare(a) : a.localeCompare(b))
     return values.map(value => {
@@ -197,8 +198,8 @@ export function dashboardGroupKey(s: Student, group: Exclude<DashboardGrouping, 
     return appSource ? `App · ${appSource}` : (s.channelSource || s.registerChannel || '__unknown__')
   }
   if (!s.registerTime || !dayjs.utc(s.registerTime).isValid()) return '__unknown__'
-  const today = dayjs.utc(now).utcOffset(420).startOf('day')
-  const registered = dayjs.utc(s.registerTime).utcOffset(420).startOf('day')
+  const today = dayjs.utc(now).local().startOf('day')
+  const registered = dayjs.utc(s.registerTime).local().startOf('day')
   const days = today.diff(registered, 'day')
   return days < 0 ? '__unknown__' : days <= 7 ? '0–7' : days <= 30 ? '8–30' : '31+'
 }
@@ -230,7 +231,7 @@ export function dashboardReasonRows(population: Student[], calls: CallRecord[], 
   }
   rows.forEach(s => {
     const events = (s.salesLifecycleEvents || []).filter(e => e.node === config.node && (e.result === config.result || (kind === 'noShow' && e.result === '未出勤')) &&
-      dayjs.utc(e.reportedAt).isValid() && (filters.mode === 'current' || inVietnamRange(e.reportedAt, filters.start, filters.end)))
+      dayjs.utc(e.reportedAt).isValid() && (filters.mode === 'current' || inDashboardRange(e.reportedAt, filters.start, filters.end)))
       .sort((a, b) => dayjs.utc(b.reportedAt).valueOf() - dayjs.utc(a.reportedAt).valueOf())
     if (filters.mode === 'current') add(events[0]?.reason, s)
     else events.forEach(e => add(e.reason, s))

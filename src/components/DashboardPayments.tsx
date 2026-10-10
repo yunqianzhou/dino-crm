@@ -1,14 +1,16 @@
+import { dashboardTimeZone } from '../dashboardTime'
 import { Card, Empty, Segmented, Table } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import type { Order, Student } from '../types'
-import { dashboardOwnerIds, dashboardPaymentOrders, type DashboardFilters } from '../dashboardData'
+import { dashboardPaymentOrders, type DashboardFilters } from '../dashboardData'
 import { dashboardNumberCompare } from '../dashboardSort'
 import { useDashboardText } from '../dashboardText'
 import { useStore } from '../store'
 import { Export43, useDashboard43 } from './Dashboard43Shared'
 import DashboardMoneyCell from './DashboardMoneyCell'
-import { localMoneySortable, localMoneySortValue, currencyExportHeaders, currencyExportRow } from '../dashboardCurrency'
+import { exportMoney, exportMoneyHeaders } from '../dashboardExport'
+import { localMoneySortable, localMoneySortValue } from '../dashboardCurrency'
 
 type Props = { population: Student[]; orders: Order[]; filters: DashboardFilters; rangeLabel: string }
 export default function DashboardPayments({ population, orders, filters, rangeLabel }: Props) {
@@ -18,13 +20,11 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
  const [query,setQuery]=useSearchParams()
  const students=new Map(population.map(s=>[s.studentId,s]))
  const ownerName=(id:string)=>id==='__unassigned__'?d('unassigned'):accounts.find(a=>a.email===id)?.name||id
- const owners=dashboardOwnerIds(filters.owner)
- const ownerLabel=owners.length?owners.map(ownerName).join(' / '):d('allCC')
  // Currency labels never filter the order or payer population.
  const matchingOrders=dashboardPaymentOrders(orders,population,filters)
  const grouping=query.get('revenueGroup')==='cc'?'cc':'date'
  const ownerKey=(o:Order)=>students.get(o.studentId)?.salesOwner||'__unassigned__'
- const dateKey=(o:Order)=>dayjs.utc(o.paidTime).utcOffset(420).format('YYYY-MM-DD')
+ const dateKey=(o:Order)=>dayjs.utc(o.paidTime).local().format('YYYY-MM-DD')
  const groupKey=grouping==='date'?dateKey:ownerKey
  type Row={id:string;value:string;owner?:string;name:string;orders:Order[];children?:Row[]}
  const rows:Row[]=[...new Set(matchingOrders.map(groupKey))].sort((a,b)=>grouping==='date'?b.localeCompare(a):a.localeCompare(b)).map(id=>{
@@ -35,13 +35,15 @@ export default function DashboardPayments({ population, orders, filters, rangeLa
  const clear=(next:URLSearchParams)=>['paymentDetail','paymentValue','paymentOwner','paymentView','paymentUser','paymentCurrency'].forEach(k=>next.delete(k))
  const changeGroup=(value:string)=>{const next=new URLSearchParams(query);clear(next);next.set('revenueGroup',value);setQuery(next)}
  const comparable=localMoneySortable(matchingOrders)
- return <Card title={d('revenueTitle')} className="dashboard-payments" extra={<span className="dashboard-section-note">{d('paidDate')} · {rangeLabel} · UTC+7</span>}>
+ return <Card title={d('revenueTitle')} className="dashboard-payments" extra={<span className="dashboard-section-note">{d('paidDate')} · {rangeLabel} · {dashboardTimeZone()}</span>}>
   <p className="dashboard-help">{text('按支付日期统计当前业务线的有效订单，展示本地货币实付金额及均值。','Valid orders in the selected business line are counted by payment date, with amounts and averages in local currency.')}</p>
   <div className="dashboard-table-tools">
-   <Export43 name="payments" disabled={!matchingOrders.length} sheets={()=>[
-    {name:'Paid orders',headers:['Order ID','CRM ID','Current CC','Paid UTC',...currencyExportHeaders],rows:matchingOrders.map(o=>[o.orderId,o.studentId,ownerName(ownerKey(o)),o.paidTime,...currencyExportRow(o)])},
-    {name:'Scope',headers:['Scope','Value'],rows:[['Paid dates UTC+7',rangeLabel],['Current CC',ownerLabel],['Money display','Recorded local amounts; separate totals per currency'],['Exported UTC',dayjs.utc().toISOString()]]}
-   ]}/>
+   <Export43 name="payments" disabled={!matchingOrders.length} scope={[[text('支付日期范围','Payment dates'),rangeLabel],[text('分组方式','Grouping'),grouping==='date'?text('支付日期 → 当前 CC','Payment date → Current CC'):text('当前 CC','Current CC')]]} sheets={()=>{
+    const values=(subset:Order[])=>exportMoney(subset,text,true).map(m=>[subset.length,users(subset),...m])
+    const data:unknown[][]=values(matchingOrders).map(v=>[text('整体汇总','Overall summary'),text('所选范围','Selected scope'),text('所选范围','Selected scope'),...v])
+    for(const row of rows){data.push(...values(row.orders).map(v=>[text('一级分组','Primary group'),grouping==='date'?row.name:'—',grouping==='cc'?row.name:'—',...v]));for(const child of row.children||[])data.push(...values(child.orders).map(v=>[text('二级分组','Secondary group'),row.name,child.name,...v]))}
+    return [{name:text('支付结果','Payment results'),headers:[text('行类型','Row type'),d('paidDate'),d('currentCC'),d('paidOrders'),d('paidUsers'),...exportMoneyHeaders(text,true)],rows:data}]
+   }}/>
    <Segmented value={grouping} onChange={v=>changeGroup(String(v))} options={[{value:'cc',label:d('ccTitle')},{value:'date',label:d('paidDate')}]}/>
   </div>
   <div className="dashboard-payment-totals">

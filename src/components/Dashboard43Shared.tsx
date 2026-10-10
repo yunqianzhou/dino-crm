@@ -1,5 +1,7 @@
+import { dashboardTimeZone, dashboardTimestamp } from '../dashboardTime'
 import { salesBusinessLineOptions } from '../channel'
 import { useState } from 'react'
+import dayjs from 'dayjs'
 import { Button, Empty, Select, Table } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
@@ -8,7 +10,7 @@ import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
 import { useStore } from '../store'
 import type { Order, Student } from '../types'
-import { inVietnamRange, dashboardSelectedLines } from '../dashboardData'
+import { inDashboardRange, dashboardSelectedLines } from '../dashboardData'
 import { dashboardNumberCompare } from '../dashboardSort'
 import { l2s, type PeopleMetrics } from '../dashboard43'
 import DashboardMoneyCell from './DashboardMoneyCell'
@@ -37,7 +39,7 @@ export function MetricTable43({ rows, total, keys, firstTitle, context, conversi
  const { text, label, count } = useDashboard43()
  const [sortBy, setSortBy] = useState<'amount' | 'averagePerOrder'>('amount')
  const moneySortable = localMoneySortable(orders || [])
- const rowOrders = (metrics: PeopleMetrics, date?: string) => { const ids = new Set((metrics.leads || metrics.paid || []).map(s => s.studentId)); return (orders || []).filter(o => ids.has(o.studentId) && (!date || inVietnamRange(o.paidTime,date,date))) }
+ const rowOrders = (metrics: PeopleMetrics, date?: string) => { const ids = new Set((metrics.leads || metrics.paid || []).map(s => s.studentId)); return (orders || []).filter(o => ids.has(o.studentId) && (!date || inDashboardRange(o.paidTime,date,date))) }
  const metricLabel = (key:string) => labels[key] || label(key)
  const numeric = (metrics: PeopleMetrics, key: string, date?: string) => date && !datedCurrent && currentKeys?.includes(key) ? <span className="dashboard-not-applicable" title={text('当前快照不按历史日期重复展示','Current snapshot is not repeated for historical dates')}>—</span> : count(metrics[key] || [])
  const moneyTitle = <div className="dashboard-money-header"><span>{text('实付金额 / AOV','Amount paid / AOV')}</span><div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}><Select aria-label={text('金额排序依据','Money sort metric')} size="small" value={sortBy} onChange={setSortBy} options={[{ value:'amount', label:text('按金额','By revenue') },{value:'averagePerOrder',label:text('按 AOV','By AOV')}]} /></div></div>
@@ -58,12 +60,15 @@ export function MetricTable43({ rows, total, keys, firstTitle, context, conversi
  ]} summary={() => <Table.Summary fixed="top"><Table.Summary.Row><Table.Summary.Cell index={0}>{text('合计（去重）','Total (unique users)')}</Table.Summary.Cell>{keys.map((key,i) => <Table.Summary.Cell index={i+1} key={key}>{numeric(total,key)}</Table.Summary.Cell>)}{conversion && <Table.Summary.Cell index={keys.length+1}>{rateText(l2s(total))}</Table.Summary.Cell>}{orders && <Table.Summary.Cell index={keys.length+1+(conversion?1:0)}><DashboardMoneyCell orders={rowOrders(total)} /></Table.Summary.Cell>}</Table.Summary.Row></Table.Summary>} />
 }
 export type ExportSheet43 = { name: string; headers: string[]; rows: unknown[][] }
-export function Export43({ name, sheets, disabled = false }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean }) {
+export function Export43({ name, sheets, disabled = false, scope: scopeRows = [] }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean; scope?: unknown[][] }) {
  const { text, can } = useDashboard43()
  const [query] = useSearchParams()
  const { allowedLines } = usePerm()
  const channels = useStore(s => s.channels)
  const students = useStore(s => s.students)
+ const snapshotAt = dayjs.utc().toISOString()
+ const accounts = useStore(s => s.accounts)
+ const selectedCC = query.getAll('cc').filter(Boolean)
  const scope = allowedLines()
  const permittedLines = salesBusinessLineOptions(channels, students).filter(line => scope === null || scope.includes(line))
  const selectedLines = dashboardSelectedLines(query.getAll('line'), permittedLines)
@@ -71,8 +76,22 @@ export function Export43({ name, sheets, disabled = false }: { name: string; she
  if (can('managementDashboard_export') !== 'operate') return null
  return <Button size="small" icon={<DownloadOutlined />} disabled={disabled} onClick={() => {
   const workbook = XLSX.utils.book_new()
-  const businessRows = [['Selected business lines', selectedLines.join(', ') || 'None'], ['Permitted business lines in selection', exportLines.join(', ') || 'None'], ['User type', 'Formal'], ['Reporting timezone', 'UTC+7']]
-  sheets().map(sheet => sheet.headers[0] === 'Scope' ? { ...sheet, rows: [...sheet.rows, ...businessRows] } : sheet).forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(() => ({wch:24})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
+  const businessRows = [
+   [text('下载模块','Module'),name],
+   [text('所选业务线','Selected business line'),selectedLines.join(', ') || text('无','None')],
+   [text('授权范围内的业务线','Permitted business line'),exportLines.join(', ') || text('无','None')],
+   [text('已选 CC','Selected CC'),selectedCC.length?selectedCC.map(id=>id==='__unassigned__'?text('未分配','Unassigned'):(accounts.find(a=>a.email===id)?.name||id)).join(', '):text('全部授权范围','All permitted CCs')],
+   [text('CC 账号','CC accounts'),selectedCC.join(', ') || text('全部授权范围','All permitted CCs')],
+   ...scopeRows,
+   [text('用户范围','User scope'),text('正式用户；当前账号可见范围','Formal users visible to the current account')],
+   [text('统计时区','Reporting timezone'),dashboardTimeZone()],
+   [text('页面统计时间','Page calculated time'),dashboardTimestamp(snapshotAt)],
+   [text('导出时间','Exported time'),dashboardTimestamp(dayjs.utc().toISOString())],
+   [text('下载范围','Export range'),text('全部分组及子行，不受分页、展开或排序截断','All groups and children, independent of pagination, expansion and sorting')],
+   [text('合计核对','Reconciliation'),text('各指标独立去重；合计、父行、子行不能一起累加；比例及均值不得相加','Metrics deduplicate independently; never add totals, parent rows and children together, or sum rates and averages')],
+  ]
+  const allSheets = [...sheets(),{name:text('筛选条件','Filters'),headers:[text('项目','Item'),text('内容','Value')],rows:businessRows}]
+  allSheets.forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(() => ({wch:24})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
   XLSX.writeFile(workbook,`${name}.xlsx`)
- }}>{text('下载原始数据','Download raw data')}</Button>
+ }}>{text('下载数据','Download data')}</Button>
 }

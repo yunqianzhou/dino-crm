@@ -1,3 +1,4 @@
+process.env.TZ = 'Asia/Ho_Chi_Minh' // Explicit viewer timezone for these fixed-date fixtures.
 const assert = require('node:assert/strict')
 const { mkdtempSync, symlinkSync, rmSync } = require('node:fs')
 const { tmpdir } = require('node:os')
@@ -7,9 +8,9 @@ execFileSync(process.execPath, [resolve('scripts/test-dashboard43.cjs')], { stdi
 execFileSync(process.execPath, [resolve('scripts/test-dashboard-current-dates.cjs')], { stdio: 'inherit' })
 const tmp = mkdtempSync(join(tmpdir(), 'crm-dashboard-tests-'))
 try {
-  execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/dashboard43.ts', 'src/dashboardPermissions.ts', 'src/managementDemo.ts', 'src/dashboardView.ts', 'src/dashboardNavigation.ts', 'src/dashboardSort.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
+  execFileSync(resolve('node_modules/.bin/tsc'), ['src/dashboardData.ts', 'src/dashboardExport.ts', 'src/dashboard43.ts', 'src/dashboardPermissions.ts', 'src/managementDemo.ts', 'src/dashboardView.ts', 'src/dashboardNavigation.ts', 'src/dashboardSort.ts', '--outDir', tmp, '--module', 'commonjs', '--moduleResolution', 'node', '--target', 'ES2020', '--esModuleInterop', '--skipLibCheck'], { stdio: 'inherit' })
   symlinkSync(resolve('node_modules'), join(tmp, 'node_modules'), 'dir')
-  const { dashboardCCAccounts, dashboardOwnerIds, dashboardSelectedLines, dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, dashboardBreakdownPayments, dashboardCohortRates, dashboardCohortMetrics, dashboardCohortRows, COHORT_METRICS, inVietnamRange } = require(join(tmp, 'dashboardData.js'))
+  const { dashboardCCAccounts, dashboardOwnerIds, dashboardSelectedLines, dashboardMetrics, dashboardPopulation, dashboardDateRows, dashboardGroupKey, dashboardGroupRows, dashboardReasonRows, dashboardPaymentOrders, dashboardPaymentSummary, dashboardBreakdownPayments, dashboardCohortRates, dashboardCohortMetrics, dashboardCohortRows, COHORT_METRICS, inDashboardRange } = require(join(tmp, 'dashboardData.js'))
   const { dashboardPermission, dashboardExportPermission, withDashboardPermission } = require(join(tmp, 'dashboardPermissions.js'))
   assert.deepEqual(dashboardSelectedLines([], ['韩国', '越南']), ['韩国'], 'default to the first permitted option in UI order')
   assert.deepEqual(dashboardSelectedLines(['', '  '], ['越南']), ['越南'], 'empty legacy selection defaults to an authorized line')
@@ -38,11 +39,11 @@ try {
   const test = user('test', { userType: '测试用户' })
   const other = user('other', { businessLine: '韩国' })
   const rows = [a, b, pool, paid, test, other, a]
-  assert.equal(inVietnamRange('2026-08-31 17:00:00', '2026-09-01', '2026-09-01'), true)
-  assert.equal(inVietnamRange('2026-08-31 16:59:59', '2026-09-01', '2026-09-01'), false)
-  assert.equal(inVietnamRange('2026-09-01T16:59:59Z', '2026-09-01', '2026-09-01'), true)
-  assert.equal(inVietnamRange('2026-09-01T17:00:00Z', '2026-09-01', '2026-09-01'), false)
-  assert.equal(inVietnamRange(undefined, '', ''), false)
+  assert.equal(inDashboardRange('2026-08-31 17:00:00', '2026-09-01', '2026-09-01'), true)
+  assert.equal(inDashboardRange('2026-08-31 16:59:59', '2026-09-01', '2026-09-01'), false)
+  assert.equal(inDashboardRange('2026-09-01T16:59:59Z', '2026-09-01', '2026-09-01'), true)
+  assert.equal(inDashboardRange('2026-09-01T17:00:00Z', '2026-09-01', '2026-09-01'), false)
+  assert.equal(inDashboardRange(undefined, '', ''), false)
   assert.deepEqual(dashboardPopulation(rows, ['韩国'], true, '').map(s => s.studentId), ['other'])
   const population = dashboardPopulation(rows, null, true, '', ['越南'])
   assert.equal(population.length, 5)
@@ -389,5 +390,52 @@ try {
   assert.equal(dashboardMoneyValue([paidOrder('v', 'payer', { currency: 'VND', paidAmount: 200 }), paidOrder('u', 'payer', { currency: 'USD', paidAmount: 99 })], 'VND', 'amount'), 200)
   assert.equal(dashboardMoneyValue([paidOrder('v1', 'payer', { currency: 'VND', paidAmount: 200 }), paidOrder('v2', 'payer', { currency: 'VND', paidAmount: 100 })], 'VND', 'averagePerOrder'), 150)
   assert.equal(dashboardMoneyValue([], 'VND', 'averagePerOrder'), null)
-  console.log('Dashboard checks passed: UTC+7 boundaries, deduplication, permissions, shared stages, dimensional totals, reason history, demo migration and recorded activity.')
+  const { exportMetricTable, exportMoney, exportRate } = require(join(tmp, 'dashboardExport.js'))
+  const zh = value => value
+  const person1 = user('export-1'), person2 = user('export-2')
+  const exportTotal = { leads: [person1, person2], paid: [person1], called: [person1], '待外呼': [person2] }
+  const exportOrders = [{ orderId: 'export-order', studentId: person1.studentId, orderStatus: '已支付', paidAmount: 199, currency: 'MYR', paidTime: '2026-09-02T01:00:00Z' }]
+  const exportRows = [{ name: '2026-09-01', metrics: exportTotal, children: [{name:'CC A', metrics:exportTotal}] }]
+  const grid = exportMetricTable({ rows:exportRows, total:exportTotal, keys:['leads','paid'], primary:'date', text:zh, orders:exportOrders, conversion:true })
+  assert.equal(grid.length, 3, 'export includes overall, primary and collapsed secondary rows')
+  assert.deepEqual(grid[0], ['合计（去重）','所选范围','所选范围',2,1,'50%','MYR',199,199])
+  assert.deepEqual(grid[2].slice(0,3), ['二级分组','2026-09-01','CC A'])
+  const reversed = exportMetricTable({ rows:[{name:'CC A',metrics:exportTotal,children:[{name:'2026-09-01',metrics:exportTotal}]}],total:exportTotal,keys:['leads'],primary:'cc',text:zh })
+  assert.deepEqual(reversed[2].slice(0,3), ['二级分组','2026-09-01','CC A'], 'CC-first exports keep dates and CC in their labeled columns')
+  const dated = [{ name:'2026-09-02',activityDate:'2026-09-02',metrics:exportTotal }]
+  const snapshot = exportMetricTable({rows:dated,total:exportTotal,keys:['待外呼','called'],primary:'date',text:zh,currentKeys:['待外呼']})
+  assert.equal(snapshot[0][3],1)
+  assert.equal(snapshot[1][3],'—','daily calling rows must match page snapshot dashes')
+  const datedState = exportMetricTable({rows:dated,total:exportTotal,keys:['待外呼'],primary:'date',text:zh,currentKeys:['待外呼'],datedCurrent:true})
+  assert.equal(datedState[1][3],1,'date-filtered follow-up states retain their actual count')
+  assert.deepEqual(exportMoney([],zh,true),[['—',0,'—','—']])
+  assert.equal(exportRate(null),'—')
+  assert.equal(exportRate(1/3*100),'33.3%')
+  const noDatePayments = exportMetricTable({rows:[{name:'2026-09-03',activityDate:'2026-09-03',metrics:exportTotal}],total:exportTotal,keys:['paid'],primary:'date',text:zh,orders:exportOrders})
+  assert.deepEqual(noDatePayments[1].slice(-3),['—',0,'—'],'group money uses the same payment date scope as the page')
+  const { dashboardDate, dashboardTimestamp, dashboardTimeZone } = require(join(tmp, 'dashboardTime.js'))
+  const { metricGroups, followupStateEvidence, scheduledInstant } = require(join(tmp, 'dashboard43.js'))
+  const tzInstant = '2026-09-01T16:30:00Z'
+  for (const [zone, expected] of [['Asia/Shanghai','2026-09-02'],['Asia/Ho_Chi_Minh','2026-09-01'],['America/Los_Angeles','2026-09-01'],['UTC','2026-09-01']]) {
+    process.env.TZ=zone
+    assert.equal(dashboardDate(tzInstant),expected,`browser date in ${zone}`)
+    assert.equal(dashboardTimeZone(),new Intl.DateTimeFormat('en',{timeZone:zone}).resolvedOptions().timeZone)
+    assert(inDashboardRange(tzInstant,expected,expected))
+    const localPerson = user('local-day',{registerTime:tzInstant,salesLifecycleEvents:[{node:'outbound',result:'已接通',occurredAt:tzInstant,reportedAt:tzInstant}]})
+    assert.equal(metricGroups({leads:[localPerson]},'date')[0].name,expected,'registration grouping follows viewer timezone')
+    assert.equal(followupStateEvidence(localPerson,[{studentId:localPerson.studentId,result:'已接通',time:tzInstant}],'已接通待预约').date,expected,'follow-up business date follows viewer timezone')
+    const localOrder={...exportOrders[0],studentId:localPerson.studentId,paidTime:tzInstant}
+    assert.equal(dashboardPaymentOrders([localOrder],[localPerson],{...filters,start:expected,end:expected}).length,1)
+    assert.equal(scheduledInstant({scheduledStartAt:'2026-09-02 10:00:00',timezone:'Asia/Kuala_Lumpur'}).toISOString(),'2026-09-02T02:00:00.000Z','source appointment timezone must not be reinterpreted as viewer timezone')
+  }
+  process.env.TZ='America/New_York'
+  assert.equal(dashboardDate('2026-03-08T04:59:59Z'),'2026-03-07')
+  assert.equal(dashboardDate('2026-03-08T05:00:00Z'),'2026-03-08')
+  assert.equal(dashboardDate('2026-03-09T03:59:59Z'),'2026-03-08')
+  assert.equal(dashboardDate('2026-03-09T04:00:00Z'),'2026-03-09','spring DST day is 23 hours')
+  assert.equal(dashboardTimestamp('2026-03-08T07:00:00Z'),'2026-03-08 03:00:00 -04:00')
+  assert.equal(dashboardDate('2026-11-02T04:59:59Z'),'2026-11-01')
+  assert.equal(dashboardDate('2026-11-02T05:00:00Z'),'2026-11-02','autumn DST day is 25 hours')
+  process.env.TZ='Asia/Ho_Chi_Minh'
+  console.log('Dashboard checks passed: browser timezones, daylight-saving boundaries, deduplication, permissions, shared stages, dimensional totals, reason history, demo migration and recorded activity.')
 } finally { rmSync(tmp, { recursive: true, force: true }) }
