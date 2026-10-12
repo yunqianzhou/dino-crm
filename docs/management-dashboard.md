@@ -55,7 +55,7 @@ Money/AOV sorting uses unrounded recorded values within a single known currency.
 
 ## Display-only metrics and detail downloads
 
-Numbers remain display-only. Only the lower conversion-details section has a conversion download button. Every download contains only its original first detail sheet, with its name, columns and values preserved. No additional business-record or Filters sheets are appended. Conversion contains 转化用户明细, one row per user. Each entry downloads its contributing users or business records, with user IDs, current CC, registration timestamps, business-record IDs and event timestamps. User sheets contain numeric 0/1 membership flags; event sheets retain every qualifying record. There are no aggregate, parent or child rows in exports. Grouping, sorting, pagination and expansion do not truncate details.
+Numbers remain display-only. Only the lower conversion-details section has a conversion download button. Every download contains only its original first detail sheet, with its name, columns and values preserved. No additional business-record or Filters sheets are appended. Conversion contains 转化用户明细, one row per user. Each entry downloads its contributing users or business records, with user IDs, current CC accounts, registration timestamps, business-record IDs and event timestamps. User sheets contain numeric 0/1 membership flags; event sheets retain every qualifying record. There are no aggregate, parent or child rows in exports. Grouping, sorting, pagination and expansion do not truncate details.
 
 Times use the browser timezone, with UTC offsets on timestamps. Missing source times stay blank, never inferred from registration or last update. Waiting remains a current snapshot regardless of the selected dates; its business date stays blank. Other follow-up states retain their selected-period business dates. IDs are strings. Orders retain original currency and amounts; cross-currency user totals stay blank. Permissions are unchanged.
 
@@ -85,28 +85,28 @@ Every entry exports exactly one detail sheet. No Filters (筛选条件) or addit
 
 ### 转化用户明细
 
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、线索数（含已付费）（0/1）、外呼人数（0/1）、接通人数（0/1）、预约人数（0/1）、体验课完成人数（0/1）、已支付人数（0/1）、首次有效外呼时间、首次接通时间、首次预约创建时间、首次体验课完成时间、首次有效支付时间、有效已支付订单数、币种、用户实付金额合计。
+用户 ID、姓名、业务线、用户类型、当前 CC 账号、注册时间、注册日期、用户状态、线索数（含已付费）（0/1）、外呼人数（0/1）、接通人数（0/1）、预约人数（0/1）、体验课完成人数（0/1）、已支付人数（0/1）、首次有效外呼时间、首次接通时间、首次预约创建时间、首次体验课完成时间、首次有效支付时间、有效已支付订单数、币种、用户实付金额合计。
 
 ### 当前线索用户明细
 
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、跟进进度、最近跟进时间、最近跟进备注、当前销售线索（0/1）、已分配（0/1）、未分配（0/1）、已拒绝（0/1）、已结束（0/1）、暂不跟进（0/1）。
+用户 ID、姓名、业务线、用户类型、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、跟进进度、最近跟进时间、最近跟进备注、当前销售线索（0/1）、已分配（0/1）、未分配（0/1）、已拒绝（0/1）、已结束（0/1）、暂不跟进（0/1）。
 
 ### 外呼用户明细
 
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、跟进进度、最近跟进时间、最近跟进备注、待外呼（0/1）、未接通 · 待跟进（0/1）、已拒绝（0/1）、外呼人数（0/1）、接通人数（0/1）、期间首次外呼时间、期间最近外呼时间、期间首次接通时间、期间最近接通时间。
+用户 ID、姓名、业务线、用户类型、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、跟进进度、最近跟进时间、最近跟进备注、待外呼（0/1）、未接通 · 待跟进（0/1）、已拒绝（0/1）、外呼人数（0/1）、接通人数（0/1）、期间首次外呼时间、期间最近外呼时间、期间首次接通时间、期间最近接通时间。
 
 ### 跟进用户明细
 
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、跟进进度、最近跟进时间、最近跟进备注、待预约（0/1）、已预约（0/1）、未出勤（0/1）、咨询未完成（0/1）、咨询已完成（0/1）、已结束（0/1）、已支付（0/1）、状态统计口径、状态业务日期、状态业务时间、状态时间依据、关联预约 ID、期间首次支付时间、期间最近支付时间、有效已支付订单数、币种、用户实付金额合计。
+用户 ID、姓名、业务线、用户类型、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、跟进进度、最近跟进时间、最近跟进备注、待预约（0/1）、已预约（0/1）、未出勤（0/1）、咨询未完成（0/1）、咨询已完成（0/1）、已结束（0/1）、已支付（0/1）、状态统计口径、状态业务日期、状态业务时间、状态时间依据、关联预约 ID、期间首次支付时间、期间最近支付时间、有效已支付订单数、币种、用户实付金额合计。
 
 ### 通话记录明细
 
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、通话 ID、外呼系统、第三方通话 ID、线路 ID、线路名称、坐席、操作人、起呼时间、通话日期、接通时间、结束时间、通话状态、通话结果、接通时长（秒）、结束原因、同步时间、通话备注。
+用户 ID、姓名、业务线、用户类型、当前 CC 账号、注册时间、注册日期、用户状态、通话 ID、外呼系统、第三方通话 ID、线路 ID、线路名称、坐席、操作人、起呼时间、通话日期、接通时间、结束时间、通话状态、通话结果、接通时长（秒）、结束原因、同步时间、通话备注。
 
 ### 支付订单明细
 
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、订单 ID、商品名称、订单状态、原价、实付金额、币种、支付方式、支付时间、支付日期、有效期截止时间。
+用户 ID、姓名、业务线、用户类型、当前 CC 账号、注册时间、注册日期、用户状态、订单 ID、商品名称、订单状态、原价、实付金额、币种、支付方式、支付时间、支付日期、有效期截止时间。
 
 ### 原因用户明细
 
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、原因分类、具体原因、拒绝或结束时间、拒绝或结束日期、时间依据、最近跟进时间、最近跟进备注。
+用户 ID、姓名、业务线、用户类型、当前 CC 账号、注册时间、注册日期、用户状态、当前销售阶段、原因分类、具体原因、拒绝或结束时间、拒绝或结束日期、时间依据、最近跟进时间、最近跟进备注。

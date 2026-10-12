@@ -15,9 +15,10 @@ try {
  const {outboundSummary}=require(join(tmp,'outbound.js'))
  const demo=createManagementDemo('2026-09-25T00:00:00Z')
  const ctx={text:zh=>zh,ownerName:id=>id,calls:demo.callRecords}
+ for(const schema of Object.values(detail.DETAIL_SCHEMAS)){assert(!schema.columns.some(c=>c[0]==='当前 CC'||c[1]==='Current CC'));assert(schema.columns.some(c=>c[0]==='当前 CC 账号'&&c[1]==='Current CC account'));}
  const val=(sh,row,col)=>row[sh.headers.indexOf(col)]
  const flagSum=(sh,from,count)=>Array.from({length:count},(_,i)=>sh.rows.reduce((n,r)=>n+r[from+i],0))
- const checkShape=sheets=>sheets.forEach(sh=>{assert.equal(new Set(sh.headers).size,sh.headers.length);sh.rows.forEach(r=>assert.equal(r.length,sh.headers.length,sh.name));assert.equal(new Set(sh.rows.map(r=>JSON.stringify(r))).size,sh.rows.length,'no duplicated complete rows')})
+ const checkShape=sheets=>sheets.forEach(sh=>{assert.equal(new Set(sh.headers).size,sh.headers.length);assert(!sh.headers.includes("当前 CC"));assert(sh.headers.includes("当前 CC 账号"));sh.rows.forEach(r=>assert.equal(r.length,sh.headers.length,sh.name));assert.equal(new Set(sh.rows.map(r=>JSON.stringify(r))).size,sh.rows.length,'no duplicated complete rows')})
  for(const businessLine of ['越南','马来'])for(const dates of [['',''],['2026-09-23','2026-09-24'],['2035-01-01','2035-01-02']]){
   const filters={mode:'current',start:dates[0],end:dates[1],owner:[],userType:'正式用户'}
   const people=demo.students.filter(s=>s.businessLine===businessLine),selected=scopedPeople(people,filters)
@@ -25,25 +26,25 @@ try {
   const exports=detail.conversionDetailSheets(funnel,demo.callRecords,demo.lessons,demo.orders,ctx)
   assert.deepEqual(exports.map(s=>s.name),['转化用户明细'],'conversion exports only user details')
   checkShape(exports)
-  assert.deepEqual(flagSum(exports[0],9,6),FUNNEL_KEYS.map(k=>funnel[k].length),'conversion user flags equal six page counts')
+  assert.deepEqual(flagSum(exports[0],8,6),FUNNEL_KEYS.map(k=>funnel[k].length),'conversion user flags equal six page counts')
   assert.equal(exports[0].rows.length,new Set(exports[0].rows.map(r=>r[0])).size,'one row per user')
-  for(const sh of exports)for(const row of sh.rows){assert.equal(row[2],businessLine);assert.match(row[6],/\+08:00$/)}
+  for(const sh of exports)for(const row of sh.rows){assert.equal(row[2],businessLine);assert.match(val(sh,row,'注册时间'),/\+08:00$/)}
   const metrics=followupMetrics(people,demo.callRecords,demo.lessons,demo.orders,filters)
   const inventory=detail.inventoryDetailSheet(metrics.current,ctx)
-  assert.deepEqual(flagSum(inventory,13,6),CURRENT_INVENTORY_KEYS.map(k=>metrics.current[k].length))
+  assert.deepEqual(flagSum(inventory,12,6),CURRENT_INVENTORY_KEYS.map(k=>metrics.current[k].length))
   const follow=datedFollowupMetrics(metrics.current,demo.callRecords,filters)
   const orders=dashboardPaymentOrders(demo.orders,selected,filters)
   const fs=detail.followupDetailSheets(follow,metrics.activity,orders,ctx)
   assert.deepEqual(fs.map(s=>s.name),['跟进用户明细'])
   checkShape(fs)
-  assert.deepEqual(flagSum(fs[0],13,7),[...CURRENT_FOLLOW_KEYS.map(k=>follow[k].length),metrics.activity.paid.length])
+  assert.deepEqual(flagSum(fs[0],12,7),[...CURRENT_FOLLOW_KEYS.map(k=>follow[k].length),metrics.activity.paid.length])
   assert.equal(fs[0].rows.reduce((n,r)=>n+val(fs[0],r,'用户实付金额合计'),0),orders.reduce((n,o)=>n+o.paidAmount,0),'user amounts sum to page money')
   const ids=new Set(selected.map(s=>s.studentId)),calls=demo.callRecords.filter(c=>ids.has(c.studentId)&&inDashboardRange(c.time,...dates))
   const cs=detail.callingDetailSheets(metrics.current,metrics.activity,calls,ctx)
   assert.deepEqual(cs.map(s=>s.name),['外呼用户明细'])
   checkShape(cs)
   const route=detail.callDetailSheet(selected,calls,ctx)
-  assert.deepEqual(flagSum(cs[0],13,5),[...CURRENT_CALL_KEYS.map(k=>metrics.current[k].length),metrics.activity.called.length,metrics.activity.connected.length])
+  assert.deepEqual(flagSum(cs[0],12,5),[...CURRENT_CALL_KEYS.map(k=>metrics.current[k].length),metrics.activity.called.length,metrics.activity.connected.length])
   const total=outboundSummary(calls)
   assert.equal(route.rows.length,total.total)
   assert.equal(route.rows.reduce((n,r)=>n+val(route,r,'接通时长（秒）'),0),total.seconds)

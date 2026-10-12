@@ -9,7 +9,7 @@ import { followReason5 } from './salesLifecycle'
 type Text = (zh: string, en: string) => string
 type Column = readonly [string, string]
 export type DetailContext = { text: Text; ownerName: (id: string) => string; calls: CallRecord[] }
-const common: Column[] = [['用户 ID','User ID'],['姓名','Name'],['业务线','Business line'],['用户类型','User type'],['当前 CC','Current CC'],['当前 CC 账号','Current CC account'],['注册时间','Registration time'],['注册日期','Registration date'],['用户状态','User status']]
+const common: Column[] = [['用户 ID','User ID'],['姓名','Name'],['业务线','Business line'],['用户类型','User type'],['当前 CC 账号','Current CC account'],['注册时间','Registration time'],['注册日期','Registration date'],['用户状态','User status']]
 const state: Column[] = [['当前销售阶段','Current sales stage'],['跟进进度','Follow-up progress'],['最近跟进时间','Latest follow-up time'],['最近跟进备注','Latest follow-up note']]
 const money: Column[] = [['有效已支付订单数','Valid paid orders'],['币种','Currency'],['用户实付金额合计','User amount paid']]
 const flags = (names: Column[]): Column[] => names.map(([zh,en])=>[`${zh}（0/1）`,`${en} (0/1)`])
@@ -34,7 +34,7 @@ const sheet = (key: DetailSchema, rows: unknown[][], ctx: DetailContext) => ({na
 const time = (value?: string) => value && dayjs.utc(value).isValid() ? dashboardTimestamp(value) : ''
 const date = (value?: string) => value && dayjs.utc(value).isValid() ? dashboardDate(value) : ''
 const firstLast = (values: (string | undefined)[]) => { const sorted=values.filter((v):v is string=>!!v&&dayjs.utc(v).isValid()).sort((a,b)=>dayjs.utc(a).valueOf()-dayjs.utc(b).valueOf());return [time(sorted[0]),time(sorted[sorted.length-1])] }
-const user = (s: Student, ctx: DetailContext) => [s.studentId,s.name,s.businessLine,s.userType,ctx.ownerName(s.salesOwner||'__unassigned__'),s.salesOwner||'',time(s.registerTime),date(s.registerTime),s.status]
+const user = (s: Student, ctx: DetailContext) => [s.studentId,s.name,s.businessLine,s.userType,s.salesOwner||'',time(s.registerTime),date(s.registerTime),s.status]
 const stateValues = (s: Student, ctx: DetailContext) => [currentFollowStage(s,ctx.calls),s.salesProgress||'',time(s.salesUpdatedAt),s.salesLatestNote||'']
 const metricValues = (s: Student, metrics: PeopleMetrics, keys: readonly string[]) => keys.map(k=>Number((metrics[k]||[]).some(p=>p.studentId===s.studentId)))
 const peopleFor = (metrics: PeopleMetrics, keys: readonly string[]) => uniquePeople(keys.flatMap(k=>metrics[k]||[]))
