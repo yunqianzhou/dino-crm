@@ -21,7 +21,7 @@ export default function DashboardConversion43({ population,calls,lessons,orders,
  const evidence = (id:string,time?:string) => { const s = metrics.leads.find(s => s.studentId===id); return !!s && !!time && dayjs.utc(time).isValid() && dayjs.utc(time).valueOf() >= dayjs.utc(s.registerTime).valueOf() && dayjs.utc(time).valueOf() <= Date.now() }
  const paidOrders = dashboardPaymentOrders(orders,metrics.leads,{...filters,start:'',end:''}).filter(o=>evidence(o.studentId,o.paidTime))
  const context = `${text('注册日期','Registration dates')}: ${rangeLabel}`
- const exportButton = <Export43 name="conversion-details" disabled={!metrics.leads.length} scope={[[text('注册日期范围','Registration dates'),rangeLabel],[text('一级分组','First grouping'),dimension(primary)],[text('二级分组','Second grouping'),secondary?dimension(primary==='cc'?'date':'cc'):text('不再细分','No subgroup')]]} sheets={() => conversionDetailSheets(metrics,calls,lessons,paidOrders,{text,ownerName,calls})} />
+ const exportButton = <Export43 name="conversion-details" includeScope={false} disabled={!metrics.leads.length} scope={[[text('注册日期范围','Registration dates'),rangeLabel],[text('一级分组','First grouping'),dimension(primary)],[text('二级分组','Second grouping'),secondary?dimension(primary==='cc'?'date':'cc'):text('不再细分','No subgroup')]]} sheets={() => conversionDetailSheets(metrics,calls,lessons,paidOrders,{text,ownerName,calls})} />
  return <>
  <Card className="dashboard-funnel-card" title={text('注册批次转化漏斗','Registration cohort funnel')}>
   <div className="dashboard-funnel-meta"><Tag color="blue">{context}</Tag><span>{text('截至当前 · 各环节按用户去重','As of now · unique users at each step')}</span></div>

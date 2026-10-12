@@ -60,7 +60,7 @@ export function MetricTable43({ rows, total, keys, firstTitle, context, conversi
  ]} summary={() => <Table.Summary fixed="top"><Table.Summary.Row><Table.Summary.Cell index={0}>{text('合计（去重）','Total (unique users)')}</Table.Summary.Cell>{keys.map((key,i) => <Table.Summary.Cell index={i+1} key={key}>{numeric(total,key)}</Table.Summary.Cell>)}{conversion && <Table.Summary.Cell index={keys.length+1}>{rateText(l2s(total))}</Table.Summary.Cell>}{orders && <Table.Summary.Cell index={keys.length+1+(conversion?1:0)}><DashboardMoneyCell orders={rowOrders(total)} /></Table.Summary.Cell>}</Table.Summary.Row></Table.Summary>} />
 }
 export type ExportSheet43 = { name: string; headers: string[]; rows: unknown[][] }
-export function Export43({ name, sheets, disabled = false, scope: scopeRows = [] }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean; scope?: unknown[][] }) {
+export function Export43({ name, sheets, disabled = false, scope: scopeRows = [], includeScope = true }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean; scope?: unknown[][]; includeScope?: boolean }) {
  const { text, can } = useDashboard43()
  const [query] = useSearchParams()
  const { allowedLines } = usePerm()
@@ -90,7 +90,7 @@ export function Export43({ name, sheets, disabled = false, scope: scopeRows = []
    [text('下载范围','Export range'),text('当前权限与筛选范围内的全部用户和业务记录，不受分页、展开或排序截断','All matching users and business records within permissions, independent of pagination, expansion and sorting')],
    [text('合计核对','Reconciliation'),text('用户指标 0/1 求和核对人数；业务记录按用户 ID 去重核对人数，订单实付金额求和核对金额；禁止跨明细表直接联表累加','Sum user 0/1 flags for counts; deduplicate record users for people counts and sum order amounts for revenue; never multiply totals by joining detail sheets')],
   ]
-  const allSheets = [...sheets(),{name:text('筛选条件','Filters'),headers:[text('项目','Item'),text('内容','Value')],rows:businessRows}]
+  const allSheets = [...sheets(),...(includeScope?[{name:text('筛选条件','Filters'),headers:[text('项目','Item'),text('内容','Value')],rows:businessRows}]:[])]
   allSheets.forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(header => ({wch:/时间|time|until/i.test(header)?32:/备注|note|内容|value/i.test(header)?48:/ID|账号|account/i.test(header)?30:26})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
   XLSX.writeFile(workbook,`${name}.xlsx`)
  }}>{text('下载明细','Download details')}</Button>

@@ -23,6 +23,7 @@ try {
   const people=demo.students.filter(s=>s.businessLine===businessLine),selected=scopedPeople(people,filters)
   const funnel=cohortFunnel(people,demo.callRecords,demo.lessons,demo.orders,filters)
   const exports=detail.conversionDetailSheets(funnel,demo.callRecords,demo.lessons,demo.orders,ctx)
+  assert.deepEqual(exports.map(s=>s.name),['转化用户明细'],'conversion exports only user details')
   checkShape(exports)
   assert.deepEqual(flagSum(exports[0],9,6),FUNNEL_KEYS.map(k=>funnel[k].length),'conversion user flags equal six page counts')
   assert.equal(exports[0].rows.length,new Set(exports[0].rows.map(r=>r[0])).size,'one row per user')
