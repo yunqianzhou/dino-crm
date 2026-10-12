@@ -63,13 +63,12 @@ export function conversionDetailSheets(metrics: PeopleMetrics, calls: CallRecord
 export const inventoryDetailSheet = (metrics: PeopleMetrics, ctx: DetailContext) => sheet('inventory',peopleFor(metrics,CURRENT_INVENTORY_KEYS).map(s=>[...user(s,ctx),...stateValues(s,ctx),...metricValues(s,metrics,CURRENT_INVENTORY_KEYS)]),ctx)
 export function callingDetailSheets(current: PeopleMetrics, activity: PeopleMetrics, calls: CallRecord[], ctx: DetailContext) {
  const keys=[...CURRENT_CALL_KEYS,'called','connected'], metrics={...current,...activity}, people=peopleFor(metrics,keys), valid=uniqueCalls(calls).filter(isCompletedCall);
- return [sheet('calling',people.map(s=>{const cs=valid.filter(c=>c.studentId===s.studentId);return [...user(s,ctx),...stateValues(s,ctx),...metricValues(s,metrics,keys),...firstLast(cs.map(c=>c.time)),...firstLast(cs.filter(c=>c.result==='已接通').map(c=>c.time))]}),ctx),callDetailSheet(people,valid,ctx)]
+ return [sheet('calling',people.map(s=>{const cs=valid.filter(c=>c.studentId===s.studentId);return [...user(s,ctx),...stateValues(s,ctx),...metricValues(s,metrics,keys),...firstLast(cs.map(c=>c.time)),...firstLast(cs.filter(c=>c.result==='已接通').map(c=>c.time))]}),ctx)]
 }
 export function followupDetailSheets(current: PeopleMetrics, activity: PeopleMetrics, orders: Order[], ctx: DetailContext) {
  const keys=[...CURRENT_FOLLOW_KEYS,'paid'], metrics={...current,paid:activity.paid}, people=peopleFor(metrics,keys);
- const appointments:{student:Student;appointment:SalesAppointment}[]=[];
- const rows=people.map(s=>{const matchingState=CURRENT_FOLLOW_KEYS.find(k=>(current[k]||[]).some(p=>p.studentId===s.studentId));const evidence=matchingState?followupStateEvidence(s,ctx.calls,matchingState):undefined;const a=s.salesAppointments?.find(a=>a.appointmentId===evidence?.appointmentId);if(a)appointments.push({student:s,appointment:a});const paid=orders.filter(o=>o.studentId===s.studentId);return [...user(s,ctx),...stateValues(s,ctx),...metricValues(s,metrics,keys),...(evidence?[matchingState==='已接通待预约'?ctx.text('当前状态','Current status'):ctx.text('所选期间','Selected period'),matchingState==='已接通待预约'?'':date(evidence.time),time(evidence.time),evidence.source,evidence.appointmentId]:['','','','','']),...firstLast(paid.map(o=>o.paidTime)),...userMoney(paid)]});
- return [sheet('followup',rows,ctx),appointmentDetailSheet(appointments,ctx),orderDetailSheet(people,orders,ctx)]
+ const rows=people.map(s=>{const matchingState=CURRENT_FOLLOW_KEYS.find(k=>(current[k]||[]).some(p=>p.studentId===s.studentId));const evidence=matchingState?followupStateEvidence(s,ctx.calls,matchingState):undefined;const paid=orders.filter(o=>o.studentId===s.studentId);return [...user(s,ctx),...stateValues(s,ctx),...metricValues(s,metrics,keys),...(evidence?[matchingState==='已接通待预约'?ctx.text('当前状态','Current status'):ctx.text('所选期间','Selected period'),matchingState==='已接通待预约'?'':date(evidence.time),time(evidence.time),evidence.source,evidence.appointmentId]:['','','','','']),...firstLast(paid.map(o=>o.paidTime)),...userMoney(paid)]});
+ return [sheet('followup',rows,ctx)]
 }
 export function reasonDetailSheet(people: Student[], metric:'已拒绝'|'已关闭', reasonLabel:(reason:string)=>string, ctx: DetailContext) {
  return sheet('reasons',outcomeReasonGroups(people).flatMap(group=>group.users.map(s=>{

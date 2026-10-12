@@ -55,11 +55,11 @@ Money/AOV sorting uses unrounded recorded values within a single known currency.
 
 ## Display-only metrics and detail downloads
 
-Numbers remain display-only. Only the lower conversion-details section has a conversion download button. Conversion downloads only one sheet, 转化用户明细, with one row per user; it does not append Filters or event sheets. Other entries download their contributing users and business records, with user IDs, current CC, registration timestamps, business-record IDs and event timestamps. User sheets contain numeric 0/1 membership flags; event sheets retain every qualifying record. There are no aggregate, parent or child rows in exports. Grouping, sorting, pagination and expansion do not truncate details.
+Numbers remain display-only. Only the lower conversion-details section has a conversion download button. Every download contains only its original first detail sheet, with its name, columns and values preserved. No additional business-record or Filters sheets are appended. Conversion contains 转化用户明细, one row per user. Each entry downloads its contributing users or business records, with user IDs, current CC, registration timestamps, business-record IDs and event timestamps. User sheets contain numeric 0/1 membership flags; event sheets retain every qualifying record. There are no aggregate, parent or child rows in exports. Grouping, sorting, pagination and expansion do not truncate details.
 
-Times use the browser timezone, with UTC offsets on timestamps and an IANA timezone in Filters. Missing source times stay blank, never inferred from registration or last update. Waiting remains a current snapshot regardless of the selected dates; its business date stays blank. Other follow-up states retain their selected-period business dates. IDs are strings. Orders retain original currency and amounts; cross-currency user totals stay blank. Permissions are unchanged.
+Times use the browser timezone, with UTC offsets on timestamps. Missing source times stay blank, never inferred from registration or last update. Waiting remains a current snapshot regardless of the selected dates; its business date stays blank. Other follow-up states retain their selected-period business dates. IDs are strings. Orders retain original currency and amounts; cross-currency user totals stay blank. Permissions are unchanged.
 
-Reconcile flags to page counts, deduplicate event user IDs for people counts, and sum only order amounts per currency for revenue. Recompute AOV, per-payer amounts and L2S. Never join multiple event tables and then sum duplicated amounts.
+Reconcile flags to page counts, deduplicate event user IDs for people counts, and sum user paid totals for conversion/follow-up or order amounts for payments, within each currency. Recompute AOV, per-payer amounts and L2S. Never join multiple event tables and then sum duplicated amounts.
 
 ## Verification
 
@@ -71,14 +71,14 @@ A one-time additive fixture update provides 96 additional Vietnamese users and 1
 
 ## Download column templates
 
-All entries except conversion append Filters (项目、内容). The public blank template is `public/templates/dashboard-download-headers.xlsx`.
+Every entry exports exactly one detail sheet. No Filters (筛选条件) or additional sheets are appended. The public blank template is `public/templates/dashboard-download-headers.xlsx`.
 
 | Entry/file | Detail sheets |
 | --- | --- |
 | conversion-details.xlsx | 转化用户明细（唯一工作表） |
 | followup-current.xlsx | 当前线索用户明细 |
-| followup-calls.xlsx | 外呼用户明细、通话记录明细 |
-| followup-followup.xlsx | 跟进用户明细、预约记录明细、支付订单明细 |
+| followup-calls.xlsx | 外呼用户明细 |
+| followup-followup.xlsx | 跟进用户明细 |
 | payments.xlsx | 支付订单明细 |
 | rejection-reasons.xlsx / closure-reasons.xlsx | 原因用户明细 |
 | calling-routes.xlsx | 通话记录明细 |
@@ -102,10 +102,6 @@ All entries except conversion append Filters (项目、内容). The public blank
 ### 通话记录明细
 
 用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、通话 ID、外呼系统、第三方通话 ID、线路 ID、线路名称、坐席、操作人、起呼时间、通话日期、接通时间、结束时间、通话状态、通话结果、接通时长（秒）、结束原因、同步时间、通话备注。
-
-### 预约记录明细
-
-用户 ID、姓名、业务线、用户类型、当前 CC、当前 CC 账号、注册时间、注册日期、用户状态、预约 ID、预约创建时间、预约上课时间、预约上课日期、预约状态、出勤状态、咨询状态、原因、预约备注、创建人、更新时间、更新人。
 
 ### 支付订单明细
 

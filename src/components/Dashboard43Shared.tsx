@@ -1,16 +1,12 @@
-import { dashboardTimeZone, dashboardTimestamp } from '../dashboardTime'
-import { salesBusinessLineOptions } from '../channel'
 import { useState } from 'react'
-import dayjs from 'dayjs'
 import { Button, Empty, Select, Table } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
-import { useSearchParams } from 'react-router-dom'
 import * as XLSX from 'xlsx'
 import { useI18n } from '../i18n'
 import { usePerm } from '../perm'
 import { useStore } from '../store'
 import type { Order, Student } from '../types'
-import { inDashboardRange, dashboardSelectedLines } from '../dashboardData'
+import { inDashboardRange } from '../dashboardData'
 import { dashboardNumberCompare } from '../dashboardSort'
 import { l2s, type PeopleMetrics } from '../dashboard43'
 import DashboardMoneyCell from './DashboardMoneyCell'
@@ -60,38 +56,16 @@ export function MetricTable43({ rows, total, keys, firstTitle, context, conversi
  ]} summary={() => <Table.Summary fixed="top"><Table.Summary.Row><Table.Summary.Cell index={0}>{text('合计（去重）','Total (unique users)')}</Table.Summary.Cell>{keys.map((key,i) => <Table.Summary.Cell index={i+1} key={key}>{numeric(total,key)}</Table.Summary.Cell>)}{conversion && <Table.Summary.Cell index={keys.length+1}>{rateText(l2s(total))}</Table.Summary.Cell>}{orders && <Table.Summary.Cell index={keys.length+1+(conversion?1:0)}><DashboardMoneyCell orders={rowOrders(total)} /></Table.Summary.Cell>}</Table.Summary.Row></Table.Summary>} />
 }
 export type ExportSheet43 = { name: string; headers: string[]; rows: unknown[][] }
-export function Export43({ name, sheets, disabled = false, scope: scopeRows = [], includeScope = true }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean; scope?: unknown[][]; includeScope?: boolean }) {
+export function Export43({ name, sheets, disabled = false }: { name: string; sheets: () => ExportSheet43[]; disabled?:boolean; scope?: unknown[][] }) {
  const { text, can } = useDashboard43()
- const [query] = useSearchParams()
- const { allowedLines } = usePerm()
- const channels = useStore(s => s.channels)
- const students = useStore(s => s.students)
- const snapshotAt = dayjs.utc().toISOString()
- const accounts = useStore(s => s.accounts)
- const selectedCC = query.getAll('cc').filter(Boolean)
- const scope = allowedLines()
- const permittedLines = salesBusinessLineOptions(channels, students).filter(line => scope === null || scope.includes(line))
- const selectedLines = dashboardSelectedLines(query.getAll('line'), permittedLines)
- const exportLines = permittedLines.filter(line => selectedLines.includes(line))
  if (can('managementDashboard_export') !== 'operate') return null
  return <Button size="small" icon={<DownloadOutlined />} disabled={disabled} onClick={() => {
+  const first = sheets()[0]
+  if (!first) return
   const workbook = XLSX.utils.book_new()
-  const businessRows = [
-   [text('下载模块','Module'),name],
-   [text('所选业务线','Selected business line'),selectedLines.join(', ') || text('无','None')],
-   [text('授权范围内的业务线','Permitted business line'),exportLines.join(', ') || text('无','None')],
-   [text('已选 CC','Selected CC'),selectedCC.length?selectedCC.map(id=>id==='__unassigned__'?text('未分配','Unassigned'):(accounts.find(a=>a.email===id)?.name||id)).join(', '):text('全部授权范围','All permitted CCs')],
-   [text('CC 账号','CC accounts'),selectedCC.join(', ') || text('全部授权范围','All permitted CCs')],
-   ...scopeRows,
-   [text('用户范围','User scope'),text('正式用户；当前账号可见范围','Formal users visible to the current account')],
-   [text('统计时区','Reporting timezone'),dashboardTimeZone()],
-   [text('页面统计时间','Page calculated time'),dashboardTimestamp(snapshotAt)],
-   [text('导出时间','Exported time'),dashboardTimestamp(dayjs.utc().toISOString())],
-   [text('下载范围','Export range'),text('当前权限与筛选范围内的全部用户和业务记录，不受分页、展开或排序截断','All matching users and business records within permissions, independent of pagination, expansion and sorting')],
-   [text('合计核对','Reconciliation'),text('用户指标 0/1 求和核对人数；业务记录按用户 ID 去重核对人数，订单实付金额求和核对金额；禁止跨明细表直接联表累加','Sum user 0/1 flags for counts; deduplicate record users for people counts and sum order amounts for revenue; never multiply totals by joining detail sheets')],
-  ]
-  const allSheets = [...sheets(),...(includeScope?[{name:text('筛选条件','Filters'),headers:[text('项目','Item'),text('内容','Value')],rows:businessRows}]:[])]
-  allSheets.forEach(sheet => { const ws = XLSX.utils.aoa_to_sheet([sheet.headers,...sheet.rows]); ws['!cols'] = sheet.headers.map(header => ({wch:/时间|time|until/i.test(header)?32:/备注|note|内容|value/i.test(header)?48:/ID|账号|account/i.test(header)?30:26})); XLSX.utils.book_append_sheet(workbook,ws,sheet.name.slice(0,31)) })
+  const ws = XLSX.utils.aoa_to_sheet([first.headers,...first.rows])
+  ws['!cols'] = first.headers.map(header => ({wch:/时间|time|until/i.test(header)?32:/备注|note|内容|value/i.test(header)?48:/ID|账号|account/i.test(header)?30:26}))
+  XLSX.utils.book_append_sheet(workbook,ws,first.name.slice(0,31))
   XLSX.writeFile(workbook,`${name}.xlsx`)
  }}>{text('下载明细','Download details')}</Button>
 }
