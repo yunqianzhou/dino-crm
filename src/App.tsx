@@ -21,6 +21,7 @@ import CoursePackagePage from './pages/CoursePackage'
 import CouponPage from './pages/Coupon'
 import LandingPageManagement from './pages/LandingPage'
 import SystemConfig from './pages/SystemConfig'
+import SystemConfig6 from './pages/SystemConfig6'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const session = useSession()
@@ -82,6 +83,8 @@ export default function App() {
         >
           <Route index element={<HomeRedirect />} />
           <Route path="users-v5" element={<Guard module="usersV2"><UserCenter phase3 phase5 /></Guard>} />
+          <Route path="system-v6" element={<Guard module="system"><SystemConfig6 /></Guard>} />
+          <Route path="sales-v6" element={<Guard module="salesV3"><SalesCenterP3 phase5 phase6 /></Guard>} />
           <Route path="system-v5" element={<Guard module="system"><SystemConfig phase5 /></Guard>} />
           <Route path="users-v5/:studentId" element={<Guard module="usersV2"><UserDetail backPath="/users-v5" /></Guard>} />
           <Route path="sales-v5" element={<Guard module="salesV3"><SalesCenterP3 phase5 /></Guard>} />

@@ -1,3 +1,5 @@
+import AssignmentSettings6 from './AssignmentSettings6'
+import { usePerm6 } from '../perm6'
 import OutboundDialModal from '../components/OutboundDialModal'
 import OutboundCallDetails from '../components/OutboundCallDetails'
 import { isCompletedCall, providerName, callResultName, uniqueCalls, upsertCall, structuredCallHeaders, structuredCallRow } from '../outbound'
@@ -92,7 +94,7 @@ const PROGRESS_COLOR: Record<string, string> = {
 
 function isPaidStudent(student: Student) { return student.status === '付费' || student.paymentStatusStr === '已付费' }
 
-export default function SalesCenter({ importAction, detailPath, phase3 = false, phase5 = false }: { importAction?: ReactNode; detailPath?: string; phase3?: boolean; phase5?: boolean }) {
+export default function SalesCenter({ importAction, detailPath, phase3 = false, phase5 = false, phase6 = false }: { importAction?: ReactNode; detailPath?: string; phase3?: boolean; phase5?: boolean; phase6?: boolean }) {
   const { t, lang } = useI18n()
   const text = (zh: string, en: string) => lang === 'zh' ? zh : en
   const navigate = useNavigate()
@@ -118,7 +120,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const canDial = can(phase3 ? 'salesV3_dial' : 'sales_dial') === 'operate'
   const canReassign = can(phase3 ? 'salesV3_reassign' : 'sales_reassign') === 'operate'
   const canViewReport = phase3 && can('salesV3_view_report') === 'operate'
-  const canManageSettings = can(phase3 ? 'salesV3_config' : 'sales_config') === 'operate'
+  const settingsPerm6 = usePerm6()
+  const canManageSettings = phase6 ? ['salesV3_config', 'salesV6_config_line', 'salesV6_config_members'].some(key => settingsPerm6.can(key as 'salesV3_config' | 'salesV6_config_line' | 'salesV6_config_members') === 'operate') : can(phase3 ? 'salesV3_config' : 'sales_config') === 'operate'
   // 全业务线（超管）或拥有重新分配权限的主管可见范围内全部领取记录
   const seeAllOwners = allowedLines() === null || canReassign
   const dashboardRows = dashboardScope ? dashboardSalesRows(students, dashboardScope, allowedLines(), seeAllOwners, actor, channels) : undefined
@@ -187,7 +190,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
   const [trialLevelStudent, setTrialLevelStudent] = useState<Student | null>(null)
   const [consulting, setConsulting] = useState<Student | null>(null)
   const [reassignTo, setReassignTo] = useState<string | undefined>()
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(phase6 && canManageSettings)
   const [form] = Form.useForm()
   const [dropForm] = Form.useForm()
   const [trialLevelForm] = Form.useForm()
@@ -1114,7 +1117,7 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
     <Card
       className="page-card"
       bordered={false}
-      title={<span className="section-title">{phase5 ? '销售线索' : t('sales.title')}</span>}
+      title={<span className="section-title">{phase6 ? '销售线索 · 六期' : phase5 ? '销售线索' : t('sales.title')}</span>}
       extra={
         canManageSettings && (
           <Button icon={<SettingOutlined />} onClick={() => setSettingsOpen(true)}>
@@ -1335,7 +1338,8 @@ export default function SalesCenter({ importAction, detailPath, phase3 = false, 
         </Form>
       </Modal>
 
-      {settingsOpen && (
+      {settingsOpen && phase6 && <AssignmentSettings6 open onCancel={() => setSettingsOpen(false)} configurableLines={allowedLines() === null ? lineOptions : allowedLines()!} />}
+      {settingsOpen && !phase6 && (
         <Modal_Settings
           t={t}
           open={settingsOpen}

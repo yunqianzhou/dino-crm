@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Layout, Menu, Avatar, Dropdown, Modal, Typography, Button, Tag } from 'antd'
 import {
   ApartmentOutlined,
@@ -31,6 +31,8 @@ const { Header, Sider, Content } = Layout
 const { Text } = Typography
 
 const NAV_MODULE: Record<string, ModuleKey> = {
+  '/system-v6': 'system',
+  '/sales-v6': 'salesV3',
   '/system-v5': 'system',
   '/users-v5': 'usersV2',
   '/sales-v5': 'salesV3',
@@ -57,12 +59,19 @@ const NAV_MODULE: Record<string, ModuleKey> = {
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false)
-  const [openKeys, setOpenKeys] = useState<string[]>([])
+  const [openKeys, setOpenKeys] = useState<string[]>(['developing', 'designing'])
   const navigate = useNavigate()
   const location = useLocation()
   // 取一级路径，保证子路由（如 /users-v2/:id 详情页）也能高亮菜单并显示标题
   const basePath = `/${location.pathname.split('/')[1] ?? ''}`
   const selectedPath = location.pathname.startsWith('/marketing-center/') || location.pathname.startsWith('/marketing-backup/') ? location.pathname : basePath
+  useEffect(() => {
+    const group = basePath.endsWith('-v6') ? 'designing'
+      : basePath.endsWith('-v5') || basePath === '/management-dashboard' ? 'developing' : 'archived'
+    const parent = location.pathname.startsWith('/marketing-center/') ? 'marketing-v2'
+      : ['/channels', '/landing', '/packages', '/coupons', '/marketing-backup'].includes(basePath) ? 'marketing-backup' : null
+    setOpenKeys(keys => [...new Set([...keys, group, ...(parent ? [parent] : [])])])
+  }, [location.pathname, basePath, collapsed])
   const session = useSession()
   const { t, lang, setLang } = useI18n()
   const { can } = usePerm()
@@ -80,7 +89,7 @@ export default function AppLayout() {
   )
   const phase2Label = (text: string) => phaseLabel(text, t('app.phase2'), 'orange')
   const phase3Label = (text: string) => phaseLabel(text, t('app.phase3'), 'purple')
-  const phase4Label = (text: string) => phaseLabel(text, '四期', 'cyan')
+  const phase4Label = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 4' : '四期', 'cyan')
   const dashboardPhaseLabel = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'geekblue')
 
   const appABPhaseLabel = (text: string) => phaseLabel(text, lang === 'en' ? 'Phase 5' : '五期', 'geekblue')
@@ -137,7 +146,7 @@ export default function AppLayout() {
     { key: '/system-v5', icon: <SafetyOutlined />, label: appABPhaseLabel(t('app.nav.system')) },
   ].filter(item => visible(item.key))
 
-  const NAV = [
+  const archivedNav = [
     ...topNav,
     ...salesNav,
     ...systemNav,
@@ -155,12 +164,25 @@ export default function AppLayout() {
           },
         ]
       : []),
-    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: dashboardPhaseLabel(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
     ...(visible('/app-ab-test') ? [{ key: '/app-ab-test', icon: <ExperimentOutlined />, label: appABPhaseLabel(lang === 'en' ? 'APP A/B test' : 'APP A/B test配置') }] : []),
+  ]
+  const developingNav = [
+    ...(visible('/management-dashboard') ? [{ key: '/management-dashboard', icon: <DashboardOutlined />, label: dashboardPhaseLabel(lang === 'en' ? 'Management Dashboard' : '管理看板') }] : []),
     ...phase5Nav,
+  ]
+  const designingNav = [
+    { key: '/system-v6', icon: <SafetyOutlined />, label: phaseLabel(t('app.nav.system'), lang === 'en' ? 'Phase 6' : '六期', 'purple') },
+    { key: '/sales-v6', icon: <SolutionOutlined />, label: phaseLabel(t('app.nav.sales'), lang === 'en' ? 'Phase 6' : '六期', 'purple') },
+  ].filter(item => visible(item.key))
+  const NAV = [
+    ...(archivedNav.length ? [{ key: 'archived', icon: <HistoryOutlined />, label: lang === 'en' ? 'Archived' : '已归档', children: archivedNav }] : []),
+    ...(developingNav.length ? [{ key: 'developing', icon: <AppstoreOutlined />, label: lang === 'en' ? 'In development' : '开发中', children: developingNav }] : []),
+    ...(designingNav.length ? [{ key: 'designing', icon: <ExperimentOutlined />, label: lang === 'en' ? 'In design' : '设计中', children: designingNav }] : []),
   ]
 
   const TITLES: Record<string, string> = {
+    '/system-v6': lang === 'en' ? 'System Configuration · Phase 6' : '系统配置 · 六期',
+    '/sales-v6': lang === 'en' ? 'Sales Center · Phase 6' : '销售中心 · 六期',
     '/system-v5': lang === 'en' ? 'System Configuration · Phase 5' : '系统配置 · 五期',
     '/users-v5': '用户中心 · 五期',
     '/sales-v5': '销售中心 · 五期',
@@ -208,8 +230,8 @@ export default function AppLayout() {
   const currentLang = LANGS.find((l) => l.value === lang)
 
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark" width={252}>
+    <Layout className="crm-shell" style={{ height: '100vh' }}>
+      <Sider breakpoint="lg" onBreakpoint={setCollapsed} collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark" width={276} style={{ overflow: 'auto' }}>
         <div
           style={{
             height: 56,
@@ -230,6 +252,7 @@ export default function AppLayout() {
         <Menu
           theme="dark"
           mode="inline"
+          inlineIndent={16}
           selectedKeys={[selectedPath]}
           openKeys={openKeys}
           onOpenChange={(keys) => setOpenKeys(keys as string[])}
@@ -239,7 +262,7 @@ export default function AppLayout() {
           }}
         />
       </Sider>
-      <Layout>
+      <Layout style={{ minWidth: 0 }}>
         <Header
           style={{
             background: '#fff',

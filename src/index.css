@@ -183,3 +183,13 @@ body {
 .phase5-summary { padding: 12px 0 16px; display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 1250px) { .phase5-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 740px) { .phase5-filter-grid { grid-template-columns: 1fr; } .phase5-filter-field.wide { grid-column: span 1; } }
+
+/* Keep grouped navigation usable in a narrow preview pane. */
+@media (max-width: 900px) {
+  .crm-shell .ant-layout-header { padding: 0 14px !important; gap: 12px; }
+  .crm-shell .ant-layout-header > .ant-typography { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 15px !important; }
+  .crm-shell .ant-layout-header > div { gap: 4px !important; }
+  .crm-shell .ant-layout-header > div > .ant-btn:first-child { display: none; }
+  .crm-shell .ant-layout-header > div > div:last-child { display: none !important; }
+  .crm-shell .ant-layout-content { margin: 12px !important; }
+}
